@@ -1,0 +1,6 @@
+{
+  "name": "@survey-service/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Angular SPA — dashboards, connections, sync status, sharing UI"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "@survey-service/connectors",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Google and Microsoft form API clients"
+}

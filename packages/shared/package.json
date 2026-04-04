@@ -1,0 +1,6 @@
+{
+  "name": "@survey-service/shared",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Pure utilities, constants, shared types without IO"
+}

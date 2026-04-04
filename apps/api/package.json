@@ -1,0 +1,6 @@
+{
+  "name": "@survey-service/api",
+  "version": "0.0.0",
+  "private": true,
+  "description": "REST/BFF — authentication, owner/share authorization, enqueue jobs to RabbitMQ"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "@survey-service/messaging",
+  "version": "0.0.0",
+  "private": true,
+  "description": "RabbitMQ topology, publishers, consumer bootstrap"
+}

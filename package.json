@@ -1,0 +1,17 @@
+{
+  "name": "survey-service",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Internal survey/form ingestion, analysis, and Angular UI (monorepo scaffold).",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "echo \"Add per-package build scripts when apps exist\"",
+    "lint": "echo \"Add lint when tooling is configured\""
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

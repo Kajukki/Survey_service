@@ -1,0 +1,6 @@
+{
+  "name": "@survey-service/db",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Migrations, schema, data access shared by api and worker"
+}

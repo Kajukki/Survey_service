@@ -1,0 +1,6 @@
+{
+  "name": "@survey-service/contracts",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DTOs, validation schemas, job payloads, OpenAPI source"
+}
