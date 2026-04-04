@@ -45,7 +45,9 @@
           @for (question of questionHighlights(); track question.id) {
             <app-question-summary-card [question]="question" />
           } @empty {
-            <section class="card widget-placeholder"><p>No question summaries in this range.</p></section>
+            <section class="card widget-placeholder">
+              <p>No question summaries in this range.</p>
+            </section>
           }
         </section>
       } @placeholder {

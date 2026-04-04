@@ -24,10 +24,10 @@ export class AppError extends Error {
     public code: ErrorCode,
     public statusCode: number,
     message: string,
-    public details?: Record<string, unknown>
+    public details?: Record<string, unknown>,
   ) {
-    super(message)
-    this.name = 'AppError'
+    super(message);
+    this.name = 'AppError';
   }
 }
 
@@ -38,13 +38,13 @@ export class ValidationError extends AppError {
   constructor(
     message: string,
     public fieldErrors: Array<{
-      field: string
-      message: string
-      code?: string
-    }>
+      field: string;
+      message: string;
+      code?: string;
+    }>,
   ) {
-    super(ErrorCode.VALIDATION_ERROR, 400, message)
-    this.name = 'ValidationError'
+    super(ErrorCode.VALIDATION_ERROR, 400, message);
+    this.name = 'ValidationError';
   }
 }
 
@@ -53,8 +53,8 @@ export class ValidationError extends AppError {
  */
 export class UnauthorizedError extends AppError {
   constructor(message: string = 'Unauthorized') {
-    super(ErrorCode.UNAUTHORIZED, 401, message)
-    this.name = 'UnauthorizedError'
+    super(ErrorCode.UNAUTHORIZED, 401, message);
+    this.name = 'UnauthorizedError';
   }
 }
 
@@ -63,8 +63,8 @@ export class UnauthorizedError extends AppError {
  */
 export class ForbiddenError extends AppError {
   constructor(message: string = 'Forbidden') {
-    super(ErrorCode.FORBIDDEN, 403, message)
-    this.name = 'ForbiddenError'
+    super(ErrorCode.FORBIDDEN, 403, message);
+    this.name = 'ForbiddenError';
   }
 }
 
@@ -73,8 +73,8 @@ export class ForbiddenError extends AppError {
  */
 export class NotFoundError extends AppError {
   constructor(resourceType: string = 'Resource') {
-    super(ErrorCode.NOT_FOUND, 404, `${resourceType} not found`)
-    this.name = 'NotFoundError'
+    super(ErrorCode.NOT_FOUND, 404, `${resourceType} not found`);
+    this.name = 'NotFoundError';
   }
 }
 
@@ -83,8 +83,8 @@ export class NotFoundError extends AppError {
  */
 export class ConflictError extends AppError {
   constructor(message: string = 'Conflict') {
-    super(ErrorCode.CONFLICT, 409, message)
-    this.name = 'ConflictError'
+    super(ErrorCode.CONFLICT, 409, message);
+    this.name = 'ConflictError';
   }
 }
 
@@ -93,20 +93,12 @@ export class ConflictError extends AppError {
  */
 export function toAppError(error: unknown, message?: string): AppError {
   if (error instanceof AppError) {
-    return error
+    return error;
   }
 
   if (error instanceof Error) {
-    return new AppError(
-      ErrorCode.INTERNAL_ERROR,
-      500,
-      message || error.message
-    )
+    return new AppError(ErrorCode.INTERNAL_ERROR, 500, message || error.message);
   }
 
-  return new AppError(
-    ErrorCode.INTERNAL_ERROR,
-    500,
-    message || 'An unexpected error occurred'
-  )
+  return new AppError(ErrorCode.INTERNAL_ERROR, 500, message || 'An unexpected error occurred');
 }

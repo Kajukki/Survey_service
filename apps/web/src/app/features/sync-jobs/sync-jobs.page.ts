@@ -45,12 +45,9 @@ export class SyncJobsPageComponent {
   private readonly apiBaseUrl = inject(API_BASE_URL);
   private readonly http = inject(HttpClient);
 
-  protected readonly jobs = httpResource<SyncJob[]>(
-    () => `${this.apiBaseUrl}/sync-jobs?limit=20`,
-    {
-      defaultValue: [],
-    },
-  );
+  protected readonly jobs = httpResource<SyncJob[]>(() => `${this.apiBaseUrl}/sync-jobs?limit=20`, {
+    defaultValue: [],
+  });
 
   protected triggerManualSync(): void {
     this.http.post(`${this.apiBaseUrl}/sync-jobs`, {}).subscribe({

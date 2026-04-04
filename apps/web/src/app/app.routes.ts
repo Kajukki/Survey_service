@@ -26,14 +26,11 @@ export const appRoutes: Routes = [
       {
         path: 'connections',
         loadChildren: () =>
-          import('./features/connections/connections.routes').then(
-            (m) => m.CONNECTIONS_ROUTES,
-          ),
+          import('./features/connections/connections.routes').then((m) => m.CONNECTIONS_ROUTES),
       },
       {
         path: 'forms',
-        loadChildren: () =>
-          import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
+        loadChildren: () => import('./features/forms/forms.routes').then((m) => m.FORMS_ROUTES),
       },
       {
         path: 'sync-jobs',

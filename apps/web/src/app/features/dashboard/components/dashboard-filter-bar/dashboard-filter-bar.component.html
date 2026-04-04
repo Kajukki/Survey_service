@@ -21,11 +21,7 @@
 
   <label>
     Granularity
-    <select
-      [ngModel]="granularity()"
-      (ngModelChange)="granularity.set($event)"
-      name="granularity"
-    >
+    <select [ngModel]="granularity()" (ngModelChange)="granularity.set($event)" name="granularity">
       <option value="day">Daily</option>
       <option value="week">Weekly</option>
       <option value="month">Monthly</option>

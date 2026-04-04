@@ -12,7 +12,9 @@ import { DashboardSeriesPoint } from '../../../../shared/models/domain.models';
 export class ResponsesTrendChartComponent {
   readonly data = input.required<DashboardSeriesPoint[]>();
 
-  protected readonly maxValue = computed(() => Math.max(...this.data().map((point) => point.count), 1));
+  protected readonly maxValue = computed(() =>
+    Math.max(...this.data().map((point) => point.count), 1),
+  );
 
   protected readonly summary = computed(() => {
     const points = this.data();

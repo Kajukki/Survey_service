@@ -1,8 +1,8 @@
 /**
  * Authorization policy for resource ownership and sharing.
  */
-import type { Principal } from '../server/types'
-import { ForbiddenError } from '../server/errors'
+import type { Principal } from '../server/types';
+import { ForbiddenError } from '../server/errors';
 
 /**
  * Resource access level.
@@ -18,7 +18,7 @@ export enum AccessLevel {
  * Check if principal owns a resource.
  */
 export function isOwner(principal: Principal, ownerId: string): boolean {
-  return principal.userId === ownerId
+  return principal.userId === ownerId;
 }
 
 /**
@@ -26,21 +26,21 @@ export function isOwner(principal: Principal, ownerId: string): boolean {
  * Actual share permission checking happens in repository via DB query.
  */
 export function canRead(principal: Principal, ownerId: string): boolean {
-  return isOwner(principal, ownerId)
+  return isOwner(principal, ownerId);
 }
 
 /**
  * Check if principal can write/edit (owner only for now).
  */
 export function canEdit(principal: Principal, ownerId: string): boolean {
-  return isOwner(principal, ownerId)
+  return isOwner(principal, ownerId);
 }
 
 /**
  * Check if principal can manage sharing (owner only).
  */
 export function canShare(principal: Principal, ownerId: string): boolean {
-  return isOwner(principal, ownerId)
+  return isOwner(principal, ownerId);
 }
 
 /**
@@ -50,31 +50,29 @@ export function enforceAccess(
   principal: Principal,
   ownerId: string,
   accessLevel: AccessLevel,
-  resourceType: string = 'Resource'
+  resourceType: string = 'Resource',
 ): void {
   switch (accessLevel) {
     case AccessLevel.READ:
       if (!canRead(principal, ownerId)) {
-        throw new ForbiddenError(`You do not have read access to this ${resourceType}`)
+        throw new ForbiddenError(`You do not have read access to this ${resourceType}`);
       }
-      break
+      break;
 
     case AccessLevel.WRITE:
       if (!canEdit(principal, ownerId)) {
-        throw new ForbiddenError(`You do not have write access to this ${resourceType}`)
+        throw new ForbiddenError(`You do not have write access to this ${resourceType}`);
       }
-      break
+      break;
 
     case AccessLevel.ADMIN:
       if (!canShare(principal, ownerId)) {
-        throw new ForbiddenError(
-          `You do not have admin access to this ${resourceType}`
-        )
+        throw new ForbiddenError(`You do not have admin access to this ${resourceType}`);
       }
-      break
+      break;
 
     case AccessLevel.NONE:
-      throw new ForbiddenError(`Access denied to ${resourceType}`)
+      throw new ForbiddenError(`Access denied to ${resourceType}`);
   }
 }
 
@@ -84,9 +82,9 @@ export function enforceAccess(
  * Actual share checking must happen in the query builder.
  */
 export function visibilityPredicate(principal: Principal): {
-  ownerId: string
+  ownerId: string;
 } {
   return {
     ownerId: principal.userId,
-  }
+  };
 }

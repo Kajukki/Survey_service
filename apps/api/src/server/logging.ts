@@ -1,14 +1,14 @@
 /**
  * Structured logging setup using Pino.
  */
-import pino, { Logger } from 'pino'
-import type { Config } from './config'
+import pino, { Logger } from 'pino';
+import type { Config } from './config';
 
 /**
  * Create a logger instance configured with the appropriate level and transport.
  */
 export function createLogger(config: Config): Logger {
-  const isDevelopment = config.NODE_ENV === 'development'
+  const isDevelopment = config.NODE_ENV === 'development';
 
   return pino(
     {
@@ -27,16 +27,13 @@ export function createLogger(config: Config): Logger {
     },
     pino.destination({
       sync: isDevelopment,
-    })
-  )
+    }),
+  );
 }
 
 /**
  * Create a child logger with additional context (e.g., request ID).
  */
-export function createChildLogger(
-  logger: Logger,
-  context: Record<string, unknown>
-): Logger {
-  return logger.child(context)
+export function createChildLogger(logger: Logger, context: Record<string, unknown>): Logger {
+  return logger.child(context);
 }

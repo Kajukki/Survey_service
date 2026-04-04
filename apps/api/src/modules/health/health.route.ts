@@ -1,22 +1,22 @@
 /**
  * Health check route for liveness and readiness probes.
  */
-import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify'
-import type { Logger } from 'pino'
-import type { Kysely } from 'kysely'
-import type { Database } from '../infra/db'
+import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
+import type { Logger } from 'pino';
+import type { Kysely } from 'kysely';
+import type { Database } from '../infra/db';
 
 /**
  * Health check response.
  */
 export interface HealthResponse {
-  status: 'ok' | 'degraded'
-  service: string
-  timestamp: string
+  status: 'ok' | 'degraded';
+  service: string;
+  timestamp: string;
   checks: {
-    database: boolean
-    rabbitmq: boolean
-  }
+    database: boolean;
+    rabbitmq: boolean;
+  };
 }
 
 /**
@@ -24,7 +24,7 @@ export interface HealthResponse {
  */
 export async function getHealth(
   request: FastifyRequest,
-  reply: FastifyReply
+  reply: FastifyReply,
 ): Promise<HealthResponse> {
   // These would be populated with actual checks
   const health: HealthResponse = {
@@ -35,9 +35,9 @@ export async function getHealth(
       database: true,
       rabbitmq: true,
     },
-  }
+  };
 
-  return reply.code(200).send(health)
+  return reply.code(200).send(health);
 }
 
 /**
@@ -46,9 +46,9 @@ export async function getHealth(
 export async function registerHealthRoutes(
   app: FastifyInstance,
   logger: Logger,
-  db: Kysely<Database>
+  db: Kysely<Database>,
 ): Promise<void> {
-  app.get('/health', getHealth)
-  
-  logger.info('Health routes registered')
+  app.get('/health', getHealth);
+
+  logger.info('Health routes registered');
 }

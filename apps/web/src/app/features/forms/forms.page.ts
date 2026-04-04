@@ -38,7 +38,9 @@ import { FormRecord } from '../../shared/models/domain.models';
               <tr>
                 <td>{{ form.title }}</td>
                 <td>{{ form.owner }}</td>
-                <td><span class="badge">{{ form.visibility }}</span></td>
+                <td>
+                  <span class="badge">{{ form.visibility }}</span>
+                </td>
                 <td>{{ form.updatedAt | date: 'mediumDate' }}</td>
               </tr>
             } @empty {

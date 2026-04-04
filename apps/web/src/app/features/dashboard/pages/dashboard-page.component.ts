@@ -9,10 +9,7 @@ import {
   DashboardFilters,
   FormRecord,
 } from '../../../shared/models/domain.models';
-import {
-  buildDashboardQueryParams,
-  parseDashboardFilters,
-} from '../data/dashboard-filters';
+import { buildDashboardQueryParams, parseDashboardFilters } from '../data/dashboard-filters';
 import { DashboardFilterBarComponent } from '../components/dashboard-filter-bar/dashboard-filter-bar.component';
 import { DashboardKpiRowComponent } from '../components/dashboard-kpi-row/dashboard-kpi-row.component';
 import { ResponsesTrendChartComponent } from '../components/responses-trend-chart/responses-trend-chart.component';
