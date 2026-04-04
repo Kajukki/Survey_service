@@ -1,0 +1,14 @@
+<article class="card question-card">
+  @let data = question();
+  <h4>{{ data.label }}</h4>
+  <p>{{ data.responses }} responses</p>
+
+  <ul>
+    @for (item of data.distribution; track item.label) {
+      <li>
+        <span>{{ item.label }}</span>
+        <strong>{{ item.value }}</strong>
+      </li>
+    }
+  </ul>
+</article>

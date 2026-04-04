@@ -1,0 +1,39 @@
+.page {
+  padding: 1rem;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.7rem;
+  border-bottom: 1px solid var(--line-color);
+}
+
+.badge {
+  border-radius: 999px;
+  border: 1px solid var(--line-color);
+  padding: 0.1rem 0.5rem;
+}
+
+button {
+  border: 0;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.8rem;
+  background: var(--accent);
+  color: #fff;
+}
+
+.error {
+  color: var(--danger);
+}

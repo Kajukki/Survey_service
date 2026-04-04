@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+  --bg-grad-start: #f7f2e8;
+  --bg-grad-end: #dce8f2;
+  --panel-bg: #ffffff;
+  --line-color: #d5d9de;
+  --text-body: #1f2933;
+  --text-muted: #5f6b7a;
+  --accent: #0f766e;
+  --accent-soft: #d9f5f2;
+  --danger: #b42318;
+  --warn: #b54708;
+  --ok: #067647;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  color: var(--text-body);
+  background:
+    radial-gradient(90rem 55rem at 0% -20%, rgb(254 240 138 / 45%) 0%, transparent 60%),
+    radial-gradient(80rem 50rem at 110% -10%, rgb(56 189 248 / 30%) 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg-grad-start), var(--bg-grad-end));
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+}
+
+p {
+  color: var(--text-muted);
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.card {
+  border: 1px solid var(--line-color);
+  background: var(--panel-bg);
+  border-radius: 1rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}

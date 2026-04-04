@@ -1,9 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
     "rootDir": "./src",
     "outDir": "./out-tsc",
-    "types": ["node"]
+    "types": []
   },
   "angularCompilerOptions": {
     "strictInjectionParameters": true,

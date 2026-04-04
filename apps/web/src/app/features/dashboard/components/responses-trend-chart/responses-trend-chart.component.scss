@@ -1,0 +1,35 @@
+.chart {
+  padding: 1rem;
+  min-height: 360px;
+}
+
+.chart header p {
+  margin: 0.3rem 0 0.8rem;
+}
+
+.bars {
+  min-height: 260px;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  align-items: end;
+}
+
+.bar-group {
+  display: grid;
+  gap: 0.4rem;
+  justify-items: center;
+}
+
+.bar {
+  width: 100%;
+  border-radius: 0.6rem 0.6rem 0.2rem 0.2rem;
+  background: linear-gradient(180deg, #14b8a6, #0f766e);
+}
+
+small {
+  font-size: 0.68rem;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  color: var(--text-muted);
+}

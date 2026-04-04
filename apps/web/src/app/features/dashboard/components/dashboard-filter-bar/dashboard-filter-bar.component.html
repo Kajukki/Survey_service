@@ -1,0 +1,36 @@
+<form class="filter-bar card" (ngSubmit)="apply()">
+  <label>
+    Form
+    <select [ngModel]="formId()" (ngModelChange)="formId.set($event)" name="formId">
+      <option value="">Choose form</option>
+      @for (form of forms(); track form.id) {
+        <option [value]="form.id">{{ form.title }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    From
+    <input type="date" [ngModel]="from()" (ngModelChange)="from.set($event)" name="from" />
+  </label>
+
+  <label>
+    To
+    <input type="date" [ngModel]="to()" (ngModelChange)="to.set($event)" name="to" />
+  </label>
+
+  <label>
+    Granularity
+    <select
+      [ngModel]="granularity()"
+      (ngModelChange)="granularity.set($event)"
+      name="granularity"
+    >
+      <option value="day">Daily</option>
+      <option value="week">Weekly</option>
+      <option value="month">Monthly</option>
+    </select>
+  </label>
+
+  <button type="submit">Apply</button>
+</form>

@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "build": "npm --workspace @survey-service/web run build && npm --workspace @survey-service/api run build && npm --workspace @survey-service/worker run build",
+    "serve": "npm --workspace @survey-service/web ng serve",
     "typecheck": "npm run typecheck:web && npm run typecheck:api && npm run typecheck:worker",
     "typecheck:web": "npm --workspace @survey-service/web run typecheck",
     "typecheck:api": "npm --workspace @survey-service/api run typecheck",

@@ -1,0 +1,75 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto 1fr;
+}
+
+.shell-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid var(--line-color);
+  background: var(--panel-bg);
+}
+
+.brand h1 {
+  margin: 0;
+  font-family: 'DM Serif Display', Georgia, serif;
+  font-size: 1.75rem;
+}
+
+.brand p {
+  margin: 0.2rem 0 0;
+  color: var(--text-muted);
+}
+
+.shell-nav {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.8rem 2rem;
+  border-bottom: 1px solid var(--line-color);
+  background: color-mix(in hsl, var(--panel-bg) 85%, white);
+  flex-wrap: wrap;
+}
+
+.shell-nav a {
+  text-decoration: none;
+  color: var(--text-muted);
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.35rem 0.8rem;
+}
+
+.shell-nav a.active {
+  color: white;
+  background: var(--accent);
+}
+
+.shell-content {
+  width: min(1280px, 100% - 2rem);
+  margin: 1rem auto 2rem;
+}
+
+.ghost {
+  border: 1px solid var(--line-color);
+  background: transparent;
+  border-radius: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  color: var(--text-body);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .shell-header {
+    padding: 1rem;
+  }
+
+  .shell-nav {
+    padding: 0.75rem 1rem;
+  }
+
+  .shell-content {
+    width: calc(100% - 1rem);
+  }
+}

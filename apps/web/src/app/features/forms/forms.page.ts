@@ -1,0 +1,71 @@
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { httpResource } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
+
+import { API_BASE_URL } from '../../core/api/api-config.token';
+import { FormRecord } from '../../shared/models/domain.models';
+
+@Component({
+  selector: 'app-forms-page',
+  standalone: true,
+  imports: [DatePipe],
+  template: `
+    <section class="card page">
+      <header class="header">
+        <div>
+          <h2>Forms</h2>
+          <p>Owned and shared forms available for analysis.</p>
+        </div>
+        <button type="button" (click)="nextPage()">Next page</button>
+      </header>
+
+      @if (forms.isLoading()) {
+        <p>Loading forms...</p>
+      } @else if (forms.error()) {
+        <p class="error">Unable to load forms.</p>
+      } @else {
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Owner</th>
+              <th>Visibility</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (form of forms.value(); track form.id) {
+              <tr>
+                <td>{{ form.title }}</td>
+                <td>{{ form.owner }}</td>
+                <td><span class="badge">{{ form.visibility }}</span></td>
+                <td>{{ form.updatedAt | date: 'mediumDate' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4">No forms found.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </section>
+  `,
+  styleUrl: './forms.page.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class FormsPageComponent {
+  private readonly apiBaseUrl = inject(API_BASE_URL);
+  private readonly page = signal(1);
+
+  protected readonly forms = httpResource<FormRecord[]>(
+    () => `${this.apiBaseUrl}/forms?page=${this.page()}&limit=20`,
+    {
+      defaultValue: [],
+    },
+  );
+
+  protected nextPage(): void {
+    this.page.update((value) => value + 1);
+  }
+}
