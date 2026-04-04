@@ -2,5 +2,24 @@
   "name": "@survey-service/db",
   "version": "0.0.0",
   "private": true,
-  "description": "Migrations, schema, data access shared by api and worker"
+  "description": "Migrations, schema, data access shared by api and worker",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": ["dist", "src", "migrations"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "typescript": "^5.8.3"
+  }
 }

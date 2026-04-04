@@ -1,0 +1,15 @@
+<section class="kpis">
+  @if (loading()) {
+    @for (skeleton of [1, 2, 3, 4]; track skeleton) {
+      <article class="card tile skeleton"></article>
+    }
+  } @else {
+    @for (kpi of kpis(); track kpi.label) {
+      <article class="card tile">
+        <p>{{ kpi.label }}</p>
+        <h3>{{ kpi.value }}</h3>
+        <span>{{ kpi.delta }}</span>
+      </article>
+    }
+  }
+</section>

@@ -28,7 +28,7 @@ Skills live under `skills/<name>/SKILL.md`. Read the relevant skill when the tas
 
 | Skill (folder) | YAML name | Purpose |
 |----------------|-----------|---------|
-| `frontend-patterns` | `angular-modern` | Angular v17+ (signals, standalone, `httpResource`, control flow, `inject()`) |
+| `frontend-patterns` | `angular-modern` | Angular v21+ (signals, standalone, `httpResource`, control flow, `inject()`) |
 | `backend-patterns` | `backend-patterns` | Node/Express/Next API routes, layering, caching, middleware |
 | `api-design` | `api-design` | REST design: resources, errors, pagination, versioning, rate limiting |
 | `postgres-patterns` | `postgres-patterns` | PostgreSQL/Supabase: schema, indexes, queries, RLS, pooling |

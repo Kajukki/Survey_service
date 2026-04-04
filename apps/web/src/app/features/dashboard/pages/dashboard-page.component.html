@@ -1,0 +1,60 @@
+<section class="dashboard-page">
+  <header class="page-header">
+    <div>
+      <h2>Dashboard</h2>
+      <p>Monitor survey health, response trends, and question distributions.</p>
+    </div>
+    <div class="header-actions">
+      <a href="/exports">Export this range</a>
+      <button type="button" (click)="refresh()">Refresh</button>
+    </div>
+  </header>
+
+  <app-dashboard-filter-bar
+    [filters]="filters()"
+    [forms]="formsResource.value()"
+    (filtersChange)="onFiltersChange($event)"
+  />
+
+  @if (!filters().formId) {
+    <section class="card empty-state">
+      <h3>Select a form to begin</h3>
+      <p>Choose a form in the filter bar to load KPI cards and analytics widgets.</p>
+    </section>
+  } @else if (dashboardResource.error()) {
+    <section class="card empty-state">
+      <h3>Dashboard failed to load</h3>
+      <p>Try refreshing. If this continues, confirm your access rights for this form.</p>
+      <button type="button" (click)="dashboardResource.reload()">Retry</button>
+    </section>
+  } @else {
+    <app-dashboard-kpi-row
+      [kpis]="dashboardResource.value().kpis"
+      [loading]="dashboardResource.isLoading()"
+    />
+
+    <section class="main-grid">
+      @defer (on viewport) {
+        <app-responses-trend-chart [data]="dashboardResource.value().series" />
+      } @placeholder {
+        <section class="card widget-placeholder"><p>Preparing trend chart...</p></section>
+      }
+
+      @defer (on viewport) {
+        <section class="questions-column">
+          @for (question of questionHighlights(); track question.id) {
+            <app-question-summary-card [question]="question" />
+          } @empty {
+            <section class="card widget-placeholder">
+              <p>No question summaries in this range.</p>
+            </section>
+          }
+        </section>
+      } @placeholder {
+        <section class="card widget-placeholder"><p>Preparing question cards...</p></section>
+      }
+    </section>
+
+    <app-responses-breakdown-table [questions]="dashboardResource.value().questions" />
+  }
+</section>

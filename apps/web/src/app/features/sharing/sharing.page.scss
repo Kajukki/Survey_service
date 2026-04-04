@@ -1,0 +1,19 @@
+.page {
+  padding: 1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  text-align: left;
+  border-bottom: 1px solid var(--line-color);
+  padding: 0.7rem;
+}
+
+.error {
+  color: var(--danger);
+}

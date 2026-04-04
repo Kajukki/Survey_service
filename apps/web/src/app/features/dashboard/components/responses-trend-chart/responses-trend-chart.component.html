@@ -1,0 +1,17 @@
+<article class="card chart">
+  <header>
+    <h3>Responses over time</h3>
+    <p>{{ summary() }}</p>
+  </header>
+
+  <div class="bars" role="img" [attr.aria-label]="summary()">
+    @for (point of data(); track point.date) {
+      <div class="bar-group">
+        <div class="bar" [style.height.%]="barHeight(point.count)"></div>
+        <small>{{ point.date }}</small>
+      </div>
+    } @empty {
+      <p>No points available.</p>
+    }
+  </div>
+</article>
