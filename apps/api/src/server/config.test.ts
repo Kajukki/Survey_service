@@ -28,7 +28,7 @@ describe('Configuration', () => {
 
     expect(config.DATABASE_URL).toBe('postgresql://localhost/test');
     expect(config.RABBITMQ_URL).toBe('amqp://localhost');
-    expect(config.NODE_ENV).toBe('development');
+    expect(config.NODE_ENV).toBe('test');
     expect(config.PORT).toBe(3000);
   });
 

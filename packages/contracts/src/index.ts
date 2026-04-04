@@ -50,7 +50,7 @@ export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>
  */
 export const PaginationQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  perPage: z.coerce.number().int().positive().max(100).default(20),
+  perPage: z.coerce.number().int().positive().transform(v => Math.min(v, 100)).default(20),
 })
 
 export const DateRangeSchema = z.object({

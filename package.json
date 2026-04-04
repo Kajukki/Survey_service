@@ -11,7 +11,6 @@
     "build": "npm run build:packages && npm run build:apps",
     "build:packages": "npm --workspace @survey-service/contracts run build && npm --workspace @survey-service/messaging run build && npm --workspace @survey-service/db run build && npm --workspace @survey-service/shared run build",
     "build:apps": "npm --workspace @survey-service/api run build && npm --workspace @survey-service/worker run build",
-    "serve": "npm --workspace @survey-service/web ng serve",
     "typecheck": "npm run typecheck:packages && npm run typecheck:apps",
     "typecheck:packages": "npm --workspace @survey-service/contracts run typecheck && npm --workspace @survey-service/messaging run typecheck && npm --workspace @survey-service/db run typecheck && npm --workspace @survey-service/shared run typecheck",
     "typecheck:apps": "npm run typecheck:web && npm run typecheck:api && npm run typecheck:worker",
@@ -39,15 +38,18 @@
     "format:check:worker": "npm --workspace @survey-service/worker run format:check"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=24.0.0"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^8.32.1",
-    "@typescript-eslint/parser": "^8.32.1",
-    "eslint": "^8.57.1",
-    "eslint-config-prettier": "^10.1.2",
-    "eslint-plugin-prettier": "^5.4.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.8.3"
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
+    "@typescript-eslint/eslint-plugin": "^8.58.0",
+    "@typescript-eslint/parser": "^8.58.0",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.0",
+    "globals": "^17.4.0",
+    "prettier": "^3.6.0",
+    "typescript": "^6.0.0"
   }
 }

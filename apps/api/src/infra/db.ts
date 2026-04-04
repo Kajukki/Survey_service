@@ -28,7 +28,7 @@ export function createDb(config: Config, logger: Logger): Kysely<Database> {
     connectionTimeoutMillis: 2000,
   });
 
-  pool.on('error', (err) => {
+  pool.on('error', (err: Error) => {
     logger.error({ err }, 'Unexpected connection pool error');
   });
 

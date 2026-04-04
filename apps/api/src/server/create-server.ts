@@ -5,7 +5,7 @@ import Fastify, { FastifyInstance } from 'fastify';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyRateLimit from '@fastify/rate-limit';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import type { Logger } from 'pino';
 import type { Kysely } from 'kysely';
 import type { Config } from './config';
@@ -35,7 +35,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     logger: false, // Use custom pino logger
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
-    genReqId: () => uuidv4(),
+    genReqId: () => randomUUID(),
   });
 
   // Register plugins
@@ -62,19 +62,32 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
   }
 
   // Add correlation ID to logger context
-  app.addHook('onRequest', async (request, reply) => {
-    request.log = context.logger.child({
-      requestId: request.id,
-      method: request.method,
-      url: request.url,
-    });
+  app.addHook('onRequest', async (request) => {
+    context.logger.debug(
+      {
+        requestId: request.id,
+        method: request.method,
+        url: request.url,
+      },
+      'Incoming request',
+    );
   });
 
   // Register route modules
-  await registerHealthRoutes(app, context.logger, context.db);
+  // Infrastructure routes (probes/metrics)
+  await registerHealthRoutes(app, context.logger, context.db, context.rabbitmq);
+
+  // Business logic routes prefixed with /api
+  app.register(
+    async (_api) => {
+      // Add domain modules here
+      // e.g. await registerFormsRoutes(_api, context);
+    },
+    { prefix: '/api' },
+  );
 
   // Add metrics endpoint
-  app.get('/metrics', async (request, reply) => {
+  app.get('/metrics', async (_request, reply) => {
     reply.type('text/plain');
     return context.metrics.registry.metrics();
   });
@@ -85,7 +98,8 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
 
     const statusCode = (error as any).statusCode || 500;
     const code = (error as any).code || 'internal_error';
-    const message = error.message || 'An unexpected error occurred';
+    const message =
+      statusCode >= 500 ? 'Internal Server Error' : error.message || 'An unexpected error occurred';
 
     context.metrics.httpErrorCount.labels(request.method, request.url, code).inc();
 

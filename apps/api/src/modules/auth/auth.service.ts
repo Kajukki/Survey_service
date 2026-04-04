@@ -3,9 +3,9 @@
  */
 import { jwtVerify, createRemoteJWKSet } from 'jose';
 import type { Logger } from 'pino';
-import type { Principal } from '../server/types';
-import type { Config } from '../server/config';
-import { UnauthorizedError } from '../server/errors';
+import type { Principal } from '../../server/types';
+import type { Config } from '../../server/config';
+import { UnauthorizedError } from '../../server/errors';
 
 /**
  * JWT payload schema expected from OIDC provider.

@@ -1,7 +1,7 @@
 /**
  * RabbitMQ infrastructure: connection and channel management.
  */
-import amqplib, { Connection, Channel } from 'amqplib';
+import amqplib, { ChannelModel, ConfirmChannel } from 'amqplib';
 import type { Logger } from 'pino';
 import type { Config } from '../server/config';
 
@@ -9,8 +9,9 @@ import type { Config } from '../server/config';
  * RabbitMQ connection and channel wrapper.
  */
 export interface RabbitMQClient {
-  connection: Connection;
-  channel: Channel;
+  connection: ChannelModel;
+  channel: ConfirmChannel;
+  isConnected(): boolean;
   close(): Promise<void>;
 }
 
@@ -35,10 +36,7 @@ export async function createRabbitMQClient(
       logger.warn('RabbitMQ connection closed');
     });
 
-    const channel = await connection.createChannel();
-
-    // Enable publisher confirms for reliability
-    await channel.confirmSelect();
+    const channel = await connection.createConfirmChannel();
 
     // Apply prefetch limit per consumer
     await channel.prefetch(config.RABBITMQ_PREFETCH);
@@ -53,6 +51,7 @@ export async function createRabbitMQClient(
     return {
       connection,
       channel,
+      isConnected: () => !!connection /* simplistic check for now */,
       close: async () => {
         await channel.close();
         await connection.close();

@@ -2,13 +2,13 @@
  * Shared utility functions and constants.
  * No database or network I/O here — purely synchronous helpers.
  */
-import { v4 as uuidv4 } from 'uuid'
+import { randomUUID } from 'node:crypto'
 
 /**
  * Generate a UUID.
  */
 export function generateId(): string {
-  return uuidv4()
+  return randomUUID()
 }
 
 /**
@@ -54,11 +54,11 @@ export function allResults<T, E>(results: Result<T, E>[]): Result<T[], E> {
   const values: T[] = []
   for (const result of results) {
     if (!result.ok) {
-      return result
+      return { ok: false, error: result.error }
     }
     values.push(result.value)
   }
-  return ok(values)
+  return { ok: true, value: values }
 }
 
 /**
@@ -136,9 +136,7 @@ export function parseJSON<T>(json: string, defaultValue: T): T {
  */
 export function parseISO(date: string | undefined): Date | null {
   if (!date) return null
-  try {
-    return new Date(date)
-  } catch {
-    return null
-  }
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed
 }
