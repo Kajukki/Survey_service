@@ -10,10 +10,34 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint \"src/**/*.ts\"",
     "format": "prettier --write \"src/**/*.ts\"",
-    "format:check": "prettier --check \"src/**/*.ts\""
+    "format:check": "prettier --check \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "@fastify/helmet": "^11.1.1",
+    "@fastify/rate-limit": "^9.1.0",
+    "@survey-service/contracts": "workspace:*",
+    "@survey-service/db": "workspace:*",
+    "@survey-service/messaging": "workspace:*",
+    "@survey-service/shared": "workspace:*",
+    "amqplib": "^0.10.3",
+    "fastify": "^4.28.1",
+    "jose": "^5.4.1",
+    "kysely": "^0.27.2",
+    "pg": "^8.11.3",
+    "pino": "^8.20.0",
+    "pino-pretty": "^10.3.1",
+    "prom-client": "^15.1.0",
+    "uuid": "^9.0.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/amqplib": "^0.10.5",
     "@types/node": "^24.3.0",
-    "tsx": "^4.20.5"
+    "tsx": "^4.20.5",
+    "vitest": "^1.6.0"
   }
 }
