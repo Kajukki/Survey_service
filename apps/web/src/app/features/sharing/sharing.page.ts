@@ -1,7 +1,9 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { httpResource } from '@angular/common/http';
 
+import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
+import { ShareDto, mapShares } from '../../core/api/survey-api.adapters';
 import { SharingRecord } from '../../shared/models/domain.models';
 
 @Component({
@@ -28,7 +30,7 @@ import { SharingRecord } from '../../shared/models/domain.models';
             </tr>
           </thead>
           <tbody>
-            @for (grant of grants.value(); track grant.id) {
+            @for (grant of grantItems(); track grant.id) {
               <tr>
                 <td>{{ grant.resource }}</td>
                 <td>{{ grant.principal }}</td>
@@ -49,11 +51,14 @@ import { SharingRecord } from '../../shared/models/domain.models';
 })
 export class SharingPageComponent {
   private readonly apiBaseUrl = inject(API_BASE_URL);
+  private readonly activeFormId = 'mock-form-id';
 
-  protected readonly grants = httpResource<SharingRecord[]>(
-    () => `${this.apiBaseUrl}/sharing?limit=30`,
+  protected readonly grants = httpResource<ApiSuccessEnvelope<ShareDto[]>>(
+    () => `${this.apiBaseUrl}/forms/${this.activeFormId}/shares`,
     {
-      defaultValue: [],
+      defaultValue: emptyEnvelope<ShareDto[]>([]),
     },
   );
+
+  protected readonly grantItems = computed<SharingRecord[]>(() => mapShares(this.grants.value()?.data ?? []));
 }

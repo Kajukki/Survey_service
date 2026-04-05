@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { CreateConnectionSchema, ConnectionSchema } from '@survey-service/contracts';
+import { CreateConnectionSchema } from '@survey-service/contracts';
 import { mockConnections } from './connections.mock.js';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -16,6 +16,7 @@ export async function connectionsRoutes(app: FastifyInstance) {
       success: true,
       data: connections,
       meta: {
+        requestId: request.id,
         pagination: { page: 1, perPage: 20, total: connections.length, totalPages: 1 },
       },
     });
@@ -30,16 +31,37 @@ export async function connectionsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      // Fake create
+      // Fake create from validated payload
+      const payload = request.body as Record<string, unknown>;
       return reply.status(201).send({
         success: true,
-        data: mockConnections[0],
+        data: {
+          ...mockConnections[0],
+          ...payload,
+        },
+        meta: {
+          requestId: request.id,
+        },
       });
     },
   );
 
   // DELETE /connections/:id
   zApp.delete('/connections/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!id) {
+      return reply.code(400).send({
+        success: false,
+        error: {
+          code: 'validation_error',
+          message: 'Connection id is required',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
     return reply.status(204).send();
   });
 }

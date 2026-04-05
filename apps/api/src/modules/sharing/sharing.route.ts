@@ -11,18 +11,58 @@ const mockShares = [
 ];
 
 export async function sharingRoutes(app: FastifyInstance) {
-  // GET /v1/forms/:id/shares
-  app.get('/v1/forms/:id/shares', async (request, reply) => {
-    return reply.send({ success: true, data: mockShares });
+  // GET /forms/:id/shares
+  app.get('/forms/:id/shares', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const shares = mockShares.filter((share) => share.form_id === id);
+
+    return reply.send({
+      success: true,
+      data: shares,
+      meta: {
+        requestId: request.id,
+      },
+    });
   });
 
-  // POST /v1/forms/:id/shares
-  app.post('/v1/forms/:id/shares', async (request, reply) => {
-    return reply.status(201).send({ success: true, data: mockShares[0] });
+  // POST /forms/:id/shares
+  app.post('/forms/:id/shares', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const createdShare = {
+      ...mockShares[0],
+      id: `share-${Date.now()}`,
+      form_id: id,
+    };
+    mockShares.push(createdShare);
+
+    return reply.status(201).send({
+      success: true,
+      data: createdShare,
+      meta: {
+        requestId: request.id,
+      },
+    });
   });
 
-  // DELETE /v1/forms/:id/shares/:share_id
-  app.delete('/v1/forms/:id/shares/:share_id', async (request, reply) => {
+  // DELETE /forms/:id/shares/:share_id
+  app.delete('/forms/:id/shares/:share_id', async (request, reply) => {
+    const { id, share_id } = request.params as { id: string; share_id: string };
+    const existingIndex = mockShares.findIndex((share) => share.form_id === id && share.id === share_id);
+
+    if (existingIndex === -1) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Share not found',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    mockShares.splice(existingIndex, 1);
     return reply.status(204).send();
   });
 }

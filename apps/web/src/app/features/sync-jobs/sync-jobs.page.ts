@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { httpResource, HttpClient } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 
+import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
+import { JobDto, mapJobs } from '../../core/api/survey-api.adapters';
 import { SyncJob } from '../../shared/models/domain.models';
 
 @Component({
@@ -25,7 +27,7 @@ import { SyncJob } from '../../shared/models/domain.models';
         <p class="error">Could not load jobs right now.</p>
       } @else {
         <ul>
-          @for (job of jobs.value(); track job.id) {
+          @for (job of jobItems(); track job.id) {
             <li>
               <span>{{ job.source }}</span>
               <strong>{{ job.status }}</strong>
@@ -45,12 +47,17 @@ export class SyncJobsPageComponent {
   private readonly apiBaseUrl = inject(API_BASE_URL);
   private readonly http = inject(HttpClient);
 
-  protected readonly jobs = httpResource<SyncJob[]>(() => `${this.apiBaseUrl}/sync-jobs?limit=20`, {
-    defaultValue: [],
-  });
+  protected readonly jobs = httpResource<ApiSuccessEnvelope<JobDto[]>>(
+    () => `${this.apiBaseUrl}/jobs?perPage=20`,
+    {
+      defaultValue: emptyEnvelope<JobDto[]>([]),
+    },
+  );
+
+  protected readonly jobItems = computed<SyncJob[]>(() => mapJobs(this.jobs.value()?.data ?? []));
 
   protected triggerManualSync(): void {
-    this.http.post(`${this.apiBaseUrl}/sync-jobs`, {}).subscribe({
+    this.http.post(`${this.apiBaseUrl}/jobs/sync`, {}).subscribe({
       next: () => this.jobs.reload(),
       error: () => {
         // no-op, error handling is centralized in interceptor

@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { httpResource } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 
+import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
+import { ConnectionDto, mapConnections } from '../../core/api/survey-api.adapters';
 import { Connection } from '../../shared/models/domain.models';
 
 @Component({
@@ -22,7 +24,7 @@ import { Connection } from '../../shared/models/domain.models';
         <p class="error">Could not load connectors. Try refresh.</p>
       } @else {
         <ul>
-          @for (connection of connections.value(); track connection.id) {
+          @for (connection of connectionItems(); track connection.id) {
             <li>
               <strong>{{ connection.provider }}</strong>
               <span>{{ connection.status }}</span>
@@ -41,10 +43,14 @@ import { Connection } from '../../shared/models/domain.models';
 export class ConnectionsPageComponent {
   private readonly apiBaseUrl = inject(API_BASE_URL);
 
-  protected readonly connections = httpResource<Connection[]>(
+  protected readonly connections = httpResource<ApiSuccessEnvelope<ConnectionDto[]>>(
     () => `${this.apiBaseUrl}/connections`,
     {
-      defaultValue: [],
+      defaultValue: emptyEnvelope<ConnectionDto[]>([]),
     },
+  );
+
+  protected readonly connectionItems = computed<Connection[]>(() =>
+    mapConnections(this.connections.value()?.data ?? []),
   );
 }

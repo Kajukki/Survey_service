@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { httpResource } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 
+import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
+import { ExportDto, mapExports } from '../../core/api/survey-api.adapters';
 import { ExportRecord } from '../../shared/models/domain.models';
 
 @Component({
@@ -22,7 +24,7 @@ import { ExportRecord } from '../../shared/models/domain.models';
         <p class="error">Unable to fetch export history.</p>
       } @else {
         <ul>
-          @for (exportItem of exportsResource.value(); track exportItem.id) {
+          @for (exportItem of exportItems(); track exportItem.id) {
             <li>
               <span>{{ exportItem.format }}</span>
               <strong>{{ exportItem.status }}</strong>
@@ -41,10 +43,14 @@ import { ExportRecord } from '../../shared/models/domain.models';
 export class ExportsPageComponent {
   private readonly apiBaseUrl = inject(API_BASE_URL);
 
-  protected readonly exportsResource = httpResource<ExportRecord[]>(
-    () => `${this.apiBaseUrl}/exports?limit=20`,
+  protected readonly exportsResource = httpResource<ApiSuccessEnvelope<ExportDto[]>>(
+    () => `${this.apiBaseUrl}/exports?perPage=20`,
     {
-      defaultValue: [],
+      defaultValue: emptyEnvelope<ExportDto[]>([]),
     },
+  );
+
+  protected readonly exportItems = computed<ExportRecord[]>(() =>
+    mapExports(this.exportsResource.value()?.data ?? []),
   );
 }

@@ -31,6 +31,8 @@ export async function registerHealthRoutes(
   rabbitmq: RabbitMQClient,
 ): Promise<void> {
   app.get('/health', async (request, reply) => {
+    logger.debug({ requestId: request.id }, 'Running health check');
+
     let dbOk = false;
     let rmqOk = false;
 

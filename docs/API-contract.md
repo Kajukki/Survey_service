@@ -14,9 +14,13 @@ All requests should be prefixed with `/api/v1`.
 ### Success Envelope (Single Resource)
 ```json
 {
+  "success": true,
   "data": {
     "id": "123e4567-e89b-12d3-a456-426614174000",
     "...": "..."
+  },
+  "meta": {
+    "requestId": "req-123"
   }
 }
 ```
@@ -24,19 +28,16 @@ All requests should be prefixed with `/api/v1`.
 ### Success Envelope (Collection with Pagination)
 ```json
 {
+  "success": true,
   "data": [
     { "id": "123e4567-e89b-12d3...", "name": "..." }
   ],
   "meta": {
+    "requestId": "req-123",
     "total": 45,
     "page": 1,
-    "per_page": 20,
-    "total_pages": 3
-  },
-  "links": {
-    "self": "/api/v1/forms?page=1&per_page=20",
-    "next": "/api/v1/forms?page=2&per_page=20",
-    "last": "/api/v1/forms?page=3&per_page=20"
+    "perPage": 20,
+    "totalPages": 3
   }
 }
 ```
@@ -44,12 +45,16 @@ All requests should be prefixed with `/api/v1`.
 ### Error Response
 ```json
 {
+  "success": false,
   "error": {
     "code": "validation_error",
     "message": "Invalid request parameters.",
     "details": [
       { "field": "provider", "message": "Unsupported provider type.", "code": "invalid_enum" }
     ]
+  },
+  "meta": {
+    "requestId": "req-123"
   }
 }
 ```
@@ -72,8 +77,8 @@ List all configured connections for the authenticated user.
 - **200 OK**: Returns paginated collection of `Connection` objects.
 
 ### `POST /api/v1/connections`
-Create a new provider connection. (Tokens managed via OAuth flow, but this initializes the metadata).
-- **Body:** `{ "provider": "google|microsoft", "label": "My Workspace" }`
+Create a new provider connection.
+- **Body:** `{ "type": "google|microsoft", "name": "My Workspace", "externalId": "provider-id", "credentialToken": "opaque-token" }`
 - **201 Created**: Returns the created `Connection` object.
 
 ### `DELETE /api/v1/connections/:id`
@@ -87,7 +92,7 @@ Manages ingested survey configurations and metadata.
 
 ### `GET /api/v1/forms`
 List forms owned by or shared with the user.
-- **Query Params:** `?page=1&per_page=20&search=survey&connection_id=...`
+- **Query Params:** `?page=1&perPage=20&search=survey&connectionId=...`
 - **200 OK**: Returns paginated collection of `Form` objects.
 
 ### `GET /api/v1/forms/:id`
@@ -137,15 +142,19 @@ Check the status of a previously enqueued job.
 - **200 OK**:
   ```json
   {
+    "success": true,
     "data": {
       "id": "job-uuid-1234",
-      "status": "processing|completed|failed",
+      "status": "queued|running|succeeded|failed",
       "result": {
         "sync_count": 45,
         "errors": []
       },
       "created_at": "...",
       "completed_at": "..."
+    },
+    "meta": {
+      "requestId": "req-123"
     }
   }
   ```

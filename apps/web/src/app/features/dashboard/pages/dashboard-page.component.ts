@@ -3,7 +3,9 @@ import { httpResource } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 
+import { ApiSuccessEnvelope, emptyEnvelope } from '../../../core/api/api-envelope';
 import { API_BASE_URL } from '../../../core/api/api-config.token';
+import { FormDto, mapForms } from '../../../core/api/survey-api.adapters';
 import {
   DashboardPayload,
   DashboardFilters,
@@ -47,12 +49,14 @@ export class DashboardPageComponent {
 
   protected readonly filters = computed(() => parseDashboardFilters(this.queryParams()));
 
-  protected readonly formsResource = httpResource<FormRecord[]>(
-    () => `${this.apiBaseUrl}/forms?limit=200`,
+  protected readonly formsResource = httpResource<ApiSuccessEnvelope<FormDto[]>>(
+    () => `${this.apiBaseUrl}/forms?perPage=200`,
     {
-      defaultValue: [],
+      defaultValue: emptyEnvelope<FormDto[]>([]),
     },
   );
+
+  protected readonly forms = computed<FormRecord[]>(() => mapForms(this.formsResource.value()?.data ?? []));
 
   protected readonly dashboardResource = httpResource<DashboardPayload>(
     () => this.buildDashboardEndpoint(this.filters()),

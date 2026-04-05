@@ -86,7 +86,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
   // Infrastructure routes (probes/metrics)
   await registerHealthRoutes(app, context.logger, context.db, context.rabbitmq);
 
-  // Business logic routes prefixed with /api
+  // Business logic routes prefixed with /api/v1
   app.register(
     async (_api) => {
       // Add domain modules here
@@ -96,7 +96,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
       await jobsRoutes(_api);
       await exportsRoutes(_api);
     },
-    { prefix: '/api' },
+    { prefix: '/api/v1' },
   );
 
   // Add metrics endpoint
