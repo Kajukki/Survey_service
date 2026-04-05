@@ -2,6 +2,7 @@
  * Main entry point for the Survey Service API.
  * Bootstraps configuration, logger, database, and starts the server.
  */
+import 'dotenv/config';
 import { loadConfig } from './server/config';
 import { createLogger } from './server/logging';
 import { createMetrics } from './infra/metrics';

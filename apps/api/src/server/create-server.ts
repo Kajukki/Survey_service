@@ -6,6 +6,7 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyRateLimit from '@fastify/rate-limit';
 import { randomUUID } from 'node:crypto';
+import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { Logger } from 'pino';
 import type { Kysely } from 'kysely';
 import type { Config } from './config';
@@ -13,6 +14,11 @@ import type { Database } from '../infra/db';
 import type { RabbitMQClient } from '../infra/rabbitmq';
 import type { Metrics } from '../infra/metrics';
 import { registerHealthRoutes } from '../modules/health/health.route';
+import { connectionsRoutes } from '../modules/connections/connections.route';
+import { formsRoutes } from '../modules/forms/forms.route';
+import { sharingRoutes } from '../modules/sharing/sharing.route';
+import { jobsRoutes } from '../modules/jobs/jobs.route';
+import { exportsRoutes } from '../modules/exports/exports.route';
 
 /**
  * Application context shared across modules.
@@ -36,7 +42,10 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     requestIdHeader: 'x-request-id',
     requestIdLogLabel: 'requestId',
     genReqId: () => randomUUID(),
-  });
+  }).withTypeProvider<ZodTypeProvider>();
+
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
 
   // Register plugins
   await app.register(fastifyHelmet, {
@@ -81,7 +90,11 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
   app.register(
     async (_api) => {
       // Add domain modules here
-      // e.g. await registerFormsRoutes(_api, context);
+      await connectionsRoutes(_api);
+      await formsRoutes(_api);
+      await sharingRoutes(_api);
+      await jobsRoutes(_api);
+      await exportsRoutes(_api);
     },
     { prefix: '/api' },
   );
