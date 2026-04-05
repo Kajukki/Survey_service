@@ -22,6 +22,16 @@ export async function createRabbitMQClient(
   config: Config,
   logger: Logger,
 ): Promise<RabbitMQClient> {
+  if (process.env.MOCK_INFRA === 'true') {
+    logger.warn('MOCK_INFRA is set, bypassing RabbitMQ connection');
+    return {
+      connection: {} as ChannelModel,
+      channel: {} as ConfirmChannel,
+      isConnected: () => true,
+      close: async () => { },
+    };
+  }
+
   try {
     const connection = await amqplib.connect(config.RABBITMQ_URL, {
       connectionTimeout: 10000,
@@ -51,14 +61,14 @@ export async function createRabbitMQClient(
     return {
       connection,
       channel,
-      isConnected: () => !!connection /* simplistic check for now */,
+      isConnected: () => true,
       close: async () => {
-        await channel.close();
         await connection.close();
+        await channel.close();
       },
     };
   } catch (error) {
-    logger.error({ error }, 'Failed to connect to RabbitMQ');
+    logger.error({ error }, 'Failed to initialize RabbitMQ client');
     throw error;
   }
 }

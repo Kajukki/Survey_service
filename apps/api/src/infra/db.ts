@@ -20,6 +20,13 @@ export interface Database {
  * Create a Kysely instance with PostgreSQL dialect and connection pooling.
  */
 export function createDb(config: Config, logger: Logger): Kysely<Database> {
+  if (process.env.MOCK_INFRA === 'true') {
+    logger.warn('MOCK_INFRA is set, bypassing Real DB Connection check');
+    return {
+       destroy: async () => {},
+    } as unknown as Kysely<Database>;
+  }
+
   const pool = new Pool({
     connectionString: config.DATABASE_URL,
     max: config.DATABASE_POOL_MAX,
