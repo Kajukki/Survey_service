@@ -1,68 +1,174 @@
-# Implementation Plan: API Design
+# Implementation Plan: API Delivery Backlog
 
-## Overview
-- Provide a consistent, secure, and well-documented RESTful API for the Angular frontend to interact with the Survey Service.
-- The API will serve as a thin orchestration layer, handling authentication, authorization (per-user data ownership and sharing), input validation, CRUD operations for configuration, and enqueueing asynchronous jobs to RabbitMQ for workers to process.
-- Designed in accordance with `architecture.md` and the REST API conventions defined in `api-design/SKILL.md`.
+## Purpose
 
-## Assumptions and Constraints
-- The API is stateless and horizontally scalable, deployed via Kubernetes and exposed through an NGINX Ingress.
-- Data ownership is strictly enforced: resources are accessible if the `owner_user_id` matches the current user, or if explicit sharing grants exist.
-- Long-running tasks (e.g., syncing forms, generating exports, or heavy analysis) are not executed synchronously in HTTP requests. The API enqueues these jobs and returns a `202 Accepted` status with job tracking information.
-- Authentication utilizes the organization's IdP (e.g., via JWTs).
-- All endpoints use a standard JSON response envelope for success, errors, and pagination.
+This document is the execution backlog for API delivery, based on the current implementation state in this branch.
 
-## Affected Areas
-- **API Runtime Configuration:** Fastify setup, routing, and error handling (`apps/api/src/server/`).
-- **Data Contracts:** Shared Zod schemas and TypeScript types (`packages/contracts/`).
-- **Database Access:** Repositories with tenant-aware queries (`apps/api/src/modules/` and `apps/api/src/policy/`).
-- **Messaging:** Job publishing interfaces (`apps/api/src/infra/rabbitmq.ts`, `packages/messaging/`).
-- **API Implementation Files:** Route handlers and services for all domains (`auth`, `connections`, `forms`, `sharing`, `jobs`, `exports`).
+## Delivery Status Board
 
-## Phased Steps
+### Completed
 
-1. **Phase 1: API Contracts & Shared Schemas** (Goal: Define request/response shapes)
-   - Define exact Zod schemas for entity DTOs (Connection, Form, Share, Job, Export).
-   - Define standard response envelopes (`ApiResponse`, `ApiError`, `PaginationMeta`) in `packages/contracts`.
-   - *Risk Level: Low*
+1. Core runtime
+- Fastify bootstrap, config validation, logging, metrics, error envelope.
 
-2. **Phase 2: Core Platform & Security Middleware** (Goal: Setup HTTP server and authz)
-   - Configure Fastify with `helmet`, `cors`, and structured JSON logging (`pino`).
-   - Implement authentication middleware to verify JWTs and inject the current user identity.
-   - Implement authorization utilities (`canRead`, `canEdit`) that check ownership and share policies.
-   - *Risk Level: Medium*
+2. Messaging and jobs
+- RabbitMQ topology assertion and publish confirms.
+- `jobs` table persistence and job route support.
+- Worker lifecycle updates from queue messages.
 
-3. **Phase 3: Synchronous CRUD Endpoints** (Goal: Connections, Forms, and Sharing APIs)
-   - Implement `GET /api/v1/connections` and related CRUD endpoints.
-   - Implement `GET /api/v1/forms` (with offset pagination) and `GET /api/v1/forms/:id`.
-   - Implement `POST /api/v1/forms/:id/shares` and related endpoints for managing access.
-   - *Risk Level: Low*
+3. Local auth
+- `register`, `login`, `refresh` endpoints.
+- Users and refresh-token storage.
+- Shared auth schemas.
 
-4. **Phase 4: Asynchronous Job Enqueueing & Tracking** (Goal: Manual syncs and exports)
-   - Implement `POST /api/v1/jobs` (or domain-specific triggers like `POST /api/v1/forms/:id/sync`) which validates access, writes a job record to PostgreSQL, and publishes to RabbitMQ via `amqplib` (using Publisher Confirms).
-   - Implement `GET /api/v1/jobs/:id` for the frontend to poll status.
-   - *Risk Level: High (requires transactional consistency between DB and RabbitMQ)*
+### In Progress
 
-5. **Phase 5: Aggregation & Analysis Read Endpoints** (Goal: Dashboard data)
-   - Implement endpoints to serve aggregated data (e.g., `GET /api/v1/forms/:id/analytics`) by querying materialized views or summary tables populated by workers.
-   - *Risk Level: Medium*
+1. Domain persistence parity
+- Connections/forms/sharing routes still rely on mock-backed behavior.
 
-## Testing Strategy
-- **Unit Coverage:** Target 80%+ for services, authorization policy functions, and Zod validators.
-- **Integration Flow Coverage:** Test API endpoint routes using tools like `supertest` or Fastify's `inject`, combined with a test database container (e.g., Testcontainers) to verify DB queries, RLS/authz rules, and RabbitMQ publish mocks.
-- **Regression Checks:** Ensure unauthorized access returns `403 Forbidden` or `404 Not Found` (to prevent data enumeration).
+2. Authorization parity
+- Principal-based policy checks are not yet universal across protected routes.
 
-## Risks and Mitigations
-- **Risk:** Distributed transaction failure (DB write succeeds but RabbitMQ publish fails).
-  - *Mitigation:* Implement an Outbox pattern or ensure robust error handling with publisher confirms. If publish fails, the API can rollback the job creation or mark it as `failed_to_queue`.
-- **Risk:** Frontend polling overwhelming the API.
-  - *Mitigation:* Apply rate limiting on job status endpoints (`@fastify/rate-limit`). Design the frontend to use exponential backoff when polling `GET /jobs/:id`.
+### Not Started
 
-## Acceptance Checklist
-- [ ] API endpoints adhere to the URL structure and status codes in `api-design/SKILL.md`.
-- [ ] Zod schemas and TypeScript types are exported from `packages/contracts`.
-- [ ] Authentication middleware actively rejects invalid tokens with `401 Unauthorized`.
-- [ ] Forms and Connections list/detail endpoints strictly filter by `owner_user_id` or active shares.
-- [ ] Sync and Export endpoints successfully enqueue messages to RabbitMQ and return `202 Accepted`.
-- [ ] Standardized JSON error format is used for all `4xx` and `5xx` responses.
-- [ ] Integration tests verify that cross-tenant data access is blocked.
+1. Export workflow completion.
+2. Analytics endpoints for dashboard.
+3. Environment-ready enterprise IdP auth mode.
+
+## Priority Backlog
+
+## P0: Security and Correctness
+
+### Item 1: Principal extraction and propagation
+
+Scope:
+
+- Add principal extraction middleware/plugin.
+- Ensure protected routes consume principal from request context.
+
+Definition of done:
+
+- No protected route relies on hardcoded user IDs.
+- Integration tests cover unauthenticated and unauthorized cases.
+
+### Item 2: Route authorization enforcement
+
+Scope:
+
+- Apply owner/share checks in connections/forms/sharing/jobs read paths.
+
+Definition of done:
+
+- Policy matrix tests pass for owner/shared/forbidden scenarios.
+- Contract responses use expected 401/403/404 semantics.
+
+## P1: Replace Mock-backed Domain Paths
+
+### Item 3: Connections persistence
+
+Scope:
+
+- Repository/service implementation.
+- Route handlers switched from mock data to persistence.
+
+Definition of done:
+
+- CRUD route tests pass against DB-backed repository.
+
+### Item 4: Forms persistence
+
+Scope:
+
+- Forms list/detail backed by DB and visibility predicates.
+
+Definition of done:
+
+- Pagination and ownership/share checks covered by tests.
+
+### Item 5: Sharing persistence
+
+Scope:
+
+- Grants list/create/delete backed by DB.
+
+Definition of done:
+
+- Permission checks and persistence tests pass.
+
+## P2: Product Completeness
+
+### Item 6: Export workflow
+
+Scope:
+
+- Export enqueue/status/download contract and implementation.
+
+Definition of done:
+
+- Export route integration tests pass.
+
+### Item 7: Analytics reads
+
+Scope:
+
+- Dashboard-oriented aggregate read endpoints.
+
+Definition of done:
+
+- Contract tests pass for dashboard payload shape.
+
+## P3: Auth Strategy Consolidation
+
+### Item 8: Environment auth matrix
+
+Scope:
+
+- Document and implement final auth mode per environment.
+
+Definition of done:
+
+- No conflicting auth statements across architecture, plans, API README, and contract docs.
+
+## Test Plan by Milestone
+
+### Milestone A (P0)
+
+Required:
+
+1. Route auth tests for missing/invalid principal.
+2. Policy matrix tests for access decisions.
+3. Regression tests for current auth endpoints.
+
+### Milestone B (P1)
+
+Required:
+
+1. Connections/forms/sharing route integration tests with DB.
+2. Contract envelope compatibility tests.
+
+### Milestone C (P2/P3)
+
+Required:
+
+1. Export end-to-end test (enqueue to terminal state).
+2. Analytics read contract test.
+3. Auth mode selection tests/config checks per environment.
+
+## Documentation Sync Rules
+
+Every PR closing one backlog item must update:
+
+1. `docs/API-contract.md` endpoint status tags.
+2. `apps/api/README.md` endpoint maturity table.
+3. `IMPLEMENTATION_GUIDE.md` status snapshot.
+
+## Suggested Execution Order
+
+1. P0 Item 1
+2. P0 Item 2
+3. P1 Item 3
+4. P1 Item 4
+5. P1 Item 5
+6. P2 Item 6
+7. P2 Item 7
+8. P3 Item 8

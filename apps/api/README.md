@@ -2,13 +2,22 @@
 
 HTTP API server: validates requests, enforces ownership and sharing rules, enqueues jobs to RabbitMQ, and returns async job metadata.
 
+## Implementation Status
+
+This README separates what is implemented now from target-state architecture.
+
+- Implemented now: local credential auth endpoints, job persistence, RabbitMQ publish with confirms, worker-consumable job lifecycle.
+- Partially implemented: domain routes for connections/forms/sharing are present but still mock-backed in key paths.
+- Planned: full principal extraction and owner/share enforcement on every protected domain route.
+
 ## Architecture
 
 - **Framework:** Fastify for high throughput and strong TypeScript support
 - **Database:** Kysely (type-safe query builder) + pg driver with connection pooling
 - **Messaging:** amqplib for RabbitMQ publish/consume
 - **Validation:** Zod schemas in [packages/contracts](../../packages/contracts)
-- **Auth:** JWT verification via OIDC JWKS endpoint
+- **Auth (current):** local credential login/register/refresh with signed access tokens
+- **Auth (target):** JWT verification via OIDC JWKS endpoint
 - **Logging:** Pino structured JSON logging
 - **Metrics:** Prometheus via prom-client
 
@@ -58,10 +67,13 @@ DATABASE_POOL_MIN=2
 RABBITMQ_URL=amqp://user:pass@host/
 RABBITMQ_PREFETCH=10
 
-# Authentication (OIDC)
+# Authentication
 OIDC_ISSUER=https://your-idp.example.com
 OIDC_AUDIENCE=api.example.com
 OIDC_JWKS_URI=https://your-idp.example.com/.well-known/jwks.json
+AUTH_JWT_SECRET=replace-with-a-long-random-secret
+ACCESS_TOKEN_TTL_SECONDS=900
+REFRESH_TOKEN_TTL_SECONDS=604800
 
 # CORS
 ALLOWED_ORIGINS=http://localhost:4200,https://app.example.com
@@ -88,11 +100,26 @@ RATE_LIMIT_MAX=100
 
 - `GET /health` — liveness/readiness probe
 - `GET /metrics` — Prometheus metrics endpoint
+- `POST /api/v1/auth/register` — create a local account and issue tokens
+- `POST /api/v1/auth/login` — verify credentials and issue tokens
+- `POST /api/v1/auth/refresh` — rotate refresh token and issue a new access token
 - `POST /api/v1/jobs/sync` — create queued sync job and publish RabbitMQ message
 - `GET /api/v1/jobs` — list persisted sync jobs
 - `GET /api/v1/jobs/:id` — poll persisted job status
 
 Additional endpoints are implemented in feature modules under `modules/`.
+
+### Endpoint Maturity
+
+| Endpoint group | Runtime maturity |
+|---|---|
+| `/health`, `/metrics` | Implemented |
+| `/auth/*` | Implemented with DB-backed users and refresh tokens |
+| `/jobs/*` | Implemented with DB + RabbitMQ publish |
+| `/connections/*` | Implemented route surface, currently mock-backed |
+| `/forms/*` | Implemented route surface, currently mock-backed |
+| `/forms/:id/shares/*` | Implemented route surface, currently mock-backed |
+| `/exports/*` | Scaffolded route module, feature completion pending |
 
 See [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) for full endpoint specification and design decisions.
 
@@ -101,7 +128,8 @@ See [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) for ful
 Before deploying:
 
 - [ ] All secrets from environment (never hardcoded)
-- [ ] JWT verification enabled and issuer/audience validated
+- [ ] Route-level principal extraction enabled for all protected endpoints
+- [ ] JWT verification enabled and issuer/audience validated (target IdP mode)
 - [ ] Rate limiting enabled on expensive endpoints
 - [ ] Input validation via Zod at all boundaries
 - [ ] CORS origin whitelist restricted
@@ -139,7 +167,7 @@ Once the full stack is running, trigger a sync job and observe it through the Ra
 # Create job
 curl -X POST http://localhost:3000/api/v1/jobs/sync \
   -H "Content-Type: application/json" \
-  -d '{}'
+  -d '{"connectionId":"11111111-1111-4111-8111-111111111111"}'
 
 # Check RabbitMQ UI
 open http://localhost:15672  # guest / guest

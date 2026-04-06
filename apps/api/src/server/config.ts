@@ -26,6 +26,9 @@ const envSchema = z.object({
   OIDC_ISSUER: z.string().min(1, 'OIDC_ISSUER is required'),
   OIDC_AUDIENCE: z.string().min(1, 'OIDC_AUDIENCE is required'),
   OIDC_JWKS_URI: z.string().min(1, 'OIDC_JWKS_URI is required'),
+  AUTH_JWT_SECRET: z.string().min(32, 'AUTH_JWT_SECRET must be at least 32 chars'),
+  ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+  REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
 
   // CORS
   ALLOWED_ORIGINS: z

@@ -6,7 +6,7 @@ import { mockConnections } from '../connections/connections.mock.js';
 export const mockForms: Form[] = [
   {
     id: randomUUID(),
-    ownerId: 'mock-user-1',
+    ownerId: 'user-one',
     connectionId: mockConnections[0]!.id,
     externalFormId: 'form-ext-abc',
     title: 'Customer Satisfaction Survey 2026',
@@ -17,7 +17,7 @@ export const mockForms: Form[] = [
   },
   {
     id: randomUUID(),
-    ownerId: 'mock-user-1',
+    ownerId: 'user-one',
     connectionId: mockConnections[1]!.id,
     externalFormId: 'form-ext-xyz',
     title: 'Employee Engagement Feedback',
@@ -27,7 +27,7 @@ export const mockForms: Form[] = [
   },
   {
     id: randomUUID(),
-    ownerId: 'mock-user-2', // different owner to test sharing/filtering
+    ownerId: 'user-one',
     connectionId: randomUUID(),
     externalFormId: 'form-ext-pqr',
     title: 'Marketing Campaign Leads',

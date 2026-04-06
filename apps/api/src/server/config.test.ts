@@ -10,6 +10,7 @@ describe('Configuration', () => {
   beforeEach(() => {
     // Snapshot current env
     process.env = { ...originalEnv };
+    process.env.AUTH_JWT_SECRET = 'test-secret-test-secret-test-secret';
   });
 
   afterEach(() => {
@@ -30,6 +31,7 @@ describe('Configuration', () => {
     expect(config.RABBITMQ_URL).toBe('amqp://localhost');
     expect(config.NODE_ENV).toBe('test');
     expect(config.PORT).toBe(3000);
+    expect(config.AUTH_JWT_SECRET).toBe('test-secret-test-secret-test-secret');
   });
 
   it('should use default values', () => {
@@ -45,6 +47,7 @@ describe('Configuration', () => {
     expect(config.LOG_LEVEL).toBe('info');
     expect(config.DATABASE_POOL_MAX).toBe(10);
     expect(config.ENABLE_RATE_LIMITING).toBe(true);
+    expect(config.ACCESS_TOKEN_TTL_SECONDS).toBe(900);
   });
 
   it('should throw on missing required variables', () => {

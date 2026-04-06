@@ -4,7 +4,7 @@ const mockShares = [
   {
     id: 'share-mock-1',
     form_id: 'mock-form-id',
-    grantee_user_id: 'mock-user-2',
+    grantee_user_id: 'user-one',
     permission_level: 'read',
     created_at: new Date().toISOString(),
   },

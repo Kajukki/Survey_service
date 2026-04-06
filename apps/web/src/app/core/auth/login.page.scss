@@ -18,6 +18,23 @@
   font-family: 'DM Serif Display', Georgia, serif;
 }
 
+form {
+  display: grid;
+  gap: 0.55rem;
+}
+
+label {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+
+input {
+  border: 1px solid var(--line-color);
+  border-radius: 0.6rem;
+  padding: 0.65rem 0.75rem;
+  background: #fff;
+}
+
 button {
   border: 0;
   border-radius: 0.6rem;
@@ -26,4 +43,26 @@ button {
   color: white;
   font-weight: 700;
   cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.actions {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.secondary {
+  background: transparent;
+  color: var(--text-color);
+  border: 1px solid var(--line-color);
+}
+
+.error {
+  color: #b42318;
+  margin: 0.25rem 0 0;
 }

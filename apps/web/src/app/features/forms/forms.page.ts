@@ -69,8 +69,8 @@ export class FormsPageComponent {
     },
   );
 
-  protected readonly formItems = computed<FormRecord[]>(
-    () => mapForms(this.forms.value()?.data ?? []),
+  protected readonly formItems = computed<FormRecord[]>(() =>
+    mapForms(this.forms.value()?.data ?? []),
   );
 
   protected nextPage(): void {

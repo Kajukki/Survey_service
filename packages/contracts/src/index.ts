@@ -30,7 +30,7 @@ export const ApiErrorResponseSchema = z.object({
   error: z.object({
     code: z.string(),
     message: z.string(),
-    details: z.record(z.unknown()).optional(),
+    details: z.record(z.string(), z.unknown()).optional(),
   }),
   meta: z
     .object({
@@ -181,3 +181,48 @@ export const CreateExportSchema = z.object({
 
 export type ExportJob = z.infer<typeof ExportJobSchema>
 export type CreateExportInput = z.infer<typeof CreateExportSchema>
+
+/**
+ * Authentication schemas.
+ */
+export const AuthUsernameSchema = z
+  .string()
+  .min(3)
+  .max(64)
+  .regex(/^[A-Za-z0-9_.-]+$/)
+
+export const AuthPasswordSchema = z.string().min(8).max(128)
+
+export const AuthLoginSchema = z.object({
+  username: AuthUsernameSchema,
+  password: AuthPasswordSchema,
+})
+
+export const AuthRegisterSchema = z.object({
+  username: AuthUsernameSchema,
+  password: AuthPasswordSchema,
+})
+
+export const AuthTokenRefreshSchema = z.object({
+  refreshToken: z.string().min(1),
+})
+
+export const AuthUserSchema = z.object({
+  id: IdSchema,
+  username: AuthUsernameSchema,
+  orgId: OrgIdSchema,
+})
+
+export const AuthSessionSchema = z.object({
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1),
+  tokenType: z.literal('Bearer'),
+  expiresIn: z.number().int().positive(),
+  user: AuthUserSchema,
+})
+
+export type AuthLoginInput = z.infer<typeof AuthLoginSchema>
+export type AuthRegisterInput = z.infer<typeof AuthRegisterSchema>
+export type AuthTokenRefreshInput = z.infer<typeof AuthTokenRefreshSchema>
+export type AuthUser = z.infer<typeof AuthUserSchema>
+export type AuthSession = z.infer<typeof AuthSessionSchema>
