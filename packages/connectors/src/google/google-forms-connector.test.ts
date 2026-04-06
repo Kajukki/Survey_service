@@ -163,6 +163,66 @@ describe('GoogleFormsConnector', () => {
     expect(result.responses[0]?.externalResponseId).toBe('resp-1');
     expect(result.nextPageToken).toBe('next');
   });
+
+  it('throws mapped provider error when OAuth token exchange fails', async () => {
+    const httpClient = makeHttpClient();
+    const oauthClient = makeOAuthClient();
+
+    vi.mocked(oauthClient.getToken).mockRejectedValueOnce({
+      message: 'invalid grant',
+      response: {
+        status: 400,
+        data: {
+          error: 'invalid_grant',
+          error_description: 'Bad Request',
+        },
+      },
+    });
+
+    const connector = new GoogleFormsConnector(config, httpClient, oauthClient as any);
+
+    await expect(
+      connector.exchangeAuthorizationCode({
+        code: 'oauth-code',
+        redirectUri: 'https://app.example.com/callback',
+        codeVerifier: 'verifier-123',
+      }),
+    ).rejects.toMatchObject({
+      provider: 'google',
+      code: 'invalid_grant',
+      retryable: false,
+      status: 400,
+    });
+  });
+
+  it('throws mapped provider error when list forms API fails', async () => {
+    const httpClient = makeHttpClient();
+    vi.mocked(httpClient.request).mockRejectedValueOnce({
+      message: 'Quota exceeded',
+      response: {
+        status: 429,
+        data: {
+          error: {
+            status: 'RESOURCE_EXHAUSTED',
+            message: 'Too many requests',
+          },
+        },
+      },
+    });
+
+    const connector = new GoogleFormsConnector(config, httpClient);
+
+    await expect(
+      connector.listForms({
+        accessToken: 'token',
+      }),
+    ).rejects.toMatchObject({
+      provider: 'google',
+      code: 'resource_exhausted',
+      retryable: true,
+      status: 429,
+    });
+  });
 });
 
 describe('mapGoogleProviderError', () => {

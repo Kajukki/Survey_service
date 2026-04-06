@@ -213,7 +213,8 @@ Progress update:
 - Provider DTO schemas are defined in `packages/contracts` for auth start/result, token sets, form summaries, response pages, and provider errors.
 - `packages/connectors` now exposes provider-neutral connector interfaces and an initial `GoogleFormsConnector` scaffold with unit tests.
 - OAuth start/code exchange/refresh flows in the Google connector now use `google-auth-library`.
-- Google connector unit tests now include provider error mapping coverage for OAuth/API failure shapes.
+- Google connector methods now propagate normalized provider errors for OAuth/API failure paths.
+- Google connector unit tests include provider error mapping and propagation coverage.
 - Auth model remains OAuth 2.0 Authorization Code with PKCE (documented in this plan); secret handling and DB credential schema wiring are pending next slices.
 
 ### Phase 2: Google Client Implementation
