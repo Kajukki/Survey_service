@@ -31,9 +31,10 @@ This document is the execution backlog for API delivery, based on the current im
 
 ### Not Started
 
-1. Export workflow completion.
-2. Analytics endpoints for dashboard.
-3. Environment-ready enterprise IdP auth mode.
+1. Google Forms provider integration.
+2. Export workflow completion.
+3. Analytics endpoints for dashboard.
+4. Environment-ready enterprise IdP auth mode.
 
 ## Priority Backlog
 
@@ -95,9 +96,38 @@ Definition of done:
 
 - Permission checks and persistence tests pass.
 
-## P2: Product Completeness
+## P2: Google Forms Provider Integration
 
-### Item 6: Export workflow
+### Item 6: Google OAuth 2.0 PKCE connector boundary
+
+Scope:
+
+- Define provider-neutral connector interfaces.
+- Implement Google client wrappers in `packages/connectors/google`.
+- Implement Authorization Code + PKCE flow for per-user Google account linking.
+- Store Google refresh tokens per user connection.
+
+Definition of done:
+
+- Worker can call Google through a stable connector interface.
+- Auth and credential handling strategy is documented and tested.
+- Users can link their own Google account via the connector boundary.
+
+### Item 7: Google sync pipeline
+
+Scope:
+
+- Provider sync cursors.
+- Fetch/normalize/persist workflow in the worker.
+- Connection metadata and manual sync trigger wiring.
+
+Definition of done:
+
+- A Google sync job completes end-to-end and persists normalized results.
+
+## P3: Product Completeness
+
+### Item 8: Export workflow
 
 Scope:
 
@@ -107,7 +137,7 @@ Definition of done:
 
 - Export route integration tests pass.
 
-### Item 7: Analytics reads
+### Item 9: Analytics reads
 
 Scope:
 
@@ -117,9 +147,9 @@ Definition of done:
 
 - Contract tests pass for dashboard payload shape.
 
-## P3: Auth Strategy Consolidation
+## P4: Auth Strategy Consolidation
 
-### Item 8: Environment auth matrix
+### Item 10: Environment auth matrix
 
 Scope:
 
@@ -146,7 +176,15 @@ Required:
 1. Connections/forms/sharing route integration tests with DB.
 2. Contract envelope compatibility tests.
 
-### Milestone C (P2/P3)
+### Milestone C (P2)
+
+Required:
+
+1. Google connector unit tests for request shaping and error mapping.
+2. Google auth/token lifecycle tests.
+3. Google worker integration test from queue message to terminal job state.
+
+### Milestone D (P3/P4)
 
 Required:
 
@@ -161,6 +199,7 @@ Every PR closing one backlog item must update:
 1. `docs/API-contract.md` endpoint status tags.
 2. `apps/api/README.md` endpoint maturity table.
 3. `IMPLEMENTATION_GUIDE.md` status snapshot.
+4. `docs/plans/google-forms-integration-plan.md` when connector behavior changes.
 
 ## Suggested Execution Order
 
@@ -172,3 +211,5 @@ Every PR closing one backlog item must update:
 6. P2 Item 6
 7. P2 Item 7
 8. P3 Item 8
+9. P3 Item 9
+10. P4 Item 10

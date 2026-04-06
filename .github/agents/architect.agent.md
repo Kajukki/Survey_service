@@ -1,7 +1,7 @@
 ---
 name: architect
 description: "Software architecture specialist for system design, scalability, and technical decision-making. Use proactively when planning new features, refactoring large systems, or making architectural decisions."
-tools: [read, search]
+tools: [read, search, execute]
 model: opus
 argument-hint: "What architecture should be designed, and what constraints matter?"
 user-invocable: true
@@ -190,9 +190,9 @@ Watch for these architectural anti-patterns:
 Example architecture for an AI-powered SaaS platform:
 
 ### Current Architecture
-- Frontend: Next.js 15 (Vercel/Cloud Run)
-- Backend: FastAPI or Express (Cloud Run/Railway)
-- Database: PostgreSQL (Supabase)
+- Frontend: Angular 21 
+- Backend: Fastify
+- Database: PostgreSQL
 - Cache: Redis (Upstash/Railway)
 - AI: Claude API with structured output
 - Real-time: Supabase subscriptions
