@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { GoogleFormsConnector, type GoogleConnectorConfig } from './google-forms-connector';
+import {
+  GoogleFormsConnector,
+  mapGoogleProviderError,
+  type GoogleConnectorConfig,
+} from './google-forms-connector';
 import type { ConnectorHttpClient } from '../types';
 
 const config: GoogleConnectorConfig = {
@@ -158,5 +162,50 @@ describe('GoogleFormsConnector', () => {
     expect(result.responses).toHaveLength(1);
     expect(result.responses[0]?.externalResponseId).toBe('resp-1');
     expect(result.nextPageToken).toBe('next');
+  });
+});
+
+describe('mapGoogleProviderError', () => {
+  it('maps google OAuth invalid_grant errors as non-retryable', () => {
+    const mapped = mapGoogleProviderError(
+      {
+        message: 'invalid grant',
+        response: {
+          status: 400,
+          data: {
+            error: 'invalid_grant',
+            error_description: 'Bad Request',
+          },
+        },
+      },
+      'google',
+    );
+
+    expect(mapped.provider).toBe('google');
+    expect(mapped.code).toBe('invalid_grant');
+    expect(mapped.retryable).toBe(false);
+    expect(mapped.status).toBe(400);
+  });
+
+  it('maps google API 429 errors as retryable', () => {
+    const mapped = mapGoogleProviderError(
+      {
+        message: 'Quota exceeded',
+        response: {
+          status: 429,
+          data: {
+            error: {
+              status: 'RESOURCE_EXHAUSTED',
+              message: 'Too many requests',
+            },
+          },
+        },
+      },
+      'google',
+    );
+
+    expect(mapped.code).toBe('resource_exhausted');
+    expect(mapped.retryable).toBe(true);
+    expect(mapped.status).toBe(429);
   });
 });

@@ -11,7 +11,8 @@ No HTTP server here; used from `apps/worker` (and optionally `apps/api` for OAut
 
 - `src/types.ts` defines provider-neutral connector interfaces used by worker orchestration.
 - `src/google/google-forms-connector.ts` contains the first Google connector wrapper for:
-	- OAuth authorization URL construction (PKCE-ready inputs)
-	- token exchange and refresh mapping
-	- form list and response page mapping to provider-neutral contracts
-- `src/google/google-forms-connector.test.ts` covers request shaping and mapping behavior.
+	- OAuth authorization URL construction (PKCE-ready inputs) via `google-auth-library`.
+	- token exchange and refresh mapping via Google OAuth client primitives.
+	- form list and response page mapping to provider-neutral contracts.
+	- provider error normalization for OAuth/API failures.
+- `src/google/google-forms-connector.test.ts` covers request shaping, auth flows, and error mapping behavior.

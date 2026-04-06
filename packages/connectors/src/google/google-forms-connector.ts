@@ -8,6 +8,7 @@ import type {
 import { OAuth2Client } from 'google-auth-library';
 import {
   ProviderAuthStartResultSchema,
+  ProviderErrorSchema,
   ProviderFormResponsePageSchema,
   ProviderFormSummarySchema,
   ProviderTokenSetSchema,
@@ -48,6 +49,65 @@ interface GoogleOAuthClient {
   }): Promise<{ tokens: GoogleOAuthCredentials }>;
   setCredentials(input: { refresh_token: string }): void;
   refreshAccessToken(): Promise<{ credentials: GoogleOAuthCredentials }>;
+}
+
+interface GoogleHttpLikeError {
+  message?: string;
+  response?: {
+    status?: number;
+    data?: unknown;
+  };
+}
+
+function toErrorCode(input: unknown): string {
+  if (typeof input !== 'string' || input.trim().length === 0) {
+    return 'unknown_error';
+  }
+
+  return input.trim().toLowerCase();
+}
+
+function isRetryableStatus(status?: number): boolean {
+  if (typeof status !== 'number') {
+    return false;
+  }
+
+  return status === 429 || status >= 500;
+}
+
+export function mapGoogleProviderError(error: unknown, provider: 'google' = 'google') {
+  const candidate = error as GoogleHttpLikeError;
+  const status = candidate.response?.status;
+  const payload = candidate.response?.data as
+    | {
+        error?:
+          | string
+          | {
+              status?: string;
+              message?: string;
+            };
+        error_description?: string;
+      }
+    | undefined;
+
+  let code = 'unknown_error';
+  let message = candidate.message ?? 'Google connector request failed';
+
+  if (typeof payload?.error === 'string') {
+    code = toErrorCode(payload.error);
+    message = payload.error_description ?? message;
+  } else if (payload?.error && typeof payload.error === 'object') {
+    code = toErrorCode(payload.error.status);
+    message = payload.error.message ?? message;
+  }
+
+  return ProviderErrorSchema.parse({
+    provider,
+    code,
+    message,
+    retryable: isRetryableStatus(status),
+    status,
+  });
 }
 
 function createGoogleOAuthClient(config: GoogleConnectorConfig): GoogleOAuthClient {
@@ -110,9 +170,9 @@ export class GoogleFormsConnector implements ProviderConnector {
     codeVerifier: string;
   }): Promise<ProviderTokenSet> {
     const tokenResponse = await this.oauthClient.getToken({
-        code: input.code,
-        redirect_uri: input.redirectUri,
-        codeVerifier: input.codeVerifier,
+      code: input.code,
+      redirect_uri: input.redirectUri,
+      codeVerifier: input.codeVerifier,
     });
 
     return this.toTokenSet(tokenResponse.tokens);
