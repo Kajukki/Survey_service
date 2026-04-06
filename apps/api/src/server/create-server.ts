@@ -128,7 +128,21 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
 
   // Global error handler
   app.setErrorHandler((error, request, reply) => {
-    request.log.error({ err: error }, 'Request error');
+    context.logger.error(
+      {
+        requestId: request.id,
+        method: request.method,
+        url: request.url,
+        err: {
+          name: error.name,
+          message: error.message,
+          code: (error as any).code,
+          statusCode: (error as any).statusCode,
+          stack: error.stack,
+        },
+      },
+      'Request error',
+    );
 
     const statusCode = (error as any).statusCode || 500;
     const code = (error as any).code || 'internal_error';

@@ -106,6 +106,30 @@ interface GoogleAuthServiceDeps {
   now?: () => Date;
 }
 
+interface ProviderLikeError {
+  provider?: string;
+  code?: string;
+  message?: string;
+  retryable?: boolean;
+  status?: number;
+}
+
+function isGoogleAuthCodeExchangeResult(value: unknown): value is GoogleAuthCodeExchangeResult {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const tokenSet = candidate.tokenSet as Record<string, unknown> | undefined;
+
+  return Boolean(
+    tokenSet &&
+      typeof tokenSet.accessToken === 'string' &&
+      typeof candidate.externalAccountId === 'string' &&
+      typeof candidate.idToken === 'string',
+  );
+}
+
 function toCodeChallenge(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
@@ -224,12 +248,20 @@ function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient 
 
 export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuthService {
   const now = deps.now ?? (() => new Date());
+  const requiredScopes = ['openid', 'email', 'profile'];
   const allowedScopes = new Set(
     (deps.allowedScopes ?? [
       'https://www.googleapis.com/auth/forms.body.readonly',
       'https://www.googleapis.com/auth/forms.responses.readonly',
     ]).map((scope) => scope.trim()),
   );
+  for (const requiredScope of requiredScopes) {
+    allowedScopes.add(requiredScope);
+  }
+
+  function isProviderLikeError(error: unknown): error is ProviderLikeError {
+    return !!error && typeof error === 'object' && 'code' in error && 'message' in error;
+  }
 
   function resolveRequestedScopes(requestedScopes: string[] | undefined): string[] {
     if (!requestedScopes || requestedScopes.length === 0) {
@@ -246,7 +278,7 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
       );
     }
 
-    return normalizedRequestedScopes;
+    return [...new Set([...normalizedRequestedScopes, ...requiredScopes])];
   }
 
   return {
@@ -295,11 +327,40 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
         throw new AppError(ErrorCode.BAD_REQUEST, 400, 'Invalid PKCE code verifier');
       }
 
-      const exchangeResult = await deps.connector.exchangeAuthorizationCode({
-        code: input.code,
-        redirectUri: input.redirectUri,
-        codeVerifier: input.codeVerifier,
-      });
+      let exchangeResult: GoogleAuthCodeExchangeResult;
+      try {
+        const rawExchangeResult = await deps.connector.exchangeAuthorizationCode({
+          code: input.code,
+          redirectUri: input.redirectUri,
+          codeVerifier: input.codeVerifier,
+        });
+
+        if (!isGoogleAuthCodeExchangeResult(rawExchangeResult)) {
+          throw new AppError(
+            ErrorCode.BAD_REQUEST,
+            400,
+            'Google OAuth connector returned an invalid token exchange payload',
+          );
+        }
+
+        exchangeResult = rawExchangeResult;
+      } catch (error) {
+        if (error instanceof AppError) {
+          throw error;
+        }
+
+        if (isProviderLikeError(error)) {
+          const statusCode = typeof error.status === 'number' ? error.status : 400;
+          const errorCode = statusCode >= 500 ? ErrorCode.SERVICE_UNAVAILABLE : ErrorCode.BAD_REQUEST;
+          throw new AppError(errorCode, statusCode, error.message ?? 'Google OAuth exchange failed', {
+            provider: error.provider,
+            providerCode: error.code,
+            retryable: error.retryable,
+          });
+        }
+
+        throw error;
+      }
 
       return deps.connectionStore.upsert({
         ownerId: principal.userId,
