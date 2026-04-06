@@ -215,6 +215,7 @@ Progress update:
 - OAuth start/code exchange/refresh flows in the Google connector now use `google-auth-library`.
 - Google connector methods now propagate normalized provider errors for OAuth/API failure paths.
 - Google connector unit tests include provider error mapping and propagation coverage.
+- Error-path coverage now includes refresh-token and response-list failure propagation behavior.
 - Auth model remains OAuth 2.0 Authorization Code with PKCE (documented in this plan); secret handling and DB credential schema wiring are pending next slices.
 
 ### Phase 2: Google Client Implementation

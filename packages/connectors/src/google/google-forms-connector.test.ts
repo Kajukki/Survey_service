@@ -223,6 +223,65 @@ describe('GoogleFormsConnector', () => {
       status: 429,
     });
   });
+
+  it('throws mapped provider error when refresh token flow fails', async () => {
+    const httpClient = makeHttpClient();
+    const oauthClient = makeOAuthClient();
+
+    vi.mocked(oauthClient.refreshAccessToken).mockRejectedValueOnce({
+      message: 'temporarily unavailable',
+      response: {
+        status: 503,
+        data: {
+          error: {
+            status: 'UNAVAILABLE',
+            message: 'Service unavailable',
+          },
+        },
+      },
+    });
+
+    const connector = new GoogleFormsConnector(config, httpClient, oauthClient as any);
+
+    await expect(
+      connector.refreshAccessToken({ refreshToken: 'refresh-token' }),
+    ).rejects.toMatchObject({
+      provider: 'google',
+      code: 'unavailable',
+      retryable: true,
+      status: 503,
+    });
+  });
+
+  it('throws mapped provider error when list responses API fails', async () => {
+    const httpClient = makeHttpClient();
+    vi.mocked(httpClient.request).mockRejectedValueOnce({
+      message: 'Internal Error',
+      response: {
+        status: 500,
+        data: {
+          error: {
+            status: 'INTERNAL',
+            message: 'Internal server error',
+          },
+        },
+      },
+    });
+
+    const connector = new GoogleFormsConnector(config, httpClient);
+
+    await expect(
+      connector.listFormResponses({
+        accessToken: 'token',
+        externalFormId: 'form-ext-1',
+      }),
+    ).rejects.toMatchObject({
+      provider: 'google',
+      code: 'internal',
+      retryable: true,
+      status: 500,
+    });
+  });
 });
 
 describe('mapGoogleProviderError', () => {
