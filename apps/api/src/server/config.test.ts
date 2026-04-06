@@ -11,6 +11,8 @@ describe('Configuration', () => {
     // Snapshot current env
     process.env = { ...originalEnv };
     process.env.AUTH_JWT_SECRET = 'test-secret-test-secret-test-secret';
+    process.env.GOOGLE_OAUTH_CLIENT_ID = 'google-client-id';
+    process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'google-client-secret';
   });
 
   afterEach(() => {
@@ -104,6 +106,17 @@ describe('Configuration', () => {
     process.env.OIDC_AUDIENCE = 'api.example.com';
     process.env.OIDC_JWKS_URI = 'https://idp.example.com/.well-known/jwks.json';
     process.env.NODE_ENV = 'invalid';
+
+    expect(() => loadConfig()).toThrow();
+  });
+
+  it('should throw when GOOGLE_OAUTH_CLIENT_ID is missing', () => {
+    process.env.DATABASE_URL = 'postgresql://localhost/test';
+    process.env.RABBITMQ_URL = 'amqp://localhost';
+    process.env.OIDC_ISSUER = 'https://idp.example.com';
+    process.env.OIDC_AUDIENCE = 'api.example.com';
+    process.env.OIDC_JWKS_URI = 'https://idp.example.com/.well-known/jwks.json';
+    delete process.env.GOOGLE_OAUTH_CLIENT_ID;
 
     expect(() => loadConfig()).toThrow();
   });

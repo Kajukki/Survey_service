@@ -3,6 +3,7 @@ import { GoogleFormsConnector, type ConnectorHttpClient } from '@survey-service/
 import type { ProviderAuthStartResult, ProviderTokenSet } from '@survey-service/contracts';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
+import type { Config } from '../../../server/config';
 import { AppError, ErrorCode, ForbiddenError } from '../../../server/errors';
 import { createGoogleAuthRepository } from './google-auth.repository';
 
@@ -94,6 +95,7 @@ interface GoogleAuthServiceDeps {
   connector: GoogleAuthConnector;
   stateStore: GoogleAuthStateStore;
   connectionStore: GoogleConnectionStore;
+  allowedScopes?: string[];
   now?: () => Date;
 }
 
@@ -213,14 +215,35 @@ function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient 
 
 export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuthService {
   const now = deps.now ?? (() => new Date());
+  const allowedScopes = new Set(
+    (deps.allowedScopes ?? [
+      'https://www.googleapis.com/auth/forms.body.readonly',
+      'https://www.googleapis.com/auth/forms.responses.readonly',
+    ]).map((scope) => scope.trim()),
+  );
+
+  function resolveRequestedScopes(requestedScopes: string[] | undefined): string[] {
+    if (!requestedScopes || requestedScopes.length === 0) {
+      return [...allowedScopes];
+    }
+
+    const normalizedRequestedScopes = requestedScopes.map((scope) => scope.trim());
+    const disallowed = normalizedRequestedScopes.filter((scope) => !allowedScopes.has(scope));
+    if (disallowed.length > 0) {
+      throw new AppError(
+        ErrorCode.BAD_REQUEST,
+        400,
+        `Unsupported Google OAuth scopes requested: ${disallowed.join(', ')}`,
+      );
+    }
+
+    return normalizedRequestedScopes;
+  }
 
   return {
     async startAuthorization({ principal, input }) {
       const state = randomUUID();
-      const scopes =
-        input.scopes && input.scopes.length > 0
-          ? input.scopes
-          : ['https://www.googleapis.com/auth/forms.body.readonly'];
+      const scopes = resolveRequestedScopes(input.scopes);
 
       await deps.stateStore.save({
         state,
@@ -280,14 +303,25 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
   };
 }
 
-export function createDefaultGoogleAuthService(db?: Kysely<Database>): GoogleAuthService {
+export function createDefaultGoogleAuthService(
+  config: Config | undefined,
+  db?: Kysely<Database>,
+): GoogleAuthService {
+  if (!config) {
+    throw new AppError(
+      ErrorCode.INTERNAL_ERROR,
+      500,
+      'Google auth service requires API configuration',
+    );
+  }
+
   const connector = new GoogleFormsConnector(
     {
-      clientId: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
-      clientSecret: process.env.GOOGLE_OAUTH_CLIENT_SECRET,
-      authBaseUrl: process.env.GOOGLE_OAUTH_AUTH_BASE_URL ?? 'https://accounts.google.com/o/oauth2/v2/auth',
-      tokenUrl: process.env.GOOGLE_OAUTH_TOKEN_URL ?? 'https://oauth2.googleapis.com/token',
-      formsApiBaseUrl: process.env.GOOGLE_FORMS_API_BASE_URL ?? 'https://forms.googleapis.com/v1',
+      clientId: config.GOOGLE_OAUTH_CLIENT_ID,
+      clientSecret: config.GOOGLE_OAUTH_CLIENT_SECRET,
+      authBaseUrl: config.GOOGLE_OAUTH_AUTH_BASE_URL,
+      tokenUrl: config.GOOGLE_OAUTH_TOKEN_URL,
+      formsApiBaseUrl: config.GOOGLE_FORMS_API_BASE_URL,
     },
     createFetchHttpClient(),
   );
@@ -298,6 +332,7 @@ export function createDefaultGoogleAuthService(db?: Kysely<Database>): GoogleAut
       connector,
       stateStore: repository.stateStore,
       connectionStore: repository.connectionStore,
+      allowedScopes: config.GOOGLE_OAUTH_ALLOWED_SCOPES,
     });
   }
 
@@ -305,5 +340,6 @@ export function createDefaultGoogleAuthService(db?: Kysely<Database>): GoogleAut
     connector,
     stateStore: createInMemoryStateStore(),
     connectionStore: createInMemoryConnectionStore(),
+    allowedScopes: config.GOOGLE_OAUTH_ALLOWED_SCOPES,
   });
 }

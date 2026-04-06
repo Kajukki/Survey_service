@@ -169,4 +169,39 @@ describe('GoogleAuthService', () => {
       statusCode: 400,
     });
   });
+
+  it('rejects start authorization when request includes disallowed scopes', async () => {
+    const stateStore = createInMemoryStateStore();
+    const connectionStore = createInMemoryConnectionStore();
+
+    const connector = {
+      buildAuthorizationUrl: vi.fn(),
+      exchangeAuthorizationCode: vi.fn(),
+    };
+
+    const service = createGoogleAuthService({
+      connector,
+      stateStore,
+      connectionStore,
+      allowedScopes: ['https://www.googleapis.com/auth/forms.body.readonly'],
+    });
+
+    await expect(
+      service.startAuthorization({
+        principal: { userId: 'de2ddde8-ffdd-4eb9-8930-c71f6653f77f', orgId: 'default-org' },
+        input: {
+          redirectUri: 'https://app.example.com/providers/google/callback',
+          codeChallenge: 'bKE9UspwyIPg8LsQHkJaiehiTeUdstI5JZOvaoQRgJA',
+          codeChallengeMethod: 'S256',
+          scopes: [
+            'https://www.googleapis.com/auth/forms.body.readonly',
+            'https://www.googleapis.com/auth/drive.readonly',
+          ],
+        },
+      }),
+    ).rejects.toMatchObject({
+      code: 'bad_request',
+      statusCode: 400,
+    });
+  });
 });

@@ -301,6 +301,12 @@ This removes containers and local PostgreSQL/RabbitMQ data. Be careful—this de
 | `AUTH_JWT_SECRET` | (required) | HS256 signing secret for local auth tokens |
 | `ACCESS_TOKEN_TTL_SECONDS` | 900 | Access token lifetime in seconds |
 | `REFRESH_TOKEN_TTL_SECONDS` | 604800 | Refresh token lifetime in seconds |
+| `GOOGLE_OAUTH_CLIENT_ID` | (required) | Google OAuth2 client id for provider auth initialization |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | (required) | Google OAuth2 client secret for provider auth initialization |
+| `GOOGLE_OAUTH_AUTH_BASE_URL` | https://accounts.google.com/o/oauth2/v2/auth | Google OAuth authorization base URL |
+| `GOOGLE_OAUTH_TOKEN_URL` | https://oauth2.googleapis.com/token | Google OAuth token exchange URL |
+| `GOOGLE_FORMS_API_BASE_URL` | https://forms.googleapis.com/v1 | Google Forms API base URL |
+| `GOOGLE_OAUTH_ALLOWED_SCOPES` | forms.body.readonly,forms.responses.readonly | Comma-separated allowlist enforced for requested Google scopes |
 
 ### Worker (`apps/worker/.env`)
 

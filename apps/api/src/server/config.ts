@@ -30,6 +30,34 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
 
+  // Google OAuth (provider auth flow)
+  GOOGLE_OAUTH_CLIENT_ID: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_ID is required'),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_SECRET is required'),
+  GOOGLE_OAUTH_AUTH_BASE_URL: z
+    .string()
+    .url('GOOGLE_OAUTH_AUTH_BASE_URL must be a valid URL')
+    .default('https://accounts.google.com/o/oauth2/v2/auth'),
+  GOOGLE_OAUTH_TOKEN_URL: z
+    .string()
+    .url('GOOGLE_OAUTH_TOKEN_URL must be a valid URL')
+    .default('https://oauth2.googleapis.com/token'),
+  GOOGLE_FORMS_API_BASE_URL: z
+    .string()
+    .url('GOOGLE_FORMS_API_BASE_URL must be a valid URL')
+    .default('https://forms.googleapis.com/v1'),
+  GOOGLE_OAUTH_ALLOWED_SCOPES: z
+    .string()
+    .default(
+      'https://www.googleapis.com/auth/forms.body.readonly,https://www.googleapis.com/auth/forms.responses.readonly',
+    )
+    .transform((value) =>
+      value
+        .split(',')
+        .map((scope) => scope.trim())
+        .filter((scope) => scope.length > 0),
+    )
+    .pipe(z.array(z.string().min(1)).min(1, 'At least one GOOGLE_OAUTH_ALLOWED_SCOPES entry is required')),
+
   // CORS
   ALLOWED_ORIGINS: z
     .string()

@@ -75,6 +75,14 @@ AUTH_JWT_SECRET=replace-with-a-long-random-secret
 ACCESS_TOKEN_TTL_SECONDS=900
 REFRESH_TOKEN_TTL_SECONDS=604800
 
+# Google OAuth provider initialization
+GOOGLE_OAUTH_CLIENT_ID=your-google-client-id
+GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret
+GOOGLE_OAUTH_AUTH_BASE_URL=https://accounts.google.com/o/oauth2/v2/auth
+GOOGLE_OAUTH_TOKEN_URL=https://oauth2.googleapis.com/token
+GOOGLE_FORMS_API_BASE_URL=https://forms.googleapis.com/v1
+GOOGLE_OAUTH_ALLOWED_SCOPES=https://www.googleapis.com/auth/forms.body.readonly,https://www.googleapis.com/auth/forms.responses.readonly
+
 # CORS
 ALLOWED_ORIGINS=http://localhost:4200,https://app.example.com
 

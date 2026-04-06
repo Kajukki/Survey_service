@@ -51,16 +51,14 @@ export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepo
 
     async consume(state: string): Promise<PendingAuthState | null> {
       const row = await db
-        .selectFrom('provider_auth_states')
-        .selectAll()
+        .deleteFrom('provider_auth_states')
         .where('state', '=', state)
+        .returningAll()
         .executeTakeFirst();
 
       if (!row) {
         return null;
       }
-
-      await db.deleteFrom('provider_auth_states').where('state', '=', state).execute();
 
       return {
         state: row.state,
