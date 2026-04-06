@@ -209,4 +209,31 @@ describe('google auth provider routes', () => {
     expect(payload.data.id).toBe('conn-1');
     expect(payload.data.type).toBe('google');
   });
+
+  it('rejects callback payload with legacy externalAccountId field', async () => {
+    const service: GoogleAuthService = {
+      startAuthorization: vi.fn(),
+      completeAuthorization: vi.fn(),
+    };
+    const { app, config } = await buildApp(service);
+    const token = await signAccessToken(config);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/providers/google/auth/callback',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+      payload: {
+        code: 'auth-code',
+        state: 'state-1',
+        codeVerifier: 'verifier-1',
+        redirectUri: 'https://app.example.com/providers/google/callback',
+        externalAccountId: 'legacy-client-value',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(service.completeAuthorization).not.toHaveBeenCalled();
+  });
 });

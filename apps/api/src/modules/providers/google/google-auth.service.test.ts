@@ -18,12 +18,16 @@ describe('GoogleAuthService', () => {
         codeChallengeMethod: 'S256',
       })),
       exchangeAuthorizationCode: vi.fn(async () => ({
-        provider: 'google',
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        expiresAt: '2026-01-01T00:00:00.000Z',
-        scope: 'forms.body.readonly',
-        tokenType: 'Bearer',
+        tokenSet: {
+          provider: 'google',
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: '2026-01-01T00:00:00.000Z',
+          scope: 'forms.body.readonly',
+          tokenType: 'Bearer',
+        },
+        externalAccountId: 'google-subject-1',
+        idToken: 'google-id-token',
       })),
     };
 
@@ -57,6 +61,7 @@ describe('GoogleAuthService', () => {
 
     expect(start.provider).toBe('google');
     expect(linked.type).toBe('google');
+    expect(linked.externalId).toBe('google-subject-1');
     expect(connector.exchangeAuthorizationCode).toHaveBeenCalledTimes(1);
   });
 
@@ -117,12 +122,16 @@ describe('GoogleAuthService', () => {
         codeChallengeMethod: 'S256',
       })),
       exchangeAuthorizationCode: vi.fn(async () => ({
-        provider: 'google',
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        expiresAt: '2026-01-01T00:00:00.000Z',
-        scope: 'forms.body.readonly',
-        tokenType: 'Bearer',
+        tokenSet: {
+          provider: 'google',
+          accessToken: 'access-token',
+          refreshToken: 'refresh-token',
+          expiresAt: '2026-01-01T00:00:00.000Z',
+          scope: 'forms.body.readonly',
+          tokenType: 'Bearer',
+        },
+        externalAccountId: 'google-subject-1',
+        idToken: 'google-id-token',
       })),
     };
 

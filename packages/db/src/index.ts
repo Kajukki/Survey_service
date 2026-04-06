@@ -61,6 +61,7 @@ export interface ProviderConnectionsTable {
   name: string;
   access_token: string;
   refresh_token: string | null;
+  id_token: string | null;
   expires_at: ColumnType<Date, Date | string, Date | string>;
   scope: string | null;
   token_type: string;
