@@ -17,3 +17,14 @@ Angular application (standalone, signals-first). Configure API base URL via envi
 - Typecheck: `npm run typecheck`
 
 See [repository structure](../../docs/repository-structure.md).
+
+## Google OAuth2 Provider Linking
+
+- Google provider linking is initiated from the Connections page.
+- The web app uses Authorization Code + PKCE and stores pending OAuth context in `sessionStorage`.
+- Callback handling is performed by `/auth/callback`:
+	- Session token callback (`?token=` or `#token=`) continues to dashboard sign-in completion.
+	- Google provider callback (`?code=...&state=...`) completes provider linking and redirects to connections status.
+- Connections route query params:
+	- `oauth=linked` for successful link completion.
+	- `oauth=error&reason=<value>` for callback/start failures.

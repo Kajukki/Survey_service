@@ -34,11 +34,16 @@ isProject: false
 - Session persistence and token handling implemented.
 - Refresh retry behavior in HTTP error interceptor implemented.
 
-2. Route shell and guarding
+2. Google provider OAuth2 linking flow
+- Connections page now initiates Google OAuth2 Authorization Code + PKCE flow.
+- Callback route now supports provider callback completion with state/code verifier validation via frontend pending auth context.
+- Existing app auth callback token handling remains supported.
+
+3. Route shell and guarding
 - Top-level route shell and auth guard are present.
 - Auth callback route remains available for compatibility.
 
-3. Feature route scaffolding
+4. Feature route scaffolding
 - Dashboard, connections, forms, sync-jobs, exports, and sharing routes exist.
 
 ### In Progress
