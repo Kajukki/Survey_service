@@ -20,6 +20,9 @@ todos:
   - id: dashboard-design
     content: Implement dashboard URL-bound filters, KPI row, deferred chart widgets, and robust empty/error states
     status: in_progress
+  - id: ui-theme-unification
+    content: Migrate web feature surfaces to shared dark-theme tokens and reusable button/input/list primitives
+    status: completed
 isProject: false
 ---
 
@@ -46,6 +49,12 @@ isProject: false
 4. Feature route scaffolding
 - Dashboard, connections, forms, sync-jobs, exports, and sharing routes exist.
 
+5. UI theme migration (April 2026)
+- Global dark-theme token system implemented in app styles.
+- Shared primitives established for primary/secondary buttons, text inputs, status badges, and list surfaces.
+- Shell, dashboard widgets, connections, sync jobs, forms, exports, sharing, and login surfaces now use unified visual patterns.
+- Status and timestamp treatments are standardized across operational list items.
+
 ### In Progress
 
 1. Data parity with backend
@@ -53,6 +62,9 @@ isProject: false
 
 2. Contract hardening
 - Continued alignment needed between frontend adapters and API envelope fields.
+
+3. Testing hardening for refreshed UI
+- Add visual regression snapshots and accessibility checks for newly unified page surfaces.
 
 ## Target State
 
