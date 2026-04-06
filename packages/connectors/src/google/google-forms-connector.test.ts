@@ -16,10 +16,20 @@ function makeHttpClient() {
   } as unknown as ConnectorHttpClient;
 }
 
+function makeOAuthClient() {
+  return {
+    generateAuthUrl: vi.fn(() => 'https://accounts.google.com/o/oauth2/v2/auth?mock=1'),
+    getToken: vi.fn(),
+    setCredentials: vi.fn(),
+    refreshAccessToken: vi.fn(),
+  };
+}
+
 describe('GoogleFormsConnector', () => {
   it('builds an oauth authorization URL with PKCE parameters', () => {
     const httpClient = makeHttpClient();
-    const connector = new GoogleFormsConnector(config, httpClient);
+    const oauthClient = makeOAuthClient();
+    const connector = new GoogleFormsConnector(config, httpClient, oauthClient as any);
 
     const result = connector.buildAuthorizationUrl({
       provider: 'google',
@@ -31,22 +41,33 @@ describe('GoogleFormsConnector', () => {
     });
 
     expect(result.provider).toBe('google');
-    expect(result.authorizationUrl).toContain('code_challenge=challenge-abc');
-    expect(result.authorizationUrl).toContain('code_challenge_method=S256');
-    expect(result.authorizationUrl).toContain('state=state-123');
+    expect(result.authorizationUrl).toBe('https://accounts.google.com/o/oauth2/v2/auth?mock=1');
+    expect(oauthClient.generateAuthUrl).toHaveBeenCalledWith({
+      access_type: 'offline',
+      prompt: 'consent',
+      response_type: 'code',
+      redirect_uri: 'https://app.example.com/callback',
+      scope: ['forms.body.readonly', 'forms.responses.readonly'],
+      state: 'state-123',
+      code_challenge: 'challenge-abc',
+      code_challenge_method: 'S256',
+    });
   });
 
   it('maps token exchange response into provider token set', async () => {
     const httpClient = makeHttpClient();
-    vi.mocked(httpClient.request).mockResolvedValueOnce({
-      access_token: 'access-token',
-      refresh_token: 'refresh-token',
-      expires_in: 3600,
-      scope: 'forms.body.readonly',
-      token_type: 'Bearer',
+    const oauthClient = makeOAuthClient();
+    vi.mocked(oauthClient.getToken).mockResolvedValueOnce({
+      tokens: {
+        access_token: 'access-token',
+        refresh_token: 'refresh-token',
+        expiry_date: Date.now() + 3600 * 1000,
+        scope: 'forms.body.readonly',
+        token_type: 'Bearer',
+      },
     });
 
-    const connector = new GoogleFormsConnector(config, httpClient);
+    const connector = new GoogleFormsConnector(config, httpClient, oauthClient as any);
     const result = await connector.exchangeAuthorizationCode({
       code: 'oauth-code',
       redirectUri: 'https://app.example.com/callback',
@@ -57,6 +78,35 @@ describe('GoogleFormsConnector', () => {
     expect(result.accessToken).toBe('access-token');
     expect(result.refreshToken).toBe('refresh-token');
     expect(result.expiresAt.length).toBeGreaterThan(10);
+    expect(oauthClient.getToken).toHaveBeenCalledWith({
+      code: 'oauth-code',
+      redirect_uri: 'https://app.example.com/callback',
+      codeVerifier: 'verifier-123',
+    });
+  });
+
+  it('maps refresh token flow using oauth client refresh credentials', async () => {
+    const httpClient = makeHttpClient();
+    const oauthClient = makeOAuthClient();
+
+    vi.mocked(oauthClient.refreshAccessToken).mockResolvedValueOnce({
+      credentials: {
+        access_token: 'refreshed-access-token',
+        refresh_token: 'refresh-token',
+        expiry_date: Date.now() + 1800 * 1000,
+        scope: 'forms.body.readonly forms.responses.readonly',
+        token_type: 'Bearer',
+      },
+    });
+
+    const connector = new GoogleFormsConnector(config, httpClient, oauthClient as any);
+    const result = await connector.refreshAccessToken({ refreshToken: 'refresh-token' });
+
+    expect(oauthClient.setCredentials).toHaveBeenCalledWith({
+      refresh_token: 'refresh-token',
+    });
+    expect(oauthClient.refreshAccessToken).toHaveBeenCalledTimes(1);
+    expect(result.accessToken).toBe('refreshed-access-token');
   });
 
   it('maps form list payload into provider-neutral summaries', async () => {

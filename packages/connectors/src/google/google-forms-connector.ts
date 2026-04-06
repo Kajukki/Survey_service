@@ -5,6 +5,7 @@ import type {
   ProviderFormSummary,
   ProviderTokenSet,
 } from '@survey-service/contracts';
+import { OAuth2Client } from 'google-auth-library';
 import {
   ProviderAuthStartResultSchema,
   ProviderFormResponsePageSchema,
@@ -21,10 +22,57 @@ export interface GoogleConnectorConfig {
   formsApiBaseUrl: string;
 }
 
-function encodeQuery(params: Record<string, string>): string {
-  return Object.entries(params)
-    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
-    .join('&');
+interface GoogleOAuthCredentials {
+  access_token?: string | null;
+  refresh_token?: string | null;
+  expiry_date?: number | null;
+  scope?: string | null;
+  token_type?: string | null;
+}
+
+interface GoogleOAuthClient {
+  generateAuthUrl(input: {
+    access_type: 'offline';
+    prompt: 'consent';
+    response_type: 'code';
+    redirect_uri: string;
+    scope: string[];
+    state: string;
+    code_challenge: string;
+    code_challenge_method: 'S256';
+  }): string;
+  getToken(input: {
+    code: string;
+    redirect_uri: string;
+    codeVerifier: string;
+  }): Promise<{ tokens: GoogleOAuthCredentials }>;
+  setCredentials(input: { refresh_token: string }): void;
+  refreshAccessToken(): Promise<{ credentials: GoogleOAuthCredentials }>;
+}
+
+function createGoogleOAuthClient(config: GoogleConnectorConfig): GoogleOAuthClient {
+  const client = new OAuth2Client(config.clientId, config.clientSecret);
+
+  return {
+    generateAuthUrl(input) {
+      return client.generateAuthUrl(input as any);
+    },
+    async getToken(input) {
+      const response = await client.getToken(input);
+      return {
+        tokens: response.tokens,
+      };
+    },
+    setCredentials(input) {
+      client.setCredentials(input);
+    },
+    async refreshAccessToken() {
+      const response = await client.refreshAccessToken();
+      return {
+        credentials: response.credentials,
+      };
+    },
+  };
 }
 
 export class GoogleFormsConnector implements ProviderConnector {
@@ -33,17 +81,16 @@ export class GoogleFormsConnector implements ProviderConnector {
   constructor(
     private readonly config: GoogleConnectorConfig,
     private readonly httpClient: ConnectorHttpClient,
+    private readonly oauthClient: GoogleOAuthClient = createGoogleOAuthClient(config),
   ) {}
 
   buildAuthorizationUrl(input: ProviderAuthStartInput): ProviderAuthStartResult {
-    const scope = input.scopes.join(' ');
-    const query = encodeQuery({
-      client_id: this.config.clientId,
-      redirect_uri: input.redirectUri,
-      response_type: 'code',
-      scope,
+    const authorizationUrl = this.oauthClient.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
+      response_type: 'code',
+      redirect_uri: input.redirectUri,
+      scope: input.scopes,
       state: input.state,
       code_challenge: input.codeChallenge,
       code_challenge_method: input.codeChallengeMethod,
@@ -51,7 +98,7 @@ export class GoogleFormsConnector implements ProviderConnector {
 
     return ProviderAuthStartResultSchema.parse({
       provider: this.provider,
-      authorizationUrl: `${this.config.authBaseUrl}?${query}`,
+      authorizationUrl,
       state: input.state,
       codeChallengeMethod: input.codeChallengeMethod,
     });
@@ -62,53 +109,20 @@ export class GoogleFormsConnector implements ProviderConnector {
     redirectUri: string;
     codeVerifier: string;
   }): Promise<ProviderTokenSet> {
-    const tokenResponse = await this.httpClient.request<{
-      access_token: string;
-      refresh_token?: string;
-      expires_in: number;
-      scope?: string;
-      token_type?: string;
-    }>({
-      method: 'POST',
-      url: this.config.tokenUrl,
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-      },
-      body: encodeQuery({
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret ?? '',
-        grant_type: 'authorization_code',
+    const tokenResponse = await this.oauthClient.getToken({
         code: input.code,
         redirect_uri: input.redirectUri,
-        code_verifier: input.codeVerifier,
-      }),
+        codeVerifier: input.codeVerifier,
     });
 
-    return this.toTokenSet(tokenResponse);
+    return this.toTokenSet(tokenResponse.tokens);
   }
 
   async refreshAccessToken(input: { refreshToken: string }): Promise<ProviderTokenSet> {
-    const tokenResponse = await this.httpClient.request<{
-      access_token: string;
-      refresh_token?: string;
-      expires_in: number;
-      scope?: string;
-      token_type?: string;
-    }>({
-      method: 'POST',
-      url: this.config.tokenUrl,
-      headers: {
-        'content-type': 'application/x-www-form-urlencoded',
-      },
-      body: encodeQuery({
-        client_id: this.config.clientId,
-        client_secret: this.config.clientSecret ?? '',
-        grant_type: 'refresh_token',
-        refresh_token: input.refreshToken,
-      }),
-    });
+    this.oauthClient.setCredentials({ refresh_token: input.refreshToken });
+    const tokenResponse = await this.oauthClient.refreshAccessToken();
 
-    return this.toTokenSet(tokenResponse);
+    return this.toTokenSet(tokenResponse.credentials, input.refreshToken);
   }
 
   async listForms(input: { accessToken: string; pageToken?: string }): Promise<{
@@ -188,19 +202,16 @@ export class GoogleFormsConnector implements ProviderConnector {
     });
   }
 
-  private toTokenSet(tokenResponse: {
-    access_token: string;
-    refresh_token?: string;
-    expires_in: number;
-    scope?: string;
-    token_type?: string;
-  }): ProviderTokenSet {
-    const expiresAt = new Date(Date.now() + tokenResponse.expires_in * 1000).toISOString();
+  private toTokenSet(
+    tokenResponse: GoogleOAuthCredentials,
+    fallbackRefreshToken?: string,
+  ): ProviderTokenSet {
+    const expiresAt = new Date(tokenResponse.expiry_date ?? Date.now() + 3600 * 1000).toISOString();
 
     return ProviderTokenSetSchema.parse({
       provider: this.provider,
-      accessToken: tokenResponse.access_token,
-      refreshToken: tokenResponse.refresh_token,
+      accessToken: tokenResponse.access_token ?? '',
+      refreshToken: tokenResponse.refresh_token ?? fallbackRefreshToken,
       expiresAt,
       scope: tokenResponse.scope,
       tokenType: tokenResponse.token_type ?? 'Bearer',

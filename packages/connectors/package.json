@@ -24,7 +24,8 @@
     "prepare": "npm run build"
   },
   "dependencies": {
-    "@survey-service/contracts": "file:../contracts"
+    "@survey-service/contracts": "file:../contracts",
+    "google-auth-library": "10.6.2"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
