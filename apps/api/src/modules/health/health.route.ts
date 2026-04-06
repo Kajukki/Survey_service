@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify';
 import type { Logger } from 'pino';
 import { sql } from 'kysely';
 import type { Kysely } from 'kysely';
-import type { Database } from '../../infra/db';
+import type { Database } from '@survey-service/db';
 import type { RabbitMQClient } from '../../infra/rabbitmq';
 
 /**
@@ -31,6 +31,8 @@ export async function registerHealthRoutes(
   rabbitmq: RabbitMQClient,
 ): Promise<void> {
   app.get('/health', async (request, reply) => {
+    logger.debug({ requestId: request.id }, 'Running health check');
+
     let dbOk = false;
     let rmqOk = false;
 

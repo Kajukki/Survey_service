@@ -23,10 +23,20 @@ function mapApiError(error: unknown): Error {
     return new Error('Unexpected request failure');
   }
 
-  const apiMessage =
-    typeof error.error === 'object' && error.error !== null && 'message' in error.error
-      ? String(error.error.message)
-      : undefined;
+  let apiMessage: string | undefined;
+
+  if (typeof error.error === 'object' && error.error !== null) {
+    if ('message' in error.error) {
+      apiMessage = String(error.error.message);
+    }
+
+    if (!apiMessage && 'error' in error.error) {
+      const nestedError = (error.error as { error?: { message?: unknown } }).error;
+      if (nestedError && typeof nestedError.message === 'string') {
+        apiMessage = nestedError.message;
+      }
+    }
+  }
 
   return new Error(apiMessage ?? `Request failed with status ${error.status}`);
 }

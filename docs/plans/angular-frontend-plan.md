@@ -4,22 +4,22 @@ overview: "Define an Angular v21+ SPA layout under `apps/web`, aligned with the 
 todos:
   - id: scaffold-web
     content: Scaffold apps/web with Angular CLI (standalone, strict), app.config.ts, provideRouter + provideHttpClient, shell layout
-    status: pending
+    status: completed
   - id: core-auth-http
     content: Add core/auth (functional authGuard, session/OIDC integration) and core/http (API base URL, Bearer + error mapping interceptors)
-    status: pending
+    status: completed
   - id: feature-slices
     content: "Lazy-load features: connections, forms, sync-jobs (poll), dashboard, exports, sharing — each with routes and httpResource-driven reads"
-    status: pending
+    status: in_progress
   - id: contracts-integration
     content: Wire types/client from packages/contracts or OpenAPI codegen when API exists
-    status: pending
+    status: in_progress
   - id: testing-ci
     content: Add unit tests for guards/services and smoke e2e for auth + one critical flow per rules/testing
     status: pending
   - id: dashboard-design
     content: "Implement dashboard per detailed section: URL-bound filters, KPI row, deferred chart widgets, tables, empty/error states"
-    status: pending
+    status: in_progress
 isProject: false
 ---
 
@@ -31,7 +31,7 @@ isProject: false
 
 - **Product scope** (from [docs/architecture.md](../architecture.md)): internal SPA that talks **only to the API** — dashboards, connection management, sync status, filters, charts, exports; auth via org IdP; **per-resource ownership** with **optional sharing**.
 - **Repo layout** (from [docs/repository-structure.md](../repository-structure.md)): Angular lives at **`apps/web`** in a monorepo; environment config for API base URL; optional generated client/types from `packages/contracts`.
-- **No Angular app exists in the workspace yet** — this plan is greenfield-ready and matches [skills/frontend-patterns/SKILL.md](../../skills/frontend-patterns/SKILL.md) (signals-first, standalone, `inject()`, `@if`/`@for`, `httpResource`, `OnPush`).
+- **Angular app exists in `apps/web`** and is partially implemented; this plan tracks alignment work to reach the contract-compliant target architecture from [skills/frontend-patterns/SKILL.md](../../skills/frontend-patterns/SKILL.md).
 
 ## Design principles (non-negotiables from skill + architecture)
 

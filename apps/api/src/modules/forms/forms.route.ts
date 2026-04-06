@@ -1,9 +1,18 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import type { Kysely } from 'kysely';
+import type { Database } from '@survey-service/db';
+import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { mockForms } from './forms.mock.js';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
-export async function formsRoutes(app: FastifyInstance) {
+export async function formsRoutes(
+  app: FastifyInstance,
+  _deps?: {
+    db: Kysely<Database>;
+    rabbitmq: RabbitMQClient;
+  },
+) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
 
   // GET /forms
@@ -13,6 +22,7 @@ export async function formsRoutes(app: FastifyInstance) {
       success: true,
       data: mockForms,
       meta: {
+        requestId: request.id,
         pagination: { page: 1, perPage: 20, total: mockForms.length, totalPages: 1 },
       },
     });
@@ -24,12 +34,14 @@ export async function formsRoutes(app: FastifyInstance) {
     const form = mockForms.find((f) => f.id === id);
 
     if (!form) {
-      return reply
-        .status(404)
-        .send({ success: false, error: { code: 'not_found', message: 'Form not found' } });
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
     }
 
-    return reply.send({ success: true, data: form });
+    return reply.send({ success: true, data: form, meta: { requestId: request.id } });
   });
 
   // POST /forms/:id/sync
@@ -39,9 +51,12 @@ export async function formsRoutes(app: FastifyInstance) {
     return reply.status(202).send({
       success: true,
       data: {
-        job_id: 'job-mock-1234',
+        job_id: `job-mock-${id}`,
         status: 'queued',
         type: 'sync_form',
+      },
+      meta: {
+        requestId: request.id,
       },
     });
   });

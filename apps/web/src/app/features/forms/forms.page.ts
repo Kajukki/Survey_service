@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { httpResource } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
 
+import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
+import { FormDto, mapForms } from '../../core/api/survey-api.adapters';
 import { FormRecord } from '../../shared/models/domain.models';
 
 @Component({
@@ -34,7 +36,7 @@ import { FormRecord } from '../../shared/models/domain.models';
             </tr>
           </thead>
           <tbody>
-            @for (form of forms.value(); track form.id) {
+            @for (form of formItems(); track form.id) {
               <tr>
                 <td>{{ form.title }}</td>
                 <td>{{ form.owner }}</td>
@@ -60,11 +62,15 @@ export class FormsPageComponent {
   private readonly apiBaseUrl = inject(API_BASE_URL);
   private readonly page = signal(1);
 
-  protected readonly forms = httpResource<FormRecord[]>(
-    () => `${this.apiBaseUrl}/forms?page=${this.page()}&limit=20`,
+  protected readonly forms = httpResource<ApiSuccessEnvelope<FormDto[]>>(
+    () => `${this.apiBaseUrl}/forms?page=${this.page()}&perPage=20`,
     {
-      defaultValue: [],
+      defaultValue: emptyEnvelope<FormDto[]>([]),
     },
+  );
+
+  protected readonly formItems = computed<FormRecord[]>(
+    () => mapForms(this.forms.value()?.data ?? []),
   );
 
   protected nextPage(): void {

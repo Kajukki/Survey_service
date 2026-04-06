@@ -4,17 +4,8 @@
 import { Kysely, PostgresDialect } from 'kysely';
 import { Pool } from 'pg';
 import type { Logger } from 'pino';
+import type { Database } from '@survey-service/db';
 import type { Config } from '../server/config';
-
-/**
- * Database schema types (placeholder for actual schema).
- * Update this with the actual database types from migrations.
- */
-export interface Database {
-  // This will be populated by actual schema definitions
-  // from packages/db
-  never: never;
-}
 
 /**
  * Create a Kysely instance with PostgreSQL dialect and connection pooling.
@@ -23,7 +14,7 @@ export function createDb(config: Config, logger: Logger): Kysely<Database> {
   if (process.env.MOCK_INFRA === 'true') {
     logger.warn('MOCK_INFRA is set, bypassing Real DB Connection check');
     return {
-       destroy: async () => {},
+      destroy: async () => {},
     } as unknown as Kysely<Database>;
   }
 

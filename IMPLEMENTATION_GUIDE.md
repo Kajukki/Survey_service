@@ -56,129 +56,197 @@ This document describes the API implementation following the design plan ([docs/
 - ✅ Updated [packages/\*README.md](packages/) files with usage guidance
 - ✅ Added TypeScript configuration for all packages
 
-## Next Steps for Implementation
+## Next Steps for Implementation (Strict TDD Order for RabbitMQ Sync Pipeline)
 
-### Phase 1: Database Schema and Migrations
-**Goal:** Lock down PostgreSQL schema and auto-generate Kysely types.
+This sequence is optimized for a dedicated TDD agent. Each phase is executed as RED -> GREEN -> REFACTOR before moving forward.
 
-1. **Create initial schema** in `packages/db/migrations/001_init.sql`:
-   - `users` (id, email, org_id, created_at, updated_at)
-   - `connections` (id, owner_id, type, external_id, sync_status, last_sync_at, created_at, updated_at)
-   - `forms` (id, owner_id, connection_id, external_form_id, title, response_count, created_at, updated_at)
-   - `shares` (id, resource_type, resource_id, owner_id, grantee_id, permission, created_at, revoked_at)
-   - `jobs` (id, type, status, requested_by, connection_id, form_id, trigger, started_at, completed_at, error, created_at)
-   - Indexes on (owner_id, grantee_id, status, created_at)
+### Phase 1: Job Persistence Foundation
+**Goal:** Introduce real job storage so API and worker can share lifecycle state.
 
-2. **Generate types** using `npx kysely-codegen --url postgresql://...`
-3. **Update** `packages/db/src/index.ts` with generated schema
-4. **Test locally** with Docker PostgreSQL
+**Target files/components:**
+- `packages/db/migrations/001_jobs.sql` (new migration)
+- `packages/db/src/index.ts`
+- `apps/api/src/infra/db.ts` (type alignment only)
 
-### Phase 2: Repository Layer
-**Goal:** Implement repository interfaces for each resource with owner/share filtering.
+**RED (write failing tests first):**
+1. Add repository-level tests that expect:
+  - create sync job persists `queued` status
+  - get job by id returns record with timestamps
+  - list jobs returns newest first with pagination metadata
+2. Add schema/typing test that fails if required columns are missing (`id`, `type`, `status`, `requested_by`, `connection_id`, `form_id`, `trigger`, `created_at`, `started_at`, `completed_at`, `error`).
 
-Create in `apps/api/src/modules/*/`.repo.ts`:
-- ConnectionRepository (find by owner, update sync_status)
-- FormRepository (find visible forms, pagination)
-- ShareRepository (query shares for resource)
-- JobRepository (create, find by id, list by requestedBy)
+**GREEN (minimal implementation):**
+1. Add migration for `jobs` table and required indexes (`requested_by`, `status`, `created_at`, composite on `requested_by, created_at`).
+2. Generate/update database types and make tests pass with simplest repository implementation.
 
-Pattern:
-```typescript
-interface <Resource>Repository {
-  findById(id: string, principal: Principal): Promise<Resource | null>
-  findAll(filter: Filter, principal: Principal): Promise<{ items: Resource[]; total: number }>
-  create(data: CreateInput, principal: Principal): Promise<Resource>
-  update(id: string, data: UpdateInput, principal: Principal): Promise<Resource>
-  delete(id: string, principal: Principal): Promise<void>
-}
-```
+**REFACTOR:**
+1. Extract repository helpers for pagination and status mapping.
+2. Remove duplicated SQL fragments and centralize in one module.
 
-Use visibility predicates from authorization policy in WHERE clauses.
+**Exit criteria:**
+- All Phase 1 tests pass.
+- Job schema is stable and can be consumed by API route tests.
 
-### Phase 3: Service Layer
-**Goal:** Business logic and external API orchestration.
+### Phase 2: RabbitMQ Producer Reliability in API
+**Goal:** API can safely publish sync jobs using asserted topology and confirm channel.
 
-Create in `apps/api/src/modules/*/`.service.ts`:
-- ConnectionService (OAuth callback processing, credential rotation)
-- FormService (list/detail with share inclusion)
-- ShareService (grant/revoke with audit logging)
-- JobService (enqueue sync/export with idempotency)
+**Target files/components:**
+- `apps/api/src/infra/rabbitmq.ts`
+- `packages/messaging/src/index.ts`
+- `apps/api/src/index.ts` (bootstrap call for topology)
 
-**Publish guarantees:**
-```typescript
-// In JobService.enqueueSyncJob:
-await db.transaction().execute(async tx => {
-  const job = await jobsRepo.create(jobData, tx, principal)
-  await publishToRabbitMQ(syncMessage, {
-    jobId: job.id,
-    publishOnSuccess: () => tx.run()
-  })
-  return job
-})
-```
+**RED:**
+1. Add infra tests that fail unless startup asserts:
+  - sync exchange exists
+  - sync jobs queue exists
+  - binding from exchange to queue exists
+2. Add publisher tests that fail unless:
+  - payload is validated against `SyncJobMessageSchema`
+  - publish waits for confirm
+  - publish failure is surfaced to caller
 
-### Phase 4: Route Handlers
-**Goal:** HTTP endpoints with input validation and response shaping.
+**GREEN:**
+1. Add topology bootstrap function and call it once at API startup.
+2. Add sync publish helper with schema validation + confirm handling.
 
-Create in `apps/api/src/modules/*/`.route.ts:
-- POST /connections (with credential validation)
-- GET /connections (list owner's)  
-- GET /forms (list visible)
-- GET /forms/:id (detail if authorized)
-- POST /forms/:id/shares (validate grantee + permission)
-- DELETE /forms/:id/shares/:shareId (revoke)
-- POST /jobs/sync (enqueue and return 202)
-- GET /jobs/:id (status polling)
-- POST /exports (queue export job)
+**REFACTOR:**
+1. Split connection/channel logic from topology/publisher functions.
+2. Introduce clear error classes (`RabbitMQTopologyError`, `RabbitMQPublishError`) for route/service mapping.
 
-**Response pattern:**
-```typescript
-reply.status(200).send({
-  success: true,
-  data: resource,
-  meta: { requestId: reply.request.id }
-})
-```
+**Exit criteria:**
+- Infra tests pass for topology and confirm semantics.
+- Producer behavior is deterministic under simulated publish failures.
 
-**Error pattern:**
-```typescript
-try {
-  // logic
-} catch (error) {
-  const appError = toAppError(error)
-  reply.status(appError.statusCode).send({
-    success: false,
-    error: { code: appError.code, message: appError.message },
-    meta: { requestId: reply.request.id }
-  })
-}
-```
+### Phase 3: Replace Mock Jobs API with Real Enqueue Flow
+**Goal:** `POST /api/v1/jobs/sync` and `GET /api/v1/jobs/:id` use DB + RabbitMQ instead of in-memory map.
 
-### Phase 5: Integration Tests
-**Goal:** Test API <-> Database <-> RabbitMQ flow.
+**Target files/components:**
+- `apps/api/src/modules/jobs/jobs.route.ts`
+- `apps/api/src/modules/forms/forms.route.ts` (route reuse for form sync)
+- `apps/api/src/server/create-server.ts` (context wiring if needed)
 
-Use `vitest` with:
-- Docker Compose test fixtures (PostgreSQL + RabbitMQ)
-- Transactional test isolation
-- Mock job consumers
+**RED:**
+1. Add route tests that fail unless:
+  - POST sync returns 202 with `job_id` and `status: queued`
+  - GET by id returns persisted status instead of synthetic transitions
+  - GET list includes newly created jobs for the requesting user
+2. Add negative tests:
+  - invalid payload returns 400
+  - publish failure returns controlled 5xx error envelope and does not report success
 
-Example test:
-```typescript
-it('should enqueue sync job and publish to RabbitMQ', async () => {
-  const { jobId } = await api.post('/jobs/sync', {
-    connectionId: 'conn-123'
-  }).expect(202)
-  
-  const msg = await waitForMessage(rabbitMQ, 'survey.sync.jobs')
-  expect(msg.jobId).toBe(jobId)
-})
-```
+**GREEN:**
+1. Implement minimal job creation + publish path.
+2. Replace map-backed reads with repository-backed reads.
+3. Keep response envelope fields compatible with frontend adapters.
 
-### Phase 6: Documentation and Handoff
-1. Generate OpenAPI spec from route contracts
-2. Document API error codes and retry guidance
-3. Write integration guide for frontend (polling jobs, error handling)
-4. Publish environment variable checklist for ops
+**REFACTOR:**
+1. Extract a `jobs.service.ts` to keep route handlers thin.
+2. Consolidate duplicate response mapping logic.
+
+**Exit criteria:**
+- Route-level tests pass with no in-memory fallback behavior.
+
+### Phase 4: Worker Consumer and Lifecycle Updates
+**Goal:** Worker consumes sync queue and updates job status from `queued` -> `running` -> terminal state.
+
+**Target files/components:**
+- `apps/worker/src/index.ts`
+- `apps/worker/package.json` (deps/scripts only if needed)
+- shared DB access via `packages/db`
+
+**RED:**
+1. Add worker unit tests that fail unless:
+  - valid message sets job to `running` before processing
+  - success path sets `succeeded` + `completed_at`
+  - failure path sets `failed` + error details
+2. Add consumer behavior tests for ack/nack:
+  - ack only after DB status commit
+  - invalid message is rejected predictably (nack/DLQ path)
+
+**GREEN:**
+1. Implement minimal consumer loop with schema validation.
+2. Implement status transitions and ack/nack behavior.
+
+**REFACTOR:**
+1. Isolate message handler pure logic from transport wiring.
+2. Add small retry policy helper for clearer failure handling.
+
+**Exit criteria:**
+- Worker tests pass for both success and failure paths.
+- Status transitions are visible through API reads.
+
+### Phase 5: End-to-End Integration for Frontend + API + Worker + RabbitMQ
+**Goal:** Prove local pipeline works from UI action to terminal job status.
+
+**Target files/components:**
+- `apps/api/src/modules/jobs/jobs.route.ts` integration tests
+- `apps/worker/src/index.ts` integration tests
+- `apps/web/src/app/features/sync-jobs/sync-jobs.page.ts` compatibility checks
+- `apps/web/src/app/core/api/survey-api.adapters.ts`
+
+**RED:**
+1. Add integration test that fails unless:
+  - API enqueue publishes to RabbitMQ
+  - worker consumes message
+  - job status reaches terminal state and is queryable via API
+2. Add frontend contract test that fails if API fields drift from adapter expectations (`id`, `status`, `created_at|createdAt`, `source`).
+
+**GREEN:**
+1. Wire minimal integration fixture (local services or test containers).
+2. Adjust API serialization only where needed to satisfy adapter contract.
+
+**REFACTOR:**
+1. Reduce polling/test flakiness with deterministic wait helpers.
+2. Move shared test fixtures into reusable helpers.
+
+**Exit criteria:**
+- One deterministic end-to-end test passes locally.
+- Frontend sync job screen can trigger and observe real lifecycle updates.
+
+### Phase 6: Documentation and TDD Handoff Completion
+**Goal:** Ensure implementation details are executable by another agent without missing context.
+
+**Target files/components:**
+- `apps/api/README.md`
+- `apps/worker/README.md`
+- `README.md`
+
+**RED:**
+1. Add doc quality checks (or checklist assertions) that fail handoff if required sections are missing:
+  - environment variables
+  - startup order
+  - queue/job troubleshooting
+
+**GREEN:**
+1. Document local run sequence for web, API, worker, RabbitMQ.
+2. Document expected manual test flow (Run sync -> queued -> running -> succeeded/failed).
+
+**REFACTOR:**
+1. Remove duplicated setup notes and link to canonical sections.
+
+**Exit criteria:**
+- Another agent can run implementation and validation without additional clarifications.
+
+## Phase-by-Phase Test Case Inventory (for TDD Agent Backlog)
+
+1. `jobs.repo.create` persists queued sync job with requested_by and trigger.
+2. `jobs.repo.getById` returns null for unknown id and record for known id.
+3. RabbitMQ topology bootstrap asserts exchange, queue, binding exactly once on startup.
+4. RabbitMQ publisher rejects invalid payload and never publishes.
+5. RabbitMQ publisher throws explicit error when confirm fails.
+6. `POST /api/v1/jobs/sync` returns 202 and job envelope when publish succeeds.
+7. `POST /api/v1/jobs/sync` returns controlled error envelope when publish fails.
+8. `GET /api/v1/jobs/:id` returns persisted status from DB.
+9. Worker marks job running before simulated processing begins.
+10. Worker marks job succeeded and sets completed_at on success.
+11. Worker marks job failed and stores error summary on failure.
+12. Worker ack occurs only after status persistence.
+13. End-to-end: enqueue -> consume -> terminal status observable via API.
+14. Frontend adapter compatibility test for job DTO field mapping.
+
+## Strict Sequencing Rule
+
+Do not implement GREEN for Phase N+1 until all RED/GREEN/REFACTOR checks in Phase N are complete and stable.
 
 ## Key Conventions Enforced
 
