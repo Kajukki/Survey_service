@@ -34,7 +34,7 @@ import { SyncJob } from '../../shared/models/domain.models';
                 <span class="status-badge__dot" aria-hidden="true"></span>
                 {{ job.status }}
               </strong>
-              <span class="job-created">{{ job.createdAt | date: 'short' }}</span>
+              <span class="surface-list-item__time">{{ job.createdAt | date: 'short' }}</span>
             </li>
           } @empty {
             <li class="surface-list-item empty-state">No sync jobs yet.</li>

@@ -56,7 +56,7 @@ import { Connection } from '../../shared/models/domain.models';
                 <span class="status-badge__dot" aria-hidden="true"></span>
                 {{ connection.status }}
               </span>
-              <span class="connection-date">{{ connection.updatedAt | date: 'mediumDate' }}</span>
+              <span class="surface-list-item__time">{{ connection.updatedAt | date: 'mediumDate' }}</span>
             </li>
           } @empty {
             <li class="surface-list-item empty-state">No connector configured yet.</li>

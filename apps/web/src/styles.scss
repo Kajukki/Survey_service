@@ -35,6 +35,7 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-pill: 999px;
+  --control-height: 38px;
 
   /* Back-compat aliases for existing feature styles */
   --panel-bg: var(--bg-surface);
@@ -105,23 +106,68 @@ select {
 }
 
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: var(--accent);
   color: #fff;
   border: 0;
   border-radius: var(--radius-sm);
-  padding: 10px 18px;
+  min-height: var(--control-height);
+  padding: 0 16px;
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
-  transition: background var(--motion-fast), opacity var(--motion-fast);
+  white-space: nowrap;
+  transition:
+    background var(--motion-fast),
+    opacity var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
+.btn-primary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .btn-primary:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height);
+  padding: 0 16px;
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-body);
+  font-weight: 600;
+  text-decoration: none;
+  line-height: 1;
+  transition:
+    border-color var(--motion-fast),
+    color var(--motion-fast),
+    background var(--motion-fast),
+    box-shadow var(--motion-fast);
+}
+
+.btn-secondary:hover {
+  border-color: var(--line-strong);
+  color: var(--text-strong);
+  background: var(--bg-elevated);
+}
+
+.btn-secondary:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .status-badge {
@@ -182,26 +228,38 @@ select {
 .surface-list-item {
   background: var(--bg-subtle);
   border: 1px solid var(--line-default);
-  border-left: 3px solid var(--line-default);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
 }
 
 .surface-list-item--queued {
-  border-left-color: var(--warn);
+  border-color: color-mix(in hsl, var(--warn) 45%, var(--line-default));
+  background: color-mix(in hsl, var(--warn) 8%, var(--bg-subtle));
 }
 
 .surface-list-item--connected {
-  border-left-color: var(--info);
+  border-color: color-mix(in hsl, var(--info) 45%, var(--line-default));
+  background: color-mix(in hsl, var(--info) 8%, var(--bg-subtle));
 }
 
 .surface-list-item--result {
-  border-left-color: var(--ok);
+  border-color: color-mix(in hsl, var(--ok) 45%, var(--line-default));
+  background: color-mix(in hsl, var(--ok) 8%, var(--bg-subtle));
 }
 
 .surface-list-item--error {
-  border-left-color: var(--danger);
+  border-color: color-mix(in hsl, var(--danger) 45%, var(--line-default));
+  background: color-mix(in hsl, var(--danger) 8%, var(--bg-subtle));
 }
+
+.surface-list-item__time {
+  color: var(--text-subtle);
+  font-size: 0.8rem;
+  min-width: 100px;
+  text-align: left;
+  white-space: nowrap;
+}
+
 
 .empty-state {
   text-align: center;

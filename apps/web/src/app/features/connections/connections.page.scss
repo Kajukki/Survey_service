@@ -33,11 +33,6 @@
   color: var(--text-strong);
 }
 
-.connection-date {
-  color: var(--text-subtle);
-  font-size: 0.82rem;
-}
-
 .status-message {
   margin-top: 0.8rem;
   color: var(--ok);
@@ -52,5 +47,10 @@
   .connection-item {
     grid-template-columns: 1fr;
     gap: 0.4rem;
+  }
+
+  .surface-list-item__time {
+    text-align: left;
+    min-width: 0;
   }
 }

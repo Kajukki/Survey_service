@@ -36,11 +36,6 @@
   color: var(--text-body);
 }
 
-.job-created {
-  color: var(--text-subtle);
-  font-size: 0.82rem;
-}
-
 .error {
   margin-top: 0.9rem;
   color: var(--danger);
@@ -54,5 +49,10 @@
   .job-item {
     grid-template-columns: 1fr;
     gap: 0.4rem;
+  }
+
+  .surface-list-item__time {
+    text-align: left;
+    min-width: 0;
   }
 }
