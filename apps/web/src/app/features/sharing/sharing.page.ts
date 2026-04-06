@@ -11,17 +11,17 @@ import { SharingRecord } from '../../shared/models/domain.models';
   standalone: true,
   template: `
     <section class="card page">
-      <header>
+      <header class="page-header">
         <h2>Sharing</h2>
         <p>Review and manage resource grants.</p>
       </header>
 
       @if (grants.isLoading()) {
-        <p>Loading grants...</p>
+        <p class="empty-state">Loading grants...</p>
       } @else if (grants.error()) {
         <p class="error">Could not load sharing information.</p>
       } @else {
-        <table>
+        <table class="sharing-table">
           <thead>
             <tr>
               <th>Resource</th>

@@ -13,25 +13,28 @@ import { ExportRecord } from '../../shared/models/domain.models';
   imports: [DatePipe],
   template: `
     <section class="card page">
-      <header>
+      <header class="page-header">
         <h2>Exports</h2>
         <p>CSV and Excel export requests and delivery status.</p>
       </header>
 
       @if (exportsResource.isLoading()) {
-        <p>Loading exports...</p>
+        <p class="empty-state">Loading exports...</p>
       } @else if (exportsResource.error()) {
         <p class="error">Unable to fetch export history.</p>
       } @else {
-        <ul>
+        <ul class="surface-list">
           @for (exportItem of exportItems(); track exportItem.id) {
-            <li>
-              <span>{{ exportItem.format }}</span>
-              <strong>{{ exportItem.status }}</strong>
-              <span>{{ exportItem.requestedAt | date: 'short' }}</span>
+            <li class="surface-list-item export-item" [class]="exportItemClass(exportItem.status)">
+              <span class="export-format">{{ exportItem.format }}</span>
+              <strong class="status-badge" [class]="exportBadgeClass(exportItem.status)">
+                <span class="status-badge__dot" aria-hidden="true"></span>
+                {{ exportItem.status }}
+              </strong>
+              <span class="surface-list-item__time">{{ exportItem.requestedAt | date: 'short' }}</span>
             </li>
           } @empty {
-            <li>No exports created yet.</li>
+            <li class="surface-list-item empty-state">No exports created yet.</li>
           }
         </ul>
       }
@@ -53,4 +56,29 @@ export class ExportsPageComponent {
   protected readonly exportItems = computed<ExportRecord[]>(() =>
     mapExports(this.exportsResource.value()?.data ?? []),
   );
+
+  protected exportBadgeClass(status: string): string {
+    return `status-badge status-badge--${this.toStatusTone(status)}`;
+  }
+
+  protected exportItemClass(status: string): string {
+    return `surface-list-item export-item surface-list-item--${this.toStatusTone(status)}`;
+  }
+
+  private toStatusTone(status: string): 'result' | 'queued' | 'error' | 'connected' {
+    const normalized = status.toLowerCase();
+    if (normalized.includes('done') || normalized.includes('ready') || normalized.includes('completed')) {
+      return 'result';
+    }
+
+    if (normalized.includes('pending') || normalized.includes('queue') || normalized.includes('running')) {
+      return 'queued';
+    }
+
+    if (normalized.includes('error') || normalized.includes('failed')) {
+      return 'error';
+    }
+
+    return 'connected';
+  }
 }
