@@ -28,10 +28,10 @@ This plan covers the provider boundary from API request to worker processing:
 
 ### Missing for Google
 
-1. No concrete Google client implementation yet.
-2. No Google auth/token lifecycle management.
-3. No provider sync cursor model or normalized form ingestion path.
-4. No provider-specific integration tests.
+1. Google connector boundary exists with initial OAuth URL/token/form/response mapping implementation, but full API coverage (errors/retries/rate limits) is not complete yet.
+2. No end-to-end Google auth/token lifecycle wiring through API callback routes yet.
+3. No provider sync cursor model or normalized form ingestion path yet.
+4. No provider-specific worker integration tests yet.
 
 ## Target Outcome
 
@@ -207,6 +207,12 @@ Definition of done:
 Exit criteria:
 
 - Google integration has a stable package/API boundary and a documented auth model.
+
+Progress update:
+
+- Provider DTO schemas are defined in `packages/contracts` for auth start/result, token sets, form summaries, response pages, and provider errors.
+- `packages/connectors` now exposes provider-neutral connector interfaces and an initial `GoogleFormsConnector` scaffold with unit tests.
+- Auth model remains OAuth 2.0 Authorization Code with PKCE (documented in this plan); secret handling and DB credential schema wiring are pending next slices.
 
 ### Phase 2: Google Client Implementation
 

@@ -104,6 +104,75 @@ export const FormSchema = z.object({
 export type Form = z.infer<typeof FormSchema>
 
 /**
+ * Provider connector schemas (Google/Microsoft boundary contracts).
+ */
+export const ConnectorProviderSchema = z.enum(['google', 'microsoft'])
+
+export const ProviderAuthStartInputSchema = z.object({
+  provider: ConnectorProviderSchema,
+  redirectUri: z.string().url(),
+  state: z.string().min(1),
+  codeChallenge: z.string().min(1),
+  codeChallengeMethod: z.literal('S256'),
+  scopes: z.array(z.string().min(1)).min(1),
+})
+
+export const ProviderAuthStartResultSchema = z.object({
+  provider: ConnectorProviderSchema,
+  authorizationUrl: z.string().url(),
+  state: z.string().min(1),
+  codeChallengeMethod: z.literal('S256'),
+})
+
+export const ProviderTokenSetSchema = z.object({
+  provider: ConnectorProviderSchema,
+  accessToken: z.string().min(1),
+  refreshToken: z.string().min(1).optional(),
+  expiresAt: z.string().datetime(),
+  scope: z.string().min(1).optional(),
+  tokenType: z.string().min(1).default('Bearer'),
+})
+
+export const ProviderFormSummarySchema = z.object({
+  provider: ConnectorProviderSchema,
+  externalFormId: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  lastModifiedAt: z.string().datetime().optional(),
+  responseCount: z.number().int().nonnegative().default(0),
+})
+
+export const ProviderFormResponseItemSchema = z.object({
+  externalResponseId: z.string().min(1),
+  submittedAt: z.string().datetime().optional(),
+  answers: z.record(z.string(), z.unknown()),
+})
+
+export const ProviderFormResponsePageSchema = z.object({
+  provider: ConnectorProviderSchema,
+  externalFormId: z.string().min(1),
+  nextPageToken: z.string().min(1).optional(),
+  responses: z.array(ProviderFormResponseItemSchema),
+})
+
+export const ProviderErrorSchema = z.object({
+  provider: ConnectorProviderSchema,
+  code: z.string().min(1),
+  message: z.string().min(1),
+  retryable: z.boolean().default(false),
+  status: z.number().int().min(100).max(599).optional(),
+})
+
+export type ConnectorProvider = z.infer<typeof ConnectorProviderSchema>
+export type ProviderAuthStartInput = z.infer<typeof ProviderAuthStartInputSchema>
+export type ProviderAuthStartResult = z.infer<typeof ProviderAuthStartResultSchema>
+export type ProviderTokenSet = z.infer<typeof ProviderTokenSetSchema>
+export type ProviderFormSummary = z.infer<typeof ProviderFormSummarySchema>
+export type ProviderFormResponseItem = z.infer<typeof ProviderFormResponseItemSchema>
+export type ProviderFormResponsePage = z.infer<typeof ProviderFormResponsePageSchema>
+export type ProviderError = z.infer<typeof ProviderErrorSchema>
+
+/**
  * Job lifecycle schemas.
  */
 export const JobStatusSchema = z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled'])

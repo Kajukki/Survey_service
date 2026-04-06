@@ -18,6 +18,13 @@ import {
   AuthRegisterSchema,
   AuthTokenRefreshSchema,
   AuthSessionSchema,
+  ConnectorProviderSchema,
+  ProviderAuthStartInputSchema,
+  ProviderAuthStartResultSchema,
+  ProviderTokenSetSchema,
+  ProviderFormSummarySchema,
+  ProviderFormResponsePageSchema,
+  ProviderErrorSchema,
 } from './index'
 
 describe('Connection Schemas', () => {
@@ -301,5 +308,94 @@ describe('Authentication Schemas', () => {
     })
 
     expect(result.success).toBe(true)
+  })
+})
+
+describe('Provider Connector Schemas', () => {
+  it('validates provider auth start input', () => {
+    const result = ProviderAuthStartInputSchema.safeParse({
+      provider: 'google',
+      redirectUri: 'https://app.example.com/api/v1/providers/google/callback',
+      state: 'opaque-state',
+      codeChallenge: 'pkce-challenge',
+      codeChallengeMethod: 'S256',
+      scopes: ['forms.body.readonly', 'forms.responses.readonly'],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('validates provider auth start result', () => {
+    const result = ProviderAuthStartResultSchema.safeParse({
+      provider: 'google',
+      authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?client_id=abc',
+      state: 'opaque-state',
+      codeChallengeMethod: 'S256',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('validates provider token set with expiry', () => {
+    const result = ProviderTokenSetSchema.safeParse({
+      provider: 'google',
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      expiresAt: new Date().toISOString(),
+      scope: 'forms.body.readonly forms.responses.readonly',
+      tokenType: 'Bearer',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('validates provider form summary payload', () => {
+    const result = ProviderFormSummarySchema.safeParse({
+      provider: 'google',
+      externalFormId: 'form-ext-123',
+      title: 'Customer Survey',
+      description: 'Quarterly survey',
+      lastModifiedAt: new Date().toISOString(),
+      responseCount: 42,
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('validates provider form response page payload', () => {
+    const result = ProviderFormResponsePageSchema.safeParse({
+      provider: 'google',
+      externalFormId: 'form-ext-123',
+      nextPageToken: 'page-2',
+      responses: [
+        {
+          externalResponseId: 'resp-1',
+          submittedAt: new Date().toISOString(),
+          answers: {
+            q1: 'yes',
+          },
+        },
+      ],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('validates provider error payload', () => {
+    const result = ProviderErrorSchema.safeParse({
+      provider: 'google',
+      code: 'rate_limited',
+      message: 'Too many requests',
+      retryable: true,
+      status: 429,
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects unsupported connector provider', () => {
+    const result = ConnectorProviderSchema.safeParse('typeform')
+
+    expect(result.success).toBe(false)
   })
 })

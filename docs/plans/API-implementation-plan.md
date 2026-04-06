@@ -38,12 +38,15 @@ This document is the execution backlog for API delivery, based on the current im
 - Forms sync path now enforces owner-scoped lookup.
 - Owner/share policy matrix parity is not yet universal across mock-backed domain paths.
 
+3. Google connector boundary setup
+- Provider connector DTOs now exist in `packages/contracts`.
+- Initial `GoogleFormsConnector` boundary and unit tests now exist in `packages/connectors`.
+
 ### Not Started
 
-1. Google Forms provider integration.
-2. Export workflow completion.
-3. Analytics endpoints for dashboard.
-4. Environment-ready enterprise IdP auth mode.
+1. Export workflow completion.
+2. Analytics endpoints for dashboard.
+3. Environment-ready enterprise IdP auth mode.
 
 ## Priority Backlog
 
