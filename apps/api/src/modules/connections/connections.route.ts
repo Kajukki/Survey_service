@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { CreateConnectionSchema } from '@survey-service/contracts';
 import { mockConnections } from './connections.mock.js';
+import { getPrincipal } from '../../server/principal';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
@@ -9,9 +10,10 @@ export async function connectionsRoutes(app: FastifyInstance) {
 
   // GET /connections
   zApp.get('/connections', async (request, reply) => {
-    // In a real app we'd get ownerId from JWT.
-    // For now we mock owner filter manually.
-    const connections = mockConnections;
+    const principal = getPrincipal(request);
+    const connections = mockConnections.filter(
+      (connection) => connection.ownerId === principal.userId,
+    );
     return reply.send({
       success: true,
       data: connections,
@@ -31,12 +33,14 @@ export async function connectionsRoutes(app: FastifyInstance) {
       },
     },
     async (request, reply) => {
+      const principal = getPrincipal(request);
       // Fake create from validated payload
       const payload = request.body as Record<string, unknown>;
       return reply.status(201).send({
         success: true,
         data: {
           ...mockConnections[0],
+          ownerId: principal.userId,
           ...payload,
         },
         meta: {
@@ -48,6 +52,7 @@ export async function connectionsRoutes(app: FastifyInstance) {
 
   // DELETE /connections/:id
   zApp.delete('/connections/:id', async (request, reply) => {
+    getPrincipal(request);
     const { id } = request.params as { id: string };
     if (!id) {
       return reply.code(400).send({

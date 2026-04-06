@@ -37,6 +37,10 @@ It is intentionally split into:
 - Authentication schemas and types added to `packages/contracts`.
 - Error envelope shape aligned between API and web adapter.
 
+5. Request principal extraction
+- Bearer access token verification is wired into API request handling.
+- Protected jobs/connections/forms/sharing routes now read principal from request context.
+
 ### Partially Implemented
 
 1. Domain modules with mock-backed behavior
@@ -45,7 +49,8 @@ It is intentionally split into:
 - Sharing routes exist, but are mock-backed.
 
 2. Authorization enforcement
-- Policy helpers exist, but principal extraction and owner/share checks are not consistently wired across all protected routes.
+- Policy helpers exist, and protected routes now require a request principal.
+- Owner/share policy parity is still in progress for mock-backed domain paths.
 
 ### Planned (Not Yet Implemented)
 

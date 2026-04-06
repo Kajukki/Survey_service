@@ -91,7 +91,7 @@ Core API, worker, and frontend flows are implemented for local development and i
 Known in-progress areas:
 
 - Several API domain routes still use mock-backed data paths.
-- Principal-based ownership and sharing enforcement is not yet consistently wired across all routes.
+- Bearer token principal extraction is active on protected domain routes, but full owner/share authorization parity is still in progress.
 - Target enterprise IdP integration remains planned and is not the active runtime path.
 
 ## License

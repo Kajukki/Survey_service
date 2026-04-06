@@ -21,13 +21,18 @@ This document is the execution backlog for API delivery, based on the current im
 - Users and refresh-token storage.
 - Shared auth schemas.
 
+4. Principal extraction baseline
+- Request principal extraction from bearer access tokens is wired in API runtime.
+- Protected jobs/connections/forms/sharing routes now consume principal from request context.
+
 ### In Progress
 
 1. Domain persistence parity
 - Connections/forms/sharing routes still rely on mock-backed behavior.
 
 2. Authorization parity
-- Principal-based policy checks are not yet universal across protected routes.
+- Principal extraction is active on protected routes.
+- Owner/share policy matrix parity is not yet universal across mock-backed domain paths.
 
 ### Not Started
 

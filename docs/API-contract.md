@@ -16,7 +16,8 @@ All requests should be prefixed with `/api/v1`.
 ## Authentication & Authorization
 - **Current mode:** local credential auth (`/auth/register`, `/auth/login`, `/auth/refresh`) returns bearer access tokens and refresh tokens.
 - **Target mode:** external IdP JWT verification with full owner/share policy checks at every protected route.
-- **Important:** not all domain routes currently enforce principal-based ownership and sharing. See endpoint status notes.
+- **Implemented in current runtime:** protected domain routes require a valid bearer token-backed request principal.
+- **Important:** owner/share authorization parity is still in progress for mock-backed domain paths.
 
 ## Common Data Formats
 

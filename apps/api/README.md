@@ -6,9 +6,9 @@ HTTP API server: validates requests, enforces ownership and sharing rules, enque
 
 This README separates what is implemented now from target-state architecture.
 
-- Implemented now: local credential auth endpoints, job persistence, RabbitMQ publish with confirms, worker-consumable job lifecycle.
+- Implemented now: local credential auth endpoints, bearer token principal extraction on protected routes, job persistence, RabbitMQ publish with confirms, worker-consumable job lifecycle.
 - Partially implemented: domain routes for connections/forms/sharing are present but still mock-backed in key paths.
-- Planned: full principal extraction and owner/share enforcement on every protected domain route.
+- Planned: full owner/share enforcement parity on all protected domain routes once DB-backed repositories replace mock paths.
 
 ## Architecture
 
@@ -128,7 +128,7 @@ See [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) for ful
 Before deploying:
 
 - [ ] All secrets from environment (never hardcoded)
-- [ ] Route-level principal extraction enabled for all protected endpoints
+- [x] Route-level principal extraction enabled for protected domain endpoints
 - [ ] JWT verification enabled and issuer/audience validated (target IdP mode)
 - [ ] Rate limiting enabled on expensive endpoints
 - [ ] Input validation via Zod at all boundaries

@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { getPrincipal } from '../../server/principal';
 
 const mockShares = [
   {
@@ -13,6 +14,7 @@ const mockShares = [
 export async function sharingRoutes(app: FastifyInstance) {
   // GET /forms/:id/shares
   app.get('/forms/:id/shares', async (request, reply) => {
+    getPrincipal(request);
     const { id } = request.params as { id: string };
     const shares = mockShares.filter((share) => share.form_id === id);
 
@@ -27,6 +29,7 @@ export async function sharingRoutes(app: FastifyInstance) {
 
   // POST /forms/:id/shares
   app.post('/forms/:id/shares', async (request, reply) => {
+    getPrincipal(request);
     const { id } = request.params as { id: string };
     const createdShare = {
       ...mockShares[0],
@@ -46,6 +49,7 @@ export async function sharingRoutes(app: FastifyInstance) {
 
   // DELETE /forms/:id/shares/:share_id
   app.delete('/forms/:id/shares/:share_id', async (request, reply) => {
+    getPrincipal(request);
     const { id, share_id } = request.params as { id: string; share_id: string };
     const existingIndex = mockShares.findIndex(
       (share) => share.form_id === id && share.id === share_id,

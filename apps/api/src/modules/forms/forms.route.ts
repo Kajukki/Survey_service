@@ -3,6 +3,7 @@ import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
 import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { mockForms } from './forms.mock.js';
+import { getPrincipal } from '../../server/principal';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
@@ -17,21 +18,25 @@ export async function formsRoutes(
 
   // GET /forms
   zApp.get('/forms', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const forms = mockForms.filter((form) => form.ownerId === principal.userId);
+
     // Basic mock pagination envelope
     return reply.send({
       success: true,
-      data: mockForms,
+      data: forms,
       meta: {
         requestId: request.id,
-        pagination: { page: 1, perPage: 20, total: mockForms.length, totalPages: 1 },
+        pagination: { page: 1, perPage: 20, total: forms.length, totalPages: 1 },
       },
     });
   });
 
   // GET /forms/:id
   zApp.get('/forms/:id', async (request, reply) => {
+    const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const form = mockForms.find((f) => f.id === id);
+    const form = mockForms.find((f) => f.id === id && f.ownerId === principal.userId);
 
     if (!form) {
       return reply.status(404).send({
@@ -46,6 +51,7 @@ export async function formsRoutes(
 
   // POST /forms/:id/sync
   zApp.post('/forms/:id/sync', async (request, reply) => {
+    getPrincipal(request);
     const { id } = request.params as { id: string };
     // This is where RabbitMQ enqueueing happens in real app
     return reply.status(202).send({
