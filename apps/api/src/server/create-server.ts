@@ -20,6 +20,7 @@ import { formsRoutes } from '../modules/forms/forms.route';
 import { sharingRoutes } from '../modules/sharing/sharing.route';
 import { jobsRoutes } from '../modules/jobs/jobs.route';
 import { exportsRoutes } from '../modules/exports/exports.route';
+import { registerPrincipalPlugin } from './principal';
 
 /**
  * Application context shared across modules.
@@ -70,6 +71,8 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
       timeWindow: `${context.config.RATE_LIMIT_TTL}s`,
     });
   }
+
+  await registerPrincipalPlugin(app, context.config);
 
   // Add correlation ID to logger context
   app.addHook('onRequest', async (request) => {

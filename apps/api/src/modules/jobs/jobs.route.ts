@@ -5,6 +5,7 @@ import type { Database } from '@survey-service/db';
 import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { createJobsRepository } from './jobs.repository';
 import { createJobsService } from './jobs.service';
+import { getPrincipal } from '../../server/principal';
 
 const JobsQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
@@ -31,10 +32,10 @@ export async function jobsRoutes(
     repository,
     publishSyncJob: deps.rabbitmq.publishSyncJob,
   });
-  const defaultRequestedBy = 'user-one';
 
   // GET /jobs
   app.get('/jobs', async (request, reply) => {
+    const principal = getPrincipal(request);
     const queryResult = JobsQuerySchema.safeParse(request.query ?? {});
     if (!queryResult.success) {
       return reply.status(400).send({
@@ -53,7 +54,7 @@ export async function jobsRoutes(
     }
 
     const query = queryResult.data;
-    const jobs = await service.listJobs(defaultRequestedBy, query.page, query.perPage);
+    const jobs = await service.listJobs(principal.userId, query.page, query.perPage);
 
     return reply.send({
       success: true,
@@ -78,6 +79,7 @@ export async function jobsRoutes(
 
   // POST /jobs/sync
   app.post('/jobs/sync', async (request, reply) => {
+    const principal = getPrincipal(request);
     const bodyResult = CreateSyncJobBodySchema.safeParse(request.body ?? {});
     if (!bodyResult.success) {
       return reply.status(400).send({
@@ -97,7 +99,7 @@ export async function jobsRoutes(
 
     const body = bodyResult.data;
     const job = await service.enqueueSyncJob({
-      requestedBy: defaultRequestedBy,
+      requestedBy: principal.userId,
       connectionId: body.connectionId,
       formId: body.formId,
       trigger: 'manual',
@@ -119,6 +121,7 @@ export async function jobsRoutes(
 
   // GET /jobs/:id
   app.get('/jobs/:id', async (request, reply) => {
+    getPrincipal(request);
     const { id } = request.params as { id: string };
     const existing = await service.getJobById(id);
 
