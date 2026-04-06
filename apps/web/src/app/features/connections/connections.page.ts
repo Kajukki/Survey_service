@@ -8,13 +8,7 @@ import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
 import { ConnectionDto, mapConnections } from '../../core/api/survey-api.adapters';
 import { ProviderAuthApiService } from '../../core/auth/provider-auth-api.service';
-import {
-  buildGoogleCallbackRedirectUri,
-  createCodeVerifier,
-  createOAuthState,
-  deriveS256CodeChallenge,
-  savePendingGoogleOAuth,
-} from '../../core/auth/provider-oauth.util';
+import { startGoogleOAuthFlow } from '../../core/auth/provider-oauth-start-flow';
 import { Connection } from '../../shared/models/domain.models';
 
 @Component({
@@ -131,21 +125,10 @@ export class ConnectionsPageComponent {
     this.connectErrorMessage.set(null);
 
     try {
-      const codeVerifier = createCodeVerifier();
-      const codeChallenge = await deriveS256CodeChallenge(codeVerifier);
-      const state = createOAuthState();
-      const redirectUri = buildGoogleCallbackRedirectUri(window.location.origin);
-
-      savePendingGoogleOAuth(window.sessionStorage, {
-        state,
-        codeVerifier,
-        redirectUri,
-      });
-
-      const authStart = await this.providerAuthApi.startGoogleAuth({
-        redirectUri,
-        codeChallenge,
-        codeChallengeMethod: 'S256',
+      const authStart = await startGoogleOAuthFlow({
+        origin: window.location.origin,
+        storage: window.sessionStorage,
+        startGoogleAuth: (input) => this.providerAuthApi.startGoogleAuth(input),
       });
 
       window.location.assign(authStart.authorizationUrl);
