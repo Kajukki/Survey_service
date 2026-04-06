@@ -91,6 +91,15 @@ Local: http://localhost:4200/
 
 Open `http://localhost:4200` in your browser.
 
+### Development Auth Seed (Local Only)
+
+For local development, migration `packages/db/migrations/002_auth.sql` seeds one account:
+
+- Username: `userOne`
+- Password: `passwordOne`
+
+This seed is intended for local environments only.
+
 ## Testing the Queue: End-to-End Job Sync
 
 Once all three services are running:
@@ -100,7 +109,7 @@ Once all three services are running:
 ```bash
 curl -X POST http://localhost:3000/api/v1/jobs/sync \
   -H "Content-Type: application/json" \
-  -d '{"connectionId": "11111111-1111-1111-1111-111111111111"}'
+  -d '{"connectionId": "11111111-1111-4111-8111-111111111111"}'
 ```
 
 Expected response (HTTP 202):
@@ -135,6 +144,40 @@ You should see the job status progressing: `queued` → `running` → `succeeded
 ### 5. View in Frontend (if implemented)
 
 The Angular app can be extended to call `GET /api/v1/jobs/<job_id>` and display status updates. See [apps/web/README.md](apps/web/README.md) for frontend integration details.
+
+## Testing Local Authentication Flow
+
+Use this quick sequence to verify register/login/refresh behavior in local development.
+
+### 1. Login With Seeded Account
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"userOne","password":"passwordOne"}'
+```
+
+Expected: `200 OK` with `accessToken`, `refreshToken`, `tokenType`, `expiresIn`, and `user`.
+
+### 2. Refresh Session
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{"refreshToken":"<refresh_token_from_login>"}'
+```
+
+Expected: `200 OK` with rotated token pair.
+
+### 3. Register New Account (Optional)
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"userTwo","password":"passwordTwo"}'
+```
+
+Expected: `201 Created` with session payload.
 
 ## Logs and Debugging
 
@@ -255,6 +298,9 @@ This removes containers and local PostgreSQL/RabbitMQ data. Be careful—this de
 | `DATABASE_URL` | postgresql://... | PostgreSQL connection |
 | `RABBITMQ_URL` | amqp://... | RabbitMQ broker URL |
 | `RABBITMQ_PREFETCH` | 10 | Consumer prefetch count |
+| `AUTH_JWT_SECRET` | (required) | HS256 signing secret for local auth tokens |
+| `ACCESS_TOKEN_TTL_SECONDS` | 900 | Access token lifetime in seconds |
+| `REFRESH_TOKEN_TTL_SECONDS` | 604800 | Refresh token lifetime in seconds |
 
 ### Worker (`apps/worker/.env`)
 

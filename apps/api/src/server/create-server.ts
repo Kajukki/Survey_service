@@ -14,6 +14,7 @@ import type { Config } from './config';
 import type { RabbitMQClient } from '../infra/rabbitmq';
 import type { Metrics } from '../infra/metrics';
 import { registerHealthRoutes } from '../modules/health/health.route';
+import { authRoutes } from '../modules/auth/auth.route';
 import { connectionsRoutes } from '../modules/connections/connections.route';
 import { formsRoutes } from '../modules/forms/forms.route';
 import { sharingRoutes } from '../modules/sharing/sharing.route';
@@ -90,6 +91,10 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
   app.register(
     async (_api) => {
       // Add domain modules here
+      await authRoutes(_api, {
+        db: context.db,
+        config: context.config,
+      });
       await connectionsRoutes(_api);
       await formsRoutes(_api, {
         db: context.db,

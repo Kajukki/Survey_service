@@ -24,8 +24,28 @@ export interface JobsTable {
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface UsersTable {
+  id: ColumnType<string, string | undefined, string>;
+  username: string;
+  password_hash: string;
+  org_id: string;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
+export interface AuthRefreshTokensTable {
+  id: ColumnType<string, string | undefined, string>;
+  user_id: string;
+  token_hash: string;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  revoked_at: OptionalTimestampColumn;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface DatabaseSchema {
   jobs: JobsTable;
+  users: UsersTable;
+  auth_refresh_tokens: AuthRefreshTokensTable;
 }
 
 export type Database = DatabaseSchema;

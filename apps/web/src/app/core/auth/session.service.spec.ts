@@ -46,20 +46,44 @@ describe('SessionService', () => {
     expect(service.token()).toBeNull();
   });
 
-  it('sets a token on login and clears on logout', () => {
+  it('stores a full session payload and clears on logout', () => {
     const service = new SessionService();
 
-    service.login();
+    service.beginSession({
+      accessToken: 'access-token',
+      refreshToken: 'refresh-token',
+      tokenType: 'Bearer',
+      expiresIn: 60,
+      user: {
+        id: 'de2ddde8-ffdd-4eb9-8930-c71f6653f77f',
+        username: 'userOne',
+        orgId: 'default-org',
+      },
+    });
+
     expect(service.isAuthenticated()).toBe(true);
-    expect(service.token()).toBe('demo-token');
+    expect(service.token()).toBe('access-token');
+    expect(service.refreshToken()).toBe('refresh-token');
+    expect(service.user()?.username).toBe('userOne');
 
     service.logout();
     expect(service.isAuthenticated()).toBe(false);
     expect(service.token()).toBeNull();
   });
 
-  it('stores callback token from query string', () => {
+  it('updates access token from callback when a session already exists', () => {
     const service = new SessionService();
+    service.beginSession({
+      accessToken: 'stale-token',
+      refreshToken: 'refresh-token',
+      tokenType: 'Bearer',
+      expiresIn: 60,
+      user: {
+        id: 'de2ddde8-ffdd-4eb9-8930-c71f6653f77f',
+        username: 'userOne',
+        orgId: 'default-org',
+      },
+    });
 
     service.handleAuthCallback('https://example.test/auth/callback?token=abc123');
 

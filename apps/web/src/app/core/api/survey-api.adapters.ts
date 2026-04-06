@@ -44,7 +44,7 @@ export interface ShareDto {
   permission_level: 'read' | 'write' | 'admin';
 }
 
-const CURRENT_USER_ID = 'mock-user-1';
+const CURRENT_USER_ID = 'user-one';
 
 export function mapConnections(items: ConnectionDto[]): Connection[] {
   return items.map((item) => ({

@@ -60,5 +60,7 @@ export class SharingPageComponent {
     },
   );
 
-  protected readonly grantItems = computed<SharingRecord[]>(() => mapShares(this.grants.value()?.data ?? []));
+  protected readonly grantItems = computed<SharingRecord[]>(() =>
+    mapShares(this.grants.value()?.data ?? []),
+  );
 }

@@ -30,7 +30,7 @@ describe('publishSyncJobMessage', () => {
 
     await publishSyncJobMessage(channel, {
       jobId: '8f0ef42e-84ea-4420-b784-194880c5bb8c',
-      connectionId: '11111111-1111-1111-1111-111111111111',
+      connectionId: '11111111-1111-4111-8111-111111111111',
       requestedBy: 'test-user',
       trigger: 'manual',
       forceFullSync: false,

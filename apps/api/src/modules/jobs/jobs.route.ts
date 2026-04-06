@@ -31,7 +31,7 @@ export async function jobsRoutes(
     repository,
     publishSyncJob: deps.rabbitmq.publishSyncJob,
   });
-  const defaultRequestedBy = 'mock-user-1';
+  const defaultRequestedBy = 'user-one';
 
   // GET /jobs
   app.get('/jobs', async (request, reply) => {

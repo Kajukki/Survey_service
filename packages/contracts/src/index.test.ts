@@ -14,6 +14,10 @@ import {
   ExportJobSchema,
   PaginationQuerySchema,
   DateRangeSchema,
+  AuthLoginSchema,
+  AuthRegisterSchema,
+  AuthTokenRefreshSchema,
+  AuthSessionSchema,
 } from './index'
 
 describe('Connection Schemas', () => {
@@ -253,5 +257,49 @@ describe('Pagination Schemas', () => {
         expect(result.data.perPage).toBe(100)
       }
     })
+  })
+})
+
+describe('Authentication Schemas', () => {
+  it('validates login payload', () => {
+    const result = AuthLoginSchema.safeParse({
+      username: 'userOne',
+      password: 'passwordOne',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects weak registration password', () => {
+    const result = AuthRegisterSchema.safeParse({
+      username: 'userOne',
+      password: 'short',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('validates token refresh payload', () => {
+    const result = AuthTokenRefreshSchema.safeParse({
+      refreshToken: 'refresh-token-value',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('validates auth session payload', () => {
+    const result = AuthSessionSchema.safeParse({
+      accessToken: 'access-token-value',
+      refreshToken: 'refresh-token-value',
+      tokenType: 'Bearer',
+      expiresIn: 900,
+      user: {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        username: 'userOne',
+        orgId: 'default-org',
+      },
+    })
+
+    expect(result.success).toBe(true)
   })
 })

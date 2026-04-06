@@ -2,6 +2,19 @@
 
 Internal tooling to ingest form and survey data from **Google Forms** and **Microsoft Forms**, store and analyze responses in **PostgreSQL**, and present results in a modern **Angular** frontend.
 
+## Current Capabilities
+
+- Local full stack development with API, worker, frontend, PostgreSQL, and RabbitMQ.
+- Local credential-based authentication flow (`register`, `login`, `refresh`) backed by database users and refresh tokens.
+- RabbitMQ-backed sync job pipeline with persisted job lifecycle updates (`queued` -> `running` -> terminal state).
+- Contract package updates for authentication payloads shared across apps.
+
+## Current vs Target Auth Model
+
+- Current implementation (this branch): local username/password session issuance for development and integration testing.
+- Target architecture: enterprise IdP-based authentication and authorization model.
+- Project docs now distinguish implemented behavior from target-state design to reduce drift.
+
 ## Quick Start (Local Development)
 
 ```bash
@@ -73,7 +86,13 @@ This monorepo uses npm workspaces with a shared TypeScript, ESLint, and Prettier
 
 ## Status
 
-Repository structure and docs are scaffolded; application code is added incrementally. Full-stack local development now fully supported via docker-compose.
+Core API, worker, and frontend flows are implemented for local development and integration.
+
+Known in-progress areas:
+
+- Several API domain routes still use mock-backed data paths.
+- Principal-based ownership and sharing enforcement is not yet consistently wired across all routes.
+- Target enterprise IdP integration remains planned and is not the active runtime path.
 
 ## License
 

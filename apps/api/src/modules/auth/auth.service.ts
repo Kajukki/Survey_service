@@ -1,82 +1,145 @@
-/**
- * Authentication and principal extraction from JWT bearers.
- */
-import { jwtVerify, createRemoteJWKSet } from 'jose';
-import type { Logger } from 'pino';
-import type { Principal } from '../../server/types';
+import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
+import { SignJWT } from 'jose';
 import type { Config } from '../../server/config';
-import { UnauthorizedError } from '../../server/errors';
+import { ConflictError, UnauthorizedError } from '../../server/errors';
+import type { AuthRepository, AuthUserRecord } from './auth.repository';
 
-/**
- * JWT payload schema expected from OIDC provider.
- */
-interface JWTPayload {
-  sub: string; // subject (user ID)
-  aud: string | string[]; // audience
-  iss: string; // issuer
-  org?: string; // optional org claim
-  exp?: number; // expiration
-  iat?: number; // issued at
+export interface AuthSessionUser {
+  id: string;
+  username: string;
+  orgId: string;
 }
 
-/**
- * Extract authorization header bearer token.
- */
-export function extractBearerToken(authHeader: string | undefined): string {
-  if (!authHeader) {
-    throw new UnauthorizedError('Missing authorization header');
-  }
-
-  const [scheme, token] = authHeader.split(' ');
-  if (scheme !== 'Bearer' || !token) {
-    throw new UnauthorizedError('Invalid authorization header format');
-  }
-
-  return token;
+export interface AuthSession {
+  accessToken: string;
+  refreshToken: string;
+  tokenType: 'Bearer';
+  expiresIn: number;
+  user: AuthSessionUser;
 }
 
-/**
- * Verify JWT and extract principal information.
- * Uses remote JWKS for signature verification.
- */
-export async function verifyJWT(token: string, config: Config, logger: Logger): Promise<Principal> {
-  try {
-    const JWKS = createRemoteJWKSet(new URL(config.OIDC_JWKS_URI));
+export interface AuthService {
+  register(input: { username: string; password: string }): Promise<AuthSession>;
+  login(input: { username: string; password: string }): Promise<AuthSession>;
+  refresh(refreshToken: string): Promise<AuthSession>;
+}
 
-    const { payload } = await jwtVerify(token, JWKS, {
-      issuer: config.OIDC_ISSUER,
-      audience: config.OIDC_AUDIENCE,
+const SCRYPT_PREFIX = 'scrypt';
+const SCRYPT_KEYLEN = 64;
+
+export function hashRefreshToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+export function hashPassword(password: string): string {
+  const salt = randomBytes(16).toString('hex');
+  const hash = scryptSync(password, salt, SCRYPT_KEYLEN).toString('hex');
+  return `${SCRYPT_PREFIX}$${salt}$${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  const [algorithm, salt, hashHex] = storedHash.split('$');
+  if (algorithm !== SCRYPT_PREFIX || !salt || !hashHex) {
+    return false;
+  }
+
+  const candidate = scryptSync(password, salt, SCRYPT_KEYLEN);
+  const stored = Buffer.from(hashHex, 'hex');
+
+  if (stored.length !== candidate.length) {
+    return false;
+  }
+
+  return timingSafeEqual(stored, candidate);
+}
+
+interface AuthServiceDeps {
+  repository: AuthRepository;
+  config: Config;
+}
+
+function toSessionUser(user: AuthUserRecord): AuthSessionUser {
+  return {
+    id: user.id,
+    username: user.username,
+    orgId: user.orgId,
+  };
+}
+
+async function signAccessToken(user: AuthUserRecord, config: Config): Promise<string> {
+  const secret = new TextEncoder().encode(config.AUTH_JWT_SECRET);
+
+  return new SignJWT({
+    org: user.orgId,
+    username: user.username,
+  })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id)
+    .setIssuer(config.OIDC_ISSUER)
+    .setAudience(config.OIDC_AUDIENCE)
+    .setIssuedAt()
+    .setExpirationTime(`${config.ACCESS_TOKEN_TTL_SECONDS}s`)
+    .sign(secret);
+}
+
+export function createAuthService(deps: AuthServiceDeps): AuthService {
+  async function createSessionForUser(user: AuthUserRecord): Promise<AuthSession> {
+    const accessToken = await signAccessToken(user, deps.config);
+    const refreshToken = randomBytes(48).toString('base64url');
+    const refreshTokenHash = hashRefreshToken(refreshToken);
+    const expiresAt = new Date(Date.now() + deps.config.REFRESH_TOKEN_TTL_SECONDS * 1000);
+
+    await deps.repository.createRefreshToken({
+      userId: user.id,
+      tokenHash: refreshTokenHash,
+      expiresAt,
     });
 
-    const jwtPayload = payload as unknown as JWTPayload;
-
-    if (!jwtPayload.sub) {
-      logger.warn('JWT missing sub claim');
-      throw new UnauthorizedError('Invalid token: missing subject');
-    }
-
     return {
-      userId: jwtPayload.sub,
-      orgId: jwtPayload.org || 'default',
-      token,
+      accessToken,
+      refreshToken,
+      tokenType: 'Bearer',
+      expiresIn: deps.config.ACCESS_TOKEN_TTL_SECONDS,
+      user: toSessionUser(user),
     };
-  } catch (error) {
-    if (error instanceof UnauthorizedError) {
-      throw error;
-    }
-
-    logger.warn({ error }, 'JWT verification failed');
-    throw new UnauthorizedError('Invalid token');
   }
-}
 
-/**
- * Create a mock principal for testing or development.
- * ONLY use in development mode.
- */
-export function createMockPrincipal(userId: string, orgId: string = 'test-org'): Principal {
   return {
-    userId,
-    orgId,
+    async register(input) {
+      const existing = await deps.repository.findUserByUsername(input.username);
+      if (existing) {
+        throw new ConflictError('Username is already in use');
+      }
+
+      const created = await deps.repository.createUser({
+        username: input.username,
+        passwordHash: hashPassword(input.password),
+        orgId: 'default-org',
+      });
+
+      return createSessionForUser(created);
+    },
+
+    async login(input) {
+      const user = await deps.repository.findUserByUsername(input.username);
+      if (!user || !verifyPassword(input.password, user.passwordHash)) {
+        throw new UnauthorizedError('Invalid username or password');
+      }
+
+      return createSessionForUser(user);
+    },
+
+    async refresh(refreshToken) {
+      const hashed = hashRefreshToken(refreshToken);
+      const existing = await deps.repository.findActiveRefreshTokenByHash(hashed);
+
+      if (!existing) {
+        throw new UnauthorizedError('Invalid refresh token');
+      }
+
+      await deps.repository.revokeRefreshToken(existing.token.id);
+
+      return createSessionForUser(existing.user);
+    },
   };
 }

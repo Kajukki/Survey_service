@@ -2,12 +2,21 @@
 
 This document defines the REST API contract for the Survey Service, providing a standard interface for the Angular frontend to consume.
 
+## Contract Mode
+
+This document is a transitional contract for active development.
+
+- `Implemented`: behavior exists and is active in runtime.
+- `Partial`: route exists but still uses mock-backed or temporary behavior.
+- `Planned`: contract target exists, implementation still pending.
+
 ## Base URL
 All requests should be prefixed with `/api/v1`.
 
 ## Authentication & Authorization
-- **Header:** `Authorization: Bearer <JWT>`
-- **Identity:** All resources are strictly scoped. Users can only access resources where they are the `owner_user_id` or have explicit `shares` granted to them.
+- **Current mode:** local credential auth (`/auth/register`, `/auth/login`, `/auth/refresh`) returns bearer access tokens and refresh tokens.
+- **Target mode:** external IdP JWT verification with full owner/share policy checks at every protected route.
+- **Important:** not all domain routes currently enforce principal-based ownership and sharing. See endpoint status notes.
 
 ## Common Data Formats
 
@@ -65,43 +74,79 @@ All requests should be prefixed with `/api/v1`.
 
 ### `GET /health`
 Returns service readiness and liveness information. No authentication required.
+- **Status:** `Implemented`
 - **200 OK**: `{ "status": "ok", "version": "1.0.0" }`
 
 ---
 
-## 2. Connections
+## 2. Authentication
+
+### `POST /api/v1/auth/register`
+Register a local account and return an authenticated session payload.
+- **Status:** `Implemented`
+- **Body:** `{ "username": "newUser", "password": "strongPassword" }`
+- **201 Created**: Returns `{ accessToken, refreshToken, tokenType, expiresIn, user }`.
+
+### `POST /api/v1/auth/login`
+Authenticate using username/password and return session tokens.
+- **Status:** `Implemented`
+- **Body:** `{ "username": "existingUser", "password": "yourPassword" }`
+- **200 OK**: Returns `{ accessToken, refreshToken, tokenType, expiresIn, user }`.
+
+### `POST /api/v1/auth/refresh`
+Exchange a valid refresh token for a rotated refresh token and a new access token.
+- **Status:** `Implemented`
+- **Body:** `{ "refreshToken": "opaque-refresh-token" }`
+- **200 OK**: Returns `{ accessToken, refreshToken, tokenType, expiresIn, user }`.
+
+### Local seed account
+- A local development seed account exists; see `LOCAL_DEVELOPMENT.md` for dev-only setup details.
+
+---
+
+## 3. Connections
 Manages integrations with external survey providers (Google Forms, Microsoft Forms).
+
+Current implementation note: route surface is present, but persistence and policy enforcement are still being completed.
 
 ### `GET /api/v1/connections`
 List all configured connections for the authenticated user.
+- **Status:** `Partial` (currently mock-backed)
 - **200 OK**: Returns paginated collection of `Connection` objects.
 
 ### `POST /api/v1/connections`
 Create a new provider connection.
+- **Status:** `Partial` (currently mock-backed)
 - **Body:** `{ "type": "google|microsoft", "name": "My Workspace", "externalId": "provider-id", "credentialToken": "opaque-token" }`
 - **201 Created**: Returns the created `Connection` object.
 
 ### `DELETE /api/v1/connections/:id`
 Revoke and remove a provider connection.
+- **Status:** `Partial` (route implemented; persistence integration pending)
 - **204 No Content**: Successful deletion.
 
 ---
 
-## 3. Forms
+## 4. Forms
 Manages ingested survey configurations and metadata.
+
+Current implementation note: route surface is present and responses are currently mock-backed for list/detail in active development.
 
 ### `GET /api/v1/forms`
 List forms owned by or shared with the user.
+- **Status:** `Partial` (currently mock-backed)
 - **Query Params:** `?page=1&perPage=20&search=survey&connectionId=...`
 - **200 OK**: Returns paginated collection of `Form` objects.
 
 ### `GET /api/v1/forms/:id`
 Get detailed metadata for a specific form.
+- **Status:** `Partial` (currently mock-backed)
 - **200 OK**: Returns the `Form` object.
 - **403 / 404**: Unauthorized or not found.
 
 ### `POST /api/v1/forms/:id/sync`
 Trigger a manual synchronization job for the specified form.
+- **Status:** `Partial` (currently returns placeholder `job_id` in forms module)
 - **202 Accepted**: Enqueues a job to RabbitMQ.
 - **Response:**
   ```json
@@ -116,29 +161,45 @@ Trigger a manual synchronization job for the specified form.
 
 ---
 
-## 4. Sharing
+## 5. Sharing
 Manages access grants to resources.
+
+Current implementation note: route surface is present and currently mock-backed.
 
 ### `GET /api/v1/forms/:id/shares`
 List all users/groups who have access to this form.
+- **Status:** `Partial` (currently mock-backed)
 - **200 OK**: Returns collection of `Share` objects.
 
 ### `POST /api/v1/forms/:id/shares`
 Grant access to another user in the organization.
+- **Status:** `Partial` (currently mock-backed)
 - **Body:** `{ "grantee_user_id": "user-uuid", "permission_level": "read" }`
 - **201 Created**: Returns the created `Share`.
 
 ### `DELETE /api/v1/forms/:id/shares/:share_id`
 Revoke access.
+- **Status:** `Partial` (currently mock-backed)
 - **204 No Content**: Successfully revoked.
 
 ---
 
-## 5. Jobs & Async Operations
+## 6. Jobs & Async Operations
 Used by the frontend to poll for long-running task status (syncs, exports).
+
+Current implementation note: `/jobs/sync`, `/jobs`, and `/jobs/:id` are implemented with persisted jobs and RabbitMQ publish.
+
+### `POST /api/v1/jobs/sync`
+Create and enqueue a sync job.
+- **Status:** `Implemented`
+
+### `GET /api/v1/jobs`
+List sync jobs for current request context.
+- **Status:** `Implemented`
 
 ### `GET /api/v1/jobs/:id`
 Check the status of a previously enqueued job.
+- **Status:** `Implemented`
 - **200 OK**:
   ```json
   {
@@ -161,10 +222,11 @@ Check the status of a previously enqueued job.
 
 ---
 
-## 6. Exports
+## 7. Exports
 Data extraction endpoints.
 
 ### `POST /api/v1/exports`
 Trigger an async export generation for form responses.
+- **Status:** `Planned`
 - **Body:** `{ "form_id": "form-uuid", "format": "csv" }`
 - **202 Accepted**: Returns job track info similar to form sync. Download URL will be provided in the job result once `completed`.

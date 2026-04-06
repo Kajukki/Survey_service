@@ -56,7 +56,9 @@ export class DashboardPageComponent {
     },
   );
 
-  protected readonly forms = computed<FormRecord[]>(() => mapForms(this.formsResource.value()?.data ?? []));
+  protected readonly forms = computed<FormRecord[]>(() =>
+    mapForms(this.formsResource.value()?.data ?? []),
+  );
 
   protected readonly dashboardResource = httpResource<DashboardPayload>(
     () => this.buildDashboardEndpoint(this.filters()),
