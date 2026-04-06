@@ -40,7 +40,6 @@ export interface GoogleAuthService {
       state: string;
       codeVerifier: string;
       redirectUri: string;
-      externalAccountId?: string;
       connectionName?: string;
     };
   }): Promise<LinkedGoogleConnection>;
@@ -58,6 +57,13 @@ export interface PendingAuthState {
 interface StoredGoogleConnection {
   connection: LinkedGoogleConnection;
   tokenSet: ProviderTokenSet;
+  idToken: string;
+}
+
+interface GoogleAuthCodeExchangeResult {
+  tokenSet: ProviderTokenSet;
+  externalAccountId: string;
+  idToken: string;
 }
 
 export interface GoogleAuthStateStore {
@@ -72,6 +78,7 @@ export interface GoogleConnectionStore {
     externalId: string;
     name: string;
     tokenSet: ProviderTokenSet;
+    idToken: string;
   }): Promise<LinkedGoogleConnection>;
 }
 
@@ -88,7 +95,7 @@ interface GoogleAuthConnector {
     code: string;
     redirectUri: string;
     codeVerifier: string;
-  }): Promise<ProviderTokenSet>;
+  }): Promise<GoogleAuthCodeExchangeResult>;
 }
 
 interface GoogleAuthServiceDeps {
@@ -138,6 +145,7 @@ export function createInMemoryConnectionStore(): GoogleConnectionStore {
         connectionMap.set(key, {
           connection: updated,
           tokenSet: input.tokenSet,
+          idToken: input.idToken,
         });
 
         return updated;
@@ -157,6 +165,7 @@ export function createInMemoryConnectionStore(): GoogleConnectionStore {
       connectionMap.set(key, {
         connection: created,
         tokenSet: input.tokenSet,
+        idToken: input.idToken,
       });
 
       return created;
@@ -286,7 +295,7 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
         throw new AppError(ErrorCode.BAD_REQUEST, 400, 'Invalid PKCE code verifier');
       }
 
-      const tokenSet = await deps.connector.exchangeAuthorizationCode({
+      const exchangeResult = await deps.connector.exchangeAuthorizationCode({
         code: input.code,
         redirectUri: input.redirectUri,
         codeVerifier: input.codeVerifier,
@@ -295,9 +304,10 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
       return deps.connectionStore.upsert({
         ownerId: principal.userId,
         orgId: principal.orgId,
-        externalId: input.externalAccountId ?? `google-user-${principal.userId}`,
+        externalId: exchangeResult.externalAccountId,
         name: input.connectionName ?? 'Google Forms Connection',
-        tokenSet,
+        tokenSet: exchangeResult.tokenSet,
+        idToken: exchangeResult.idToken,
       });
     },
   };

@@ -29,6 +29,11 @@ interface GoogleOAuthCredentials {
   expiry_date?: number | null;
   scope?: string | null;
   token_type?: string | null;
+  id_token?: string | null;
+}
+
+interface GoogleIdTokenPayload {
+  sub?: string;
 }
 
 interface GoogleOAuthClient {
@@ -47,8 +52,18 @@ interface GoogleOAuthClient {
     redirect_uri: string;
     codeVerifier: string;
   }): Promise<{ tokens: GoogleOAuthCredentials }>;
+  verifyIdToken(input: {
+    idToken: string;
+    audience: string;
+  }): Promise<{ getPayload(): GoogleIdTokenPayload | undefined }>;
   setCredentials(input: { refresh_token: string }): void;
   refreshAccessToken(): Promise<{ credentials: GoogleOAuthCredentials }>;
+}
+
+interface GoogleAuthCodeExchangeResult {
+  tokenSet: ProviderTokenSet;
+  idToken: string;
+  externalAccountId: string;
 }
 
 interface GoogleHttpLikeError {
@@ -73,6 +88,24 @@ function isRetryableStatus(status?: number): boolean {
   }
 
   return status === 429 || status >= 500;
+}
+
+function createInvalidIdTokenProviderError(message: string) {
+  return ProviderErrorSchema.parse({
+    provider: 'google',
+    code: 'invalid_id_token',
+    message,
+    retryable: false,
+    status: 400,
+  });
+}
+
+function isProviderErrorLike(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  return 'provider' in error && 'code' in error && 'message' in error;
 }
 
 export function mapGoogleProviderError(error: unknown, provider: 'google' = 'google') {
@@ -123,6 +156,12 @@ function createGoogleOAuthClient(config: GoogleConnectorConfig): GoogleOAuthClie
         tokens: response.tokens,
       };
     },
+    async verifyIdToken(input) {
+      return client.verifyIdToken({
+        idToken: input.idToken,
+        audience: input.audience,
+      });
+    },
     setCredentials(input) {
       client.setCredentials(input);
     },
@@ -168,7 +207,7 @@ export class GoogleFormsConnector implements ProviderConnector {
     code: string;
     redirectUri: string;
     codeVerifier: string;
-  }): Promise<ProviderTokenSet> {
+  }): Promise<GoogleAuthCodeExchangeResult> {
     try {
       const tokenResponse = await this.oauthClient.getToken({
         code: input.code,
@@ -176,8 +215,32 @@ export class GoogleFormsConnector implements ProviderConnector {
         codeVerifier: input.codeVerifier,
       });
 
-      return this.toTokenSet(tokenResponse.tokens);
+      const idToken = tokenResponse.tokens.id_token?.trim();
+      if (!idToken) {
+        throw createInvalidIdTokenProviderError('Google token exchange response is missing id_token');
+      }
+
+      const ticket = await this.oauthClient.verifyIdToken({
+        idToken,
+        audience: this.config.clientId,
+      });
+
+      const payload = ticket.getPayload();
+      const externalAccountId = payload?.sub?.trim();
+      if (!externalAccountId) {
+        throw createInvalidIdTokenProviderError('Google id_token payload is missing sub claim');
+      }
+
+      return {
+        tokenSet: this.toTokenSet(tokenResponse.tokens),
+        idToken,
+        externalAccountId,
+      };
     } catch (error) {
+      if (isProviderErrorLike(error)) {
+        throw error;
+      }
+
       throw mapGoogleProviderError(error);
     }
   }

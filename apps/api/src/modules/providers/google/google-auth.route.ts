@@ -14,16 +14,15 @@ const GoogleAuthStartBodySchema = z.object({
   codeChallenge: z.string().min(1),
   codeChallengeMethod: z.literal('S256'),
   scopes: z.array(z.string().min(1)).optional(),
-});
+}).strict();
 
 const GoogleAuthCallbackBodySchema = z.object({
   code: z.string().min(1),
   state: z.string().min(1),
   codeVerifier: z.string().min(1),
   redirectUri: z.string().url(),
-  externalAccountId: z.string().min(1).optional(),
   connectionName: z.string().min(1).max(255).optional(),
-});
+}).strict();
 
 export async function registerGoogleAuthRoutes(
   app: FastifyInstance,

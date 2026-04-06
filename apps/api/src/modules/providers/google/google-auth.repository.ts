@@ -78,6 +78,7 @@ export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepo
       externalId: string;
       name: string;
       tokenSet: ProviderTokenSet;
+      idToken: string;
     }): Promise<LinkedGoogleConnection> {
       const existing = await db
         .selectFrom('provider_connections')
@@ -97,6 +98,7 @@ export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepo
             expires_at: input.tokenSet.expiresAt,
             scope: input.tokenSet.scope ?? null,
             token_type: input.tokenSet.tokenType,
+            id_token: input.idToken,
             updated_at: new Date(),
           })
           .where('id', '=', existing.id)
@@ -119,6 +121,7 @@ export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepo
           expires_at: input.tokenSet.expiresAt,
           scope: input.tokenSet.scope ?? null,
           token_type: input.tokenSet.tokenType,
+          id_token: input.idToken,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
