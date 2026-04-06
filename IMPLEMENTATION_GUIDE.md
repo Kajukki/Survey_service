@@ -52,6 +52,8 @@ It is intentionally split into:
 - Policy helpers exist, and protected routes now require a request principal.
 - Jobs list/detail reads are now scoped by authenticated requester.
 - Sharing routes now enforce owner-scoped access checks (404 on inaccessible forms).
+- Connections delete route now enforces owner-scoped access checks.
+- Forms sync route now enforces owner-scoped access checks.
 - Owner/share policy parity is still in progress for mock-backed domain paths.
 
 ### Planned (Not Yet Implemented)

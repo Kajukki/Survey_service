@@ -52,7 +52,7 @@ export async function connectionsRoutes(app: FastifyInstance) {
 
   // DELETE /connections/:id
   zApp.delete('/connections/:id', async (request, reply) => {
-    getPrincipal(request);
+    const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
     if (!id) {
       return reply.code(400).send({
@@ -60,6 +60,23 @@ export async function connectionsRoutes(app: FastifyInstance) {
         error: {
           code: 'validation_error',
           message: 'Connection id is required',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const existing = mockConnections.find(
+      (connection) => connection.id === id && connection.ownerId === principal.userId,
+    );
+
+    if (!existing) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Connection not found',
         },
         meta: {
           requestId: request.id,

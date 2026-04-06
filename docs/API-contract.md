@@ -125,6 +125,7 @@ Create a new provider connection.
 Revoke and remove a provider connection.
 - **Status:** `Partial` (route implemented; persistence integration pending)
 - **204 No Content**: Successful deletion.
+- **404 Not Found**: Connection not found or not accessible to requester.
 
 ---
 
@@ -149,6 +150,7 @@ Get detailed metadata for a specific form.
 Trigger a manual synchronization job for the specified form.
 - **Status:** `Partial` (currently returns placeholder `job_id` in forms module)
 - **202 Accepted**: Enqueues a job to RabbitMQ.
+- **404 Not Found**: Form not found or not accessible to requester.
 - **Response:**
   ```json
   {

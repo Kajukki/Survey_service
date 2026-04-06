@@ -34,6 +34,8 @@ This document is the execution backlog for API delivery, based on the current im
 - Principal extraction is active on protected routes.
 - Jobs read paths now enforce requester-scoped lookup.
 - Sharing routes now enforce owner-scoped access checks for form share access.
+- Connections delete path now enforces owner-scoped lookup.
+- Forms sync path now enforces owner-scoped lookup.
 - Owner/share policy matrix parity is not yet universal across mock-backed domain paths.
 
 ### Not Started

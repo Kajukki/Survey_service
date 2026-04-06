@@ -8,6 +8,7 @@ import { connectionsRoutes } from './connections/connections.route';
 import { formsRoutes } from './forms/forms.route';
 import { sharingRoutes } from './sharing/sharing.route';
 import { mockForms } from './forms/forms.mock';
+import { mockConnections } from './connections/connections.mock';
 
 function buildConfig(): Config {
   return {
@@ -77,6 +78,7 @@ async function buildApp() {
 
 describe('protected domain routes', () => {
   const formId = mockForms[0]!.id;
+  const connectionId = mockConnections[0]!.id;
 
   it('returns 401 when accessing protected routes without a token', async () => {
     const { app } = await buildApp();
@@ -140,5 +142,26 @@ describe('protected domain routes', () => {
     expect(getShares.statusCode).toBe(404);
     expect(createShare.statusCode).toBe(404);
     expect(deleteShare.statusCode).toBe(404);
+  });
+
+  it('returns 404 when non-owner tries to delete a connection or trigger form sync', async () => {
+    const { app, config } = await buildApp();
+    const token = await signAccessToken(config, 'other-user');
+
+    const [deleteConnection, syncForm] = await Promise.all([
+      app.inject({
+        method: 'DELETE',
+        url: `/connections/${connectionId}`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      app.inject({
+        method: 'POST',
+        url: `/forms/${formId}/sync`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+    ]);
+
+    expect(deleteConnection.statusCode).toBe(404);
+    expect(syncForm.statusCode).toBe(404);
   });
 });

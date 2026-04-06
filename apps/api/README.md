@@ -116,8 +116,8 @@ Additional endpoints are implemented in feature modules under `modules/`.
 | `/health`, `/metrics` | Implemented |
 | `/auth/*` | Implemented with DB-backed users and refresh tokens |
 | `/jobs/*` | Implemented with DB + RabbitMQ publish and requester-scoped reads |
-| `/connections/*` | Implemented route surface, currently mock-backed |
-| `/forms/*` | Implemented route surface, currently mock-backed |
+| `/connections/*` | Implemented route surface, mock-backed with owner-scoped list/delete checks |
+| `/forms/*` | Implemented route surface, mock-backed with owner-scoped list/detail/sync checks |
 | `/forms/:id/shares/*` | Implemented route surface, mock-backed with owner-scoped access checks |
 | `/exports/*` | Scaffolded route module, feature completion pending |
 

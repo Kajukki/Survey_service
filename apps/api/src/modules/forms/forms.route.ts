@@ -51,13 +51,23 @@ export async function formsRoutes(
 
   // POST /forms/:id/sync
   zApp.post('/forms/:id/sync', async (request, reply) => {
-    getPrincipal(request);
+    const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
+    const form = mockForms.find((item) => item.id === id && item.ownerId === principal.userId);
+
+    if (!form) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
+    }
+
     // This is where RabbitMQ enqueueing happens in real app
     return reply.status(202).send({
       success: true,
       data: {
-        job_id: `job-mock-${id}`,
+        job_id: `job-mock-${form.id}`,
         status: 'queued',
         type: 'sync_form',
       },
