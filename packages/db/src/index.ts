@@ -1,13 +1,31 @@
-/**
- * Database types and query builders.
- * This will be auto-generated from the PostgreSQL schema when using kysely-codegen.
- */
+import type { ColumnType } from 'kysely';
 
-// Placeholder for auto-generated types
-// Run: npx kysely-codegen --url postgres://... 
-// to generate types from your database schema.
+export type JobType = 'sync' | 'export' | 'analysis';
+export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+export type JobTrigger = 'manual' | 'scheduled';
+
+type OptionalTimestampColumn = ColumnType<
+  Date | null,
+  Date | string | null | undefined,
+  Date | string | null
+>;
+
+export interface JobsTable {
+  id: string;
+  type: JobType;
+  status: JobStatus;
+  requested_by: string;
+  connection_id: string | null;
+  form_id: string | null;
+  trigger: JobTrigger;
+  started_at: OptionalTimestampColumn;
+  completed_at: OptionalTimestampColumn;
+  error: string | null;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
 
 export interface DatabaseSchema {
-  // Generated types will be added here
-  never: never
+  jobs: JobsTable;
 }
+
+export type Database = DatabaseSchema;

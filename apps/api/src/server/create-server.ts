@@ -9,8 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { Logger } from 'pino';
 import type { Kysely } from 'kysely';
+import type { Database } from '@survey-service/db';
 import type { Config } from './config';
-import type { Database } from '../infra/db';
 import type { RabbitMQClient } from '../infra/rabbitmq';
 import type { Metrics } from '../infra/metrics';
 import { registerHealthRoutes } from '../modules/health/health.route';
@@ -91,9 +91,15 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
     async (_api) => {
       // Add domain modules here
       await connectionsRoutes(_api);
-      await formsRoutes(_api);
+      await formsRoutes(_api, {
+        db: context.db,
+        rabbitmq: context.rabbitmq,
+      });
       await sharingRoutes(_api);
-      await jobsRoutes(_api);
+      await jobsRoutes(_api, {
+        db: context.db,
+        rabbitmq: context.rabbitmq,
+      });
       await exportsRoutes(_api);
     },
     { prefix: '/api/v1' },

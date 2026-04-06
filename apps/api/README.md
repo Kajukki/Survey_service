@@ -88,6 +88,9 @@ RATE_LIMIT_MAX=100
 
 - `GET /health` — liveness/readiness probe
 - `GET /metrics` — Prometheus metrics endpoint
+- `POST /api/v1/jobs/sync` — create queued sync job and publish RabbitMQ message
+- `GET /api/v1/jobs` — list persisted sync jobs
+- `GET /api/v1/jobs/:id` — poll persisted job status
 
 Additional endpoints are implemented in feature modules under `modules/`.
 
@@ -107,6 +110,43 @@ Before deploying:
 - [ ] SQL queries parameterized (Kysely prevents injection)
 - [ ] HTTPS enforced in production
 - [ ] Server security headers set (@fastify/helmet)
+
+## Local Development
+
+To run the API as part of the full local stack (frontend + API + worker + database + RabbitMQ):
+
+See **[LOCAL_DEVELOPMENT.md](../../LOCAL_DEVELOPMENT.md)** for the complete setup guide.
+
+Quick start:
+```bash
+# Terminal 1
+npm run dev
+
+# Terminal 2 (in separate terminal, from repo root)
+npm --workspace @survey-service/worker run dev
+
+# Terminal 3 (in separate terminal, from repo root)
+npm --workspace @survey-service/web run ng serve
+```
+
+(Assumes PostgreSQL and RabbitMQ are running via `docker-compose up -d` from repo root.)
+
+## Testing the Job Queue
+
+Once the full stack is running, trigger a sync job and observe it through the RabbitMQ → worker → database lifecycle:
+
+```bash
+# Create job
+curl -X POST http://localhost:3000/api/v1/jobs/sync \
+  -H "Content-Type: application/json" \
+  -d '{}'
+
+# Check RabbitMQ UI
+open http://localhost:15672  # guest / guest
+
+# Poll job status
+curl http://localhost:3000/api/v1/jobs/<job_id>
+```
 
 ## Related
 

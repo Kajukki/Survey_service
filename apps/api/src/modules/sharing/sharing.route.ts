@@ -47,7 +47,9 @@ export async function sharingRoutes(app: FastifyInstance) {
   // DELETE /forms/:id/shares/:share_id
   app.delete('/forms/:id/shares/:share_id', async (request, reply) => {
     const { id, share_id } = request.params as { id: string; share_id: string };
-    const existingIndex = mockShares.findIndex((share) => share.form_id === id && share.id === share_id);
+    const existingIndex = mockShares.findIndex(
+      (share) => share.form_id === id && share.id === share_id,
+    );
 
     if (existingIndex === -1) {
       return reply.status(404).send({

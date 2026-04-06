@@ -1,9 +1,18 @@
-import { FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
+import type { Kysely } from 'kysely';
+import type { Database } from '@survey-service/db';
+import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { mockForms } from './forms.mock.js';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
-export async function formsRoutes(app: FastifyInstance) {
+export async function formsRoutes(
+  app: FastifyInstance,
+  _deps?: {
+    db: Kysely<Database>;
+    rabbitmq: RabbitMQClient;
+  },
+) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
 
   // GET /forms

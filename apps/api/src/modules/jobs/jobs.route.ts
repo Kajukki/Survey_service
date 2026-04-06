@@ -1,59 +1,113 @@
-import { FastifyInstance } from 'fastify';
+import { z } from 'zod';
+import type { FastifyInstance } from 'fastify';
+import type { Kysely } from 'kysely';
+import type { Database } from '@survey-service/db';
+import type { RabbitMQClient } from '../../infra/rabbitmq';
+import { createJobsRepository } from './jobs.repository';
+import { createJobsService } from './jobs.service';
 
-interface JobRecord {
-  id: string;
-  status: 'queued' | 'running' | 'succeeded' | 'failed';
-  source: string;
-  created_at: string;
-  completed_at: string | null;
-}
+const JobsQuerySchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  perPage: z.coerce.number().int().positive().max(100).default(20),
+});
 
-const mockJobs = new Map<string, JobRecord>();
+const CreateSyncJobBodySchema = z
+  .object({
+    connectionId: z.string().uuid().optional(),
+    formId: z.string().uuid().optional(),
+    forceFullSync: z.boolean().optional(),
+  })
+  .default({});
 
-function nextJobStatus(status: JobRecord['status']): JobRecord['status'] {
-  if (status === 'queued') {
-    return 'running';
-  }
+export async function jobsRoutes(
+  app: FastifyInstance,
+  deps: {
+    db: Kysely<Database>;
+    rabbitmq: RabbitMQClient;
+  },
+) {
+  const repository = createJobsRepository(deps.db);
+  const service = createJobsService({
+    repository,
+    publishSyncJob: deps.rabbitmq.publishSyncJob,
+  });
+  const defaultRequestedBy = 'mock-user-1';
 
-  if (status === 'running') {
-    return 'succeeded';
-  }
-
-  return status;
-}
-
-export async function jobsRoutes(app: FastifyInstance) {
   // GET /jobs
   app.get('/jobs', async (request, reply) => {
-    const jobs = [...mockJobs.values()];
+    const queryResult = JobsQuerySchema.safeParse(request.query ?? {});
+    if (!queryResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'validation_error',
+          message: 'Invalid query parameters',
+          details: {
+            issues: queryResult.error.issues,
+          },
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const query = queryResult.data;
+    const jobs = await service.listJobs(defaultRequestedBy, query.page, query.perPage);
 
     return reply.send({
       success: true,
-      data: jobs,
+      data: jobs.items.map((job) => ({
+        id: job.id,
+        status: job.status,
+        source: job.source,
+        created_at: job.createdAt,
+        completed_at: job.completedAt,
+      })),
       meta: {
         requestId: request.id,
-        pagination: { page: 1, perPage: 20, total: jobs.length, totalPages: 1 },
+        pagination: {
+          page: query.page,
+          perPage: query.perPage,
+          total: jobs.total,
+          totalPages: Math.max(1, Math.ceil(jobs.total / query.perPage)),
+        },
       },
     });
   });
 
   // POST /jobs/sync
   app.post('/jobs/sync', async (request, reply) => {
-    const id = `job-${Date.now()}`;
-    const job: JobRecord = {
-      id,
-      status: 'queued',
-      source: 'manual_sync',
-      created_at: new Date().toISOString(),
-      completed_at: null,
-    };
+    const bodyResult = CreateSyncJobBodySchema.safeParse(request.body ?? {});
+    if (!bodyResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'validation_error',
+          message: 'Invalid sync job payload',
+          details: {
+            issues: bodyResult.error.issues,
+          },
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
 
-    mockJobs.set(id, job);
+    const body = bodyResult.data;
+    const job = await service.enqueueSyncJob({
+      requestedBy: defaultRequestedBy,
+      connectionId: body.connectionId,
+      formId: body.formId,
+      trigger: 'manual',
+      forceFullSync: body.forceFullSync ?? false,
+    });
 
     return reply.status(202).send({
       success: true,
       data: {
-        job_id: id,
+        job_id: job.id,
         status: job.status,
         type: 'sync',
       },
@@ -66,7 +120,7 @@ export async function jobsRoutes(app: FastifyInstance) {
   // GET /jobs/:id
   app.get('/jobs/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const existing = mockJobs.get(id);
+    const existing = await service.getJobById(id);
 
     if (!existing) {
       return reply.status(404).send({
@@ -81,20 +135,15 @@ export async function jobsRoutes(app: FastifyInstance) {
       });
     }
 
-    const status = nextJobStatus(existing.status);
-    const updated: JobRecord = {
-      ...existing,
-      status,
-      completed_at: status === 'succeeded' ? new Date().toISOString() : null,
-    };
-
-    mockJobs.set(id, updated);
-
     return reply.send({
       success: true,
       data: {
-        ...updated,
-        result: status === 'succeeded' ? { sync_count: 154, errors: [] } : null,
+        id: existing.id,
+        status: existing.status,
+        source: existing.source,
+        created_at: existing.createdAt,
+        completed_at: existing.completedAt,
+        result: existing.status === 'succeeded' ? { sync_count: 154, errors: [] } : null,
       },
       meta: {
         requestId: request.id,

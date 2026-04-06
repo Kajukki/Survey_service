@@ -2,8 +2,28 @@
 
 Internal tooling to ingest form and survey data from **Google Forms** and **Microsoft Forms**, store and analyze responses in **PostgreSQL**, and present results in a modern **Angular** frontend.
 
+## Quick Start (Local Development)
+
+```bash
+# 1. Install dependencies
+npm install
+
+# 2. Start PostgreSQL + RabbitMQ
+docker-compose up -d
+
+# 3. Open three terminals and run:
+npm --workspace @survey-service/api run dev          # Terminal 1: API (port 3000)
+npm --workspace @survey-service/worker run dev       # Terminal 2: Worker (consumes jobs)
+npm --workspace @survey-service/web run ng serve     # Terminal 3: Frontend (port 4200)
+```
+
+Then open `http://localhost:4200` in your browser.
+
+For detailed walkthrough, see **[LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md)**.
+
 ## Documentation
 
+- [Local full-stack setup](LOCAL_DEVELOPMENT.md) — Running all services locally
 - [System architecture](docs/architecture.md)
 - [Repository layout](docs/repository-structure.md)
 - [Agent / workflow notes](AGENTS.md)
@@ -21,8 +41,9 @@ Internal tooling to ingest form and survey data from **Google Forms** and **Micr
 
 ## Prerequisites
 
-- Node.js 20+
-- PostgreSQL, RabbitMQ (for local/dev when implementations land)
+- Node.js 24+
+- Docker & Docker Compose (for local development)
+- PostgreSQL 16+ and RabbitMQ 3.13+ (or use provided docker-compose)
 
 ## Toolchain
 
@@ -38,6 +59,7 @@ This monorepo uses npm workspaces with a shared TypeScript, ESLint, and Prettier
 - Format all apps: `npm run format`
 - Check formatting: `npm run format:check`
 - Typecheck all apps: `npm run typecheck`
+- Test all apps: `npm run test`
 
 ## Targeted Commands
 
@@ -47,10 +69,11 @@ This monorepo uses npm workspaces with a shared TypeScript, ESLint, and Prettier
 - Frontend format check: `npm run format:check:web`
 - API format check: `npm run format:check:api`
 - Worker format check: `npm run format:check:worker`
+- API tests: `npm --workspace @survey-service/api run test`
 
 ## Status
 
-Repository structure and docs are scaffolded; application code is added incrementally.
+Repository structure and docs are scaffolded; application code is added incrementally. Full-stack local development now fully supported via docker-compose.
 
 ## License
 
