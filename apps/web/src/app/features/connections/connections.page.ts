@@ -17,19 +17,26 @@ import { Connection } from '../../shared/models/domain.models';
   imports: [DatePipe],
   template: `
     <section class="card page">
-      <header>
+      <header class="page-header">
         <h2>Connections</h2>
         <p>Manage Google and Microsoft connectors for sync jobs.</p>
       </header>
 
       <div class="actions">
-        <button type="button" (click)="connectGoogle()" [disabled]="isConnectingGoogle()">
+        <button
+          type="button"
+          class="btn-primary"
+          (click)="connectGoogle()"
+          [disabled]="isConnectingGoogle()"
+        >
           {{ isConnectingGoogle() ? 'Redirecting to Google...' : 'Connect Google' }}
         </button>
       </div>
 
       @if (oauthStatusMessage()) {
-        <p [class.error]="oauthStatusType() === 'error'">{{ oauthStatusMessage() }}</p>
+        <p class="status-message" [class.error]="oauthStatusType() === 'error'">
+          {{ oauthStatusMessage() }}
+        </p>
       }
 
       @if (connectErrorMessage()) {
@@ -37,19 +44,22 @@ import { Connection } from '../../shared/models/domain.models';
       }
 
       @if (connections.isLoading()) {
-        <p>Loading connections...</p>
+        <p class="empty-state">Loading connections...</p>
       } @else if (connections.error()) {
         <p class="error">Could not load connectors. Try refresh.</p>
       } @else {
-        <ul>
+        <ul class="surface-list">
           @for (connection of connectionItems(); track connection.id) {
-            <li>
-              <strong>{{ connection.provider }}</strong>
-              <span>{{ connection.status }}</span>
-              <span>{{ connection.updatedAt | date: 'mediumDate' }}</span>
+            <li class="surface-list-item connection-item" [class]="connectionItemClass(connection.status)">
+              <strong class="connection-provider">{{ connection.provider }}</strong>
+              <span class="status-badge" [class]="connectionBadgeClass(connection.status)">
+                <span class="status-badge__dot" aria-hidden="true"></span>
+                {{ connection.status }}
+              </span>
+              <span class="connection-date">{{ connection.updatedAt | date: 'mediumDate' }}</span>
             </li>
           } @empty {
-            <li>No connector configured yet.</li>
+            <li class="surface-list-item empty-state">No connector configured yet.</li>
           }
         </ul>
       }
@@ -151,5 +161,30 @@ export class ConnectionsPageComponent {
 
   private readOAuthReasonFromQueryParams(): string | null {
     return this.route.snapshot.queryParamMap.get('reason');
+  }
+
+  protected connectionBadgeClass(status: string): string {
+    return `status-badge status-badge--${this.toStatusTone(status)}`;
+  }
+
+  protected connectionItemClass(status: string): string {
+    return `surface-list-item connection-item surface-list-item--${this.toStatusTone(status)}`;
+  }
+
+  private toStatusTone(status: string): 'connected' | 'connecting' | 'disconnected' | 'queued' {
+    const normalized = status.toLowerCase();
+    if (normalized.includes('active') || normalized.includes('connected') || normalized.includes('ready')) {
+      return 'connected';
+    }
+
+    if (normalized.includes('pending') || normalized.includes('authorizing') || normalized.includes('syncing')) {
+      return 'connecting';
+    }
+
+    if (normalized.includes('queue') || normalized.includes('queued')) {
+      return 'queued';
+    }
+
+    return 'disconnected';
   }
 }

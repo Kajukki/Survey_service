@@ -18,23 +18,26 @@ import { SyncJob } from '../../shared/models/domain.models';
           <h2>Sync jobs</h2>
           <p>Track and trigger ingestion jobs.</p>
         </div>
-        <button type="button" (click)="triggerManualSync()">Run sync</button>
+        <button type="button" class="btn-primary" (click)="triggerManualSync()">Run sync</button>
       </header>
 
       @if (jobs.isLoading()) {
-        <p>Loading jobs...</p>
+        <p class="empty-state">Loading jobs...</p>
       } @else if (jobs.error()) {
         <p class="error">Could not load jobs right now.</p>
       } @else {
-        <ul>
+        <ul class="surface-list">
           @for (job of jobItems(); track job.id) {
-            <li>
-              <span>{{ job.source }}</span>
-              <strong>{{ job.status }}</strong>
-              <span>{{ job.createdAt | date: 'short' }}</span>
+            <li class="surface-list-item job-item" [class]="jobItemClass(job.status)">
+              <span class="job-source">{{ job.source }}</span>
+              <strong class="status-badge" [class]="jobBadgeClass(job.status)">
+                <span class="status-badge__dot" aria-hidden="true"></span>
+                {{ job.status }}
+              </strong>
+              <span class="job-created">{{ job.createdAt | date: 'short' }}</span>
             </li>
           } @empty {
-            <li>No sync jobs yet.</li>
+            <li class="surface-list-item empty-state">No sync jobs yet.</li>
           }
         </ul>
       }
@@ -63,5 +66,30 @@ export class SyncJobsPageComponent {
         // no-op, error handling is centralized in interceptor
       },
     });
+  }
+
+  protected jobBadgeClass(status: string): string {
+    return `status-badge status-badge--${this.toStatusTone(status)}`;
+  }
+
+  protected jobItemClass(status: string): string {
+    return `surface-list-item job-item surface-list-item--${this.toStatusTone(status)}`;
+  }
+
+  private toStatusTone(status: string): 'result' | 'queued' | 'error' | 'connected' {
+    const normalized = status.toLowerCase();
+    if (normalized.includes('success') || normalized.includes('done') || normalized.includes('completed')) {
+      return 'result';
+    }
+
+    if (normalized.includes('pending') || normalized.includes('queue') || normalized.includes('running')) {
+      return 'queued';
+    }
+
+    if (normalized.includes('error') || normalized.includes('failed')) {
+      return 'error';
+    }
+
+    return 'connected';
   }
 }
