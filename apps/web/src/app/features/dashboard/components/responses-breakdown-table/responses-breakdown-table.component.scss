@@ -3,6 +3,11 @@
   padding: 1rem;
 }
 
+.table-card h3 {
+  color: var(--text-strong);
+  margin-bottom: 0.55rem;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -12,5 +17,16 @@ th,
 td {
   text-align: left;
   padding: 0.65rem;
-  border-bottom: 1px solid var(--line-color);
+  border-bottom: 1px solid var(--line-default);
+}
+
+th {
+  color: var(--text-subtle);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+td {
+  color: var(--text-body);
 }

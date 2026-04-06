@@ -6,7 +6,7 @@
     </div>
     <div class="header-actions">
       <a href="/exports">Export this range</a>
-      <button type="button" (click)="refresh()">Refresh</button>
+      <button type="button" class="btn-primary" (click)="refresh()">Refresh</button>
     </div>
   </header>
 
@@ -25,7 +25,7 @@
     <section class="card empty-state">
       <h3>Dashboard failed to load</h3>
       <p>Try refreshing. If this continues, confirm your access rights for this form.</p>
-      <button type="button" (click)="dashboardResource.reload()">Retry</button>
+      <button type="button" class="btn-primary" (click)="dashboardResource.reload()">Retry</button>
     </section>
   } @else {
     <app-dashboard-kpi-row

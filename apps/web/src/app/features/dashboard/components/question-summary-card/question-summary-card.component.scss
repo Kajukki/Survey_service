@@ -1,9 +1,15 @@
 .question-card {
-  padding: 0.85rem;
+  padding: 0.95rem;
+  background: color-mix(in hsl, var(--bg-surface) 94%, black);
 }
 
 .question-card h4 {
   margin-bottom: 0.25rem;
+  color: var(--text-strong);
+}
+
+.question-card p {
+  color: var(--text-subtle);
 }
 
 ul {
@@ -15,6 +21,11 @@ ul {
 li {
   display: flex;
   justify-content: space-between;
-  border-top: 1px dashed var(--line-color);
+  border-top: 1px dashed var(--line-default);
   padding: 0.35rem 0;
+  color: var(--text-muted);
+}
+
+li strong {
+  color: var(--text-body);
 }

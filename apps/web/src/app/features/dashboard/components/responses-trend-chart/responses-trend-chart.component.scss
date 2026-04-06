@@ -1,10 +1,12 @@
 .chart {
   padding: 1rem;
   min-height: 360px;
+  background: color-mix(in hsl, var(--bg-surface) 94%, black);
 }
 
 .chart header p {
   margin: 0.3rem 0 0.8rem;
+  color: var(--text-subtle);
 }
 
 .bars {
@@ -24,12 +26,13 @@
 .bar {
   width: 100%;
   border-radius: 0.6rem 0.6rem 0.2rem 0.2rem;
-  background: linear-gradient(180deg, #14b8a6, #0f766e);
+  background: linear-gradient(180deg, color-mix(in hsl, var(--accent) 80%, white), var(--accent));
+  box-shadow: 0 6px 14px rgb(0 0 0 / 22%);
 }
 
 small {
   font-size: 0.68rem;
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  color: var(--text-muted);
+  color: var(--text-subtle);
 }
