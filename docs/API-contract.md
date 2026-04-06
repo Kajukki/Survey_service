@@ -103,6 +103,18 @@ Exchange a valid refresh token for a rotated refresh token and a new access toke
 ### Local seed account
 - A local development seed account exists; see `LOCAL_DEVELOPMENT.md` for dev-only setup details.
 
+### `POST /api/v1/providers/google/auth/start`
+Start Google OAuth authorization for the authenticated user using PKCE parameters.
+- **Status:** `Implemented`
+- **Body:** `{ "redirectUri": "https://app.example.com/providers/google/callback", "codeChallenge": "...", "codeChallengeMethod": "S256", "scopes": ["..."] }`
+- **200 OK**: Returns provider authorization URL payload.
+
+### `POST /api/v1/providers/google/auth/callback`
+Complete Google OAuth authorization code exchange and create/update a linked provider connection.
+- **Status:** `Implemented` (connection persistence is currently temporary store backed)
+- **Body:** `{ "code": "auth-code", "state": "...", "codeVerifier": "...", "redirectUri": "https://app.example.com/providers/google/callback" }`
+- **201 Created**: Returns linked Google connection summary.
+
 ---
 
 ## 3. Connections

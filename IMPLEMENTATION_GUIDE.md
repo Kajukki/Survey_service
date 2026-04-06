@@ -56,6 +56,10 @@ It is intentionally split into:
 - Forms sync route now enforces owner-scoped access checks.
 - Owner/share policy parity is still in progress for mock-backed domain paths.
 
+3. Google provider auth API surface
+- `POST /api/v1/providers/google/auth/start` and `POST /api/v1/providers/google/auth/callback` are now implemented.
+- Current storage path for provider auth state/connection metadata is temporary and pending DB-backed persistence wiring.
+
 ### Planned (Not Yet Implemented)
 
 1. Enterprise IdP auth mode

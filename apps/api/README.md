@@ -115,6 +115,7 @@ Additional endpoints are implemented in feature modules under `modules/`.
 |---|---|
 | `/health`, `/metrics` | Implemented |
 | `/auth/*` | Implemented with DB-backed users and refresh tokens |
+| `/providers/google/auth/*` | Implemented route flow for auth start/callback (temporary in-memory provider state/connection storage) |
 | `/jobs/*` | Implemented with DB + RabbitMQ publish and requester-scoped reads |
 | `/connections/*` | Implemented route surface, mock-backed with owner-scoped list/delete checks |
 | `/forms/*` | Implemented route surface, mock-backed with owner-scoped list/detail/sync checks |

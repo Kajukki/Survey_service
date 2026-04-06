@@ -20,6 +20,7 @@ import { formsRoutes } from '../modules/forms/forms.route';
 import { sharingRoutes } from '../modules/sharing/sharing.route';
 import { jobsRoutes } from '../modules/jobs/jobs.route';
 import { exportsRoutes } from '../modules/exports/exports.route';
+import { registerGoogleAuthRoutes } from '../modules/providers/google/google-auth.route';
 import { registerPrincipalPlugin } from './principal';
 
 /**
@@ -98,6 +99,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
         db: context.db,
         config: context.config,
       });
+      await registerGoogleAuthRoutes(_api);
       await connectionsRoutes(_api);
       await formsRoutes(_api, {
         db: context.db,

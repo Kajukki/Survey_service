@@ -20,6 +20,7 @@
     "@fastify/helmet": "^11.1.1",
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/sensible": "^6.0.4",
+    "@survey-service/connectors": "file:../../packages/connectors",
     "@survey-service/contracts": "file:../../packages/contracts",
     "@survey-service/db": "file:../../packages/db",
     "@survey-service/messaging": "file:../../packages/messaging",
