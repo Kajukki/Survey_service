@@ -31,10 +31,7 @@ export function getPrincipal(request: FastifyRequest): Principal {
   return request.principal;
 }
 
-export async function registerPrincipalPlugin(
-  app: FastifyInstance,
-  config: Config,
-): Promise<void> {
+export async function registerPrincipalPlugin(app: FastifyInstance, config: Config): Promise<void> {
   app.decorateRequest('principal', null);
 
   app.addHook('onRequest', async (request) => {

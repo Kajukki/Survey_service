@@ -13,9 +13,7 @@ import { SessionService } from './session.service';
     <main class="auth-page">
       <section class="auth-card">
         <h1>{{ mode() === 'login' ? 'Sign in to Survey Service' : 'Create your account' }}</h1>
-        <p>
-          Use your credentials to continue. For local setup details, see LOCAL_DEVELOPMENT.md.
-        </p>
+        <p>Use your credentials to continue. For local setup details, see LOCAL_DEVELOPMENT.md.</p>
 
         <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
           <label for="username">Username</label>
