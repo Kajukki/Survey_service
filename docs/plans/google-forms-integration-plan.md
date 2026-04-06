@@ -217,6 +217,7 @@ Progress update:
 - Google connector unit tests include provider error mapping and propagation coverage.
 - Error-path coverage now includes refresh-token and response-list failure propagation behavior.
 - API routes for Google auth start/callback are now wired with PKCE validation and connector code exchange.
+- DB-backed tables and repository scaffolding now exist for provider auth state and provider connection credential persistence.
 - Auth model remains OAuth 2.0 Authorization Code with PKCE (documented in this plan); secret handling and DB credential schema wiring are pending next slices.
 
 ### Phase 2: Google Client Implementation

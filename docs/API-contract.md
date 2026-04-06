@@ -111,7 +111,7 @@ Start Google OAuth authorization for the authenticated user using PKCE parameter
 
 ### `POST /api/v1/providers/google/auth/callback`
 Complete Google OAuth authorization code exchange and create/update a linked provider connection.
-- **Status:** `Implemented` (connection persistence is currently temporary store backed)
+- **Status:** `Implemented` (DB-backed provider auth state + provider connection persistence scaffolding)
 - **Body:** `{ "code": "auth-code", "state": "...", "codeVerifier": "...", "redirectUri": "https://app.example.com/providers/google/callback" }`
 - **201 Created**: Returns linked Google connection summary.
 

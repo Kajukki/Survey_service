@@ -58,7 +58,7 @@ It is intentionally split into:
 
 3. Google provider auth API surface
 - `POST /api/v1/providers/google/auth/start` and `POST /api/v1/providers/google/auth/callback` are now implemented.
-- Current storage path for provider auth state/connection metadata is temporary and pending DB-backed persistence wiring.
+- Provider auth state and provider connection metadata now have DB-backed persistence groundwork.
 
 ### Planned (Not Yet Implemented)
 

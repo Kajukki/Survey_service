@@ -1,5 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import type { Kysely } from 'kysely';
+import type { Database } from '@survey-service/db';
 import { getPrincipal } from '../../../server/principal';
 import {
   createDefaultGoogleAuthService,
@@ -26,9 +28,10 @@ export async function registerGoogleAuthRoutes(
   app: FastifyInstance,
   deps?: {
     service?: GoogleAuthService;
+    db?: Kysely<Database>;
   },
 ): Promise<void> {
-  const service = deps?.service ?? createDefaultGoogleAuthService();
+  const service = deps?.service ?? createDefaultGoogleAuthService(deps?.db);
 
   app.post('/providers/google/auth/start', async (request, reply) => {
     const principal = getPrincipal(request);

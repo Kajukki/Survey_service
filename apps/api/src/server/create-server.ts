@@ -99,7 +99,9 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
         db: context.db,
         config: context.config,
       });
-      await registerGoogleAuthRoutes(_api);
+      await registerGoogleAuthRoutes(_api, {
+        db: context.db,
+      });
       await connectionsRoutes(_api);
       await formsRoutes(_api, {
         db: context.db,

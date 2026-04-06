@@ -53,3 +53,5 @@ See [docs/architecture.md](../../docs/architecture.md) section 5 for ownership a
 - `responses` — form responses (raw or normalized)
 - `shares` — permission grants
 - `jobs` — async job tracking
+- `provider_auth_states` — short-lived OAuth PKCE state records
+- `provider_connections` — provider account linkage and token lifecycle fields

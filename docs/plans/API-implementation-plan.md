@@ -42,6 +42,7 @@ This document is the execution backlog for API delivery, based on the current im
 - Provider connector DTOs now exist in `packages/contracts`.
 - Initial `GoogleFormsConnector` boundary and unit tests now exist in `packages/connectors`.
 - Google provider auth start/callback routes are now wired in `apps/api` with PKCE validation and connector exchange flow.
+- Provider auth states and provider connections now have DB schema + repository groundwork for credential lifecycle persistence.
 
 ### Not Started
 

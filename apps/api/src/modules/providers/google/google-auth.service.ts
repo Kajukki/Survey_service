@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { GoogleFormsConnector, type ConnectorHttpClient } from '@survey-service/connectors';
 import type { ProviderAuthStartResult, ProviderTokenSet } from '@survey-service/contracts';
+import type { Kysely } from 'kysely';
+import type { Database } from '@survey-service/db';
 import { AppError, ErrorCode, ForbiddenError } from '../../../server/errors';
+import { createGoogleAuthRepository } from './google-auth.repository';
 
 export interface GoogleAuthPrincipal {
   userId: string;
@@ -42,9 +45,10 @@ export interface GoogleAuthService {
   }): Promise<LinkedGoogleConnection>;
 }
 
-interface PendingAuthState {
+export interface PendingAuthState {
   state: string;
   userId: string;
+  orgId: string;
   redirectUri: string;
   codeChallenge: string;
   expiresAt: Date;
@@ -55,14 +59,15 @@ interface StoredGoogleConnection {
   tokenSet: ProviderTokenSet;
 }
 
-interface GoogleAuthStateStore {
+export interface GoogleAuthStateStore {
   save(state: PendingAuthState): Promise<void>;
   consume(state: string): Promise<PendingAuthState | null>;
 }
 
-interface GoogleConnectionStore {
+export interface GoogleConnectionStore {
   upsert(input: {
     ownerId: string;
+    orgId: string;
     externalId: string;
     name: string;
     tokenSet: ProviderTokenSet;
@@ -96,7 +101,7 @@ function toCodeChallenge(verifier: string): string {
   return createHash('sha256').update(verifier).digest('base64url');
 }
 
-function createInMemoryStateStore(): GoogleAuthStateStore {
+export function createInMemoryStateStore(): GoogleAuthStateStore {
   const stateMap = new Map<string, PendingAuthState>();
 
   return {
@@ -113,7 +118,7 @@ function createInMemoryStateStore(): GoogleAuthStateStore {
   };
 }
 
-function createInMemoryConnectionStore(): GoogleConnectionStore {
+export function createInMemoryConnectionStore(): GoogleConnectionStore {
   const connectionMap = new Map<string, StoredGoogleConnection>();
 
   return {
@@ -220,6 +225,7 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
       await deps.stateStore.save({
         state,
         userId: principal.userId,
+        orgId: principal.orgId,
         redirectUri: input.redirectUri,
         codeChallenge: input.codeChallenge,
         expiresAt: new Date(now().getTime() + 10 * 60 * 1000),
@@ -265,6 +271,7 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
 
       return deps.connectionStore.upsert({
         ownerId: principal.userId,
+        orgId: principal.orgId,
         externalId: input.externalAccountId ?? `google-user-${principal.userId}`,
         name: input.connectionName ?? 'Google Forms Connection',
         tokenSet,
@@ -273,7 +280,7 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
   };
 }
 
-export function createDefaultGoogleAuthService(): GoogleAuthService {
+export function createDefaultGoogleAuthService(db?: Kysely<Database>): GoogleAuthService {
   const connector = new GoogleFormsConnector(
     {
       clientId: process.env.GOOGLE_OAUTH_CLIENT_ID ?? '',
@@ -284,6 +291,15 @@ export function createDefaultGoogleAuthService(): GoogleAuthService {
     },
     createFetchHttpClient(),
   );
+
+  if (db) {
+    const repository = createGoogleAuthRepository(db);
+    return createGoogleAuthService({
+      connector,
+      stateStore: repository.stateStore,
+      connectionStore: repository.connectionStore,
+    });
+  }
 
   return createGoogleAuthService({
     connector,
