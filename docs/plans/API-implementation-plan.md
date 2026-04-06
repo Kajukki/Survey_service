@@ -32,6 +32,7 @@ This document is the execution backlog for API delivery, based on the current im
 
 2. Authorization parity
 - Principal extraction is active on protected routes.
+- Jobs read paths now enforce requester-scoped lookup.
 - Owner/share policy matrix parity is not yet universal across mock-backed domain paths.
 
 ### Not Started

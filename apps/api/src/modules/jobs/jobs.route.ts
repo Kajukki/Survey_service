@@ -121,9 +121,9 @@ export async function jobsRoutes(
 
   // GET /jobs/:id
   app.get('/jobs/:id', async (request, reply) => {
-    getPrincipal(request);
+    const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const existing = await service.getJobById(id);
+    const existing = await service.getJobById(principal.userId, id);
 
     if (!existing) {
       return reply.status(404).send({

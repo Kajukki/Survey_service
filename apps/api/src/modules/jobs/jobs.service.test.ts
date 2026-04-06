@@ -88,4 +88,56 @@ describe('createJobsService', () => {
       }),
     ).rejects.toThrow('publish failed');
   });
+
+  it('reads a job only within the requester scope', async () => {
+    const repository = makeRepo();
+    const publishSyncJob = vi.fn(async (_message: SyncJobMessage) => {});
+
+    const scopedJob: SyncJobRecord = {
+      id: '8f0ef42e-84ea-4420-b784-194880c5bb8c',
+      type: 'sync',
+      status: 'queued',
+      requestedBy: 'owner-user',
+      connectionId: null,
+      formId: null,
+      trigger: 'manual',
+      source: 'manual_sync',
+      createdAt: new Date().toISOString(),
+      startedAt: null,
+      completedAt: null,
+      error: null,
+    };
+
+    vi.mocked(repository.getJobById).mockResolvedValue(scopedJob);
+
+    const service = createJobsService({
+      repository,
+      publishSyncJob,
+    });
+
+    const result = await service.getJobById('owner-user', scopedJob.id);
+
+    expect(repository.getJobById).toHaveBeenCalledWith('owner-user', scopedJob.id);
+    expect(result).toEqual(scopedJob);
+  });
+
+  it('returns null when job is outside requester scope', async () => {
+    const repository = makeRepo();
+    const publishSyncJob = vi.fn(async (_message: SyncJobMessage) => {});
+
+    vi.mocked(repository.getJobById).mockResolvedValue(null);
+
+    const service = createJobsService({
+      repository,
+      publishSyncJob,
+    });
+
+    const result = await service.getJobById('other-user', '8f0ef42e-84ea-4420-b784-194880c5bb8c');
+
+    expect(repository.getJobById).toHaveBeenCalledWith(
+      'other-user',
+      '8f0ef42e-84ea-4420-b784-194880c5bb8c',
+    );
+    expect(result).toBeNull();
+  });
 });

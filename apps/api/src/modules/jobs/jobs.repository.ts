@@ -34,7 +34,7 @@ export interface JobsRepository {
     page: number,
     perPage: number,
   ): Promise<{ items: SyncJobRecord[]; total: number }>;
-  getJobById(id: string): Promise<SyncJobRecord | null>;
+  getJobById(requestedBy: string, id: string): Promise<SyncJobRecord | null>;
 }
 
 function toIso(dateValue: Date | string | null): string | null {
@@ -128,8 +128,13 @@ export function createJobsRepository(db: Kysely<Database>): JobsRepository {
       };
     },
 
-    async getJobById(id: string): Promise<SyncJobRecord | null> {
-      const row = await db.selectFrom('jobs').selectAll().where('id', '=', id).executeTakeFirst();
+    async getJobById(requestedBy: string, id: string): Promise<SyncJobRecord | null> {
+      const row = await db
+        .selectFrom('jobs')
+        .selectAll()
+        .where('requested_by', '=', requestedBy)
+        .where('id', '=', id)
+        .executeTakeFirst();
       if (!row) {
         return null;
       }

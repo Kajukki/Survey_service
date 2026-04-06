@@ -188,7 +188,7 @@ Revoke access.
 ## 6. Jobs & Async Operations
 Used by the frontend to poll for long-running task status (syncs, exports).
 
-Current implementation note: `/jobs/sync`, `/jobs`, and `/jobs/:id` are implemented with persisted jobs and RabbitMQ publish.
+Current implementation note: `/jobs/sync`, `/jobs`, and `/jobs/:id` are implemented with persisted jobs and RabbitMQ publish; list/detail reads are scoped to the authenticated requester.
 
 ### `POST /api/v1/jobs/sync`
 Create and enqueue a sync job.

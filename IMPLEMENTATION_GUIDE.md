@@ -50,6 +50,7 @@ It is intentionally split into:
 
 2. Authorization enforcement
 - Policy helpers exist, and protected routes now require a request principal.
+- Jobs list/detail reads are now scoped by authenticated requester.
 - Owner/share policy parity is still in progress for mock-backed domain paths.
 
 ### Planned (Not Yet Implemented)

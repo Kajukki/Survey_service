@@ -24,7 +24,7 @@ export interface JobsService {
     page: number,
     perPage: number,
   ): Promise<{ items: SyncJobRecord[]; total: number }>;
-  getJobById(id: string): Promise<SyncJobRecord | null>;
+  getJobById(requestedBy: string, id: string): Promise<SyncJobRecord | null>;
 }
 
 export function createJobsService(deps: {
@@ -66,8 +66,8 @@ export function createJobsService(deps: {
       return deps.repository.listJobs(requestedBy, page, perPage);
     },
 
-    async getJobById(id: string): Promise<SyncJobRecord | null> {
-      return deps.repository.getJobById(id);
+    async getJobById(requestedBy: string, id: string): Promise<SyncJobRecord | null> {
+      return deps.repository.getJobById(requestedBy, id);
     },
   };
 }
