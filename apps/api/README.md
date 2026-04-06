@@ -118,7 +118,7 @@ Additional endpoints are implemented in feature modules under `modules/`.
 | `/jobs/*` | Implemented with DB + RabbitMQ publish and requester-scoped reads |
 | `/connections/*` | Implemented route surface, currently mock-backed |
 | `/forms/*` | Implemented route surface, currently mock-backed |
-| `/forms/:id/shares/*` | Implemented route surface, currently mock-backed |
+| `/forms/:id/shares/*` | Implemented route surface, mock-backed with owner-scoped access checks |
 | `/exports/*` | Scaffolded route module, feature completion pending |
 
 See [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) for full endpoint specification and design decisions.
@@ -134,7 +134,7 @@ Before deploying:
 - [ ] Input validation via Zod at all boundaries
 - [ ] CORS origin whitelist restricted
 - [ ] Error responses do not leak sensitive data
-- [ ] Owner/share authorization enforced consistently
+- [ ] Owner/share authorization enforced consistently across all routes and persistence paths
 - [ ] SQL queries parameterized (Kysely prevents injection)
 - [ ] HTTPS enforced in production
 - [ ] Server security headers set (@fastify/helmet)

@@ -7,6 +7,7 @@ import { registerPrincipalPlugin } from '../server/principal';
 import { connectionsRoutes } from './connections/connections.route';
 import { formsRoutes } from './forms/forms.route';
 import { sharingRoutes } from './sharing/sharing.route';
+import { mockForms } from './forms/forms.mock';
 
 function buildConfig(): Config {
   return {
@@ -31,12 +32,12 @@ function buildConfig(): Config {
   };
 }
 
-async function signAccessToken(config: Config): Promise<string> {
+async function signAccessToken(config: Config, userId: string = 'user-one'): Promise<string> {
   const secret = new TextEncoder().encode(config.AUTH_JWT_SECRET);
 
   return new SignJWT({ org: 'default-org' })
     .setProtectedHeader({ alg: 'HS256' })
-    .setSubject('user-one')
+    .setSubject(userId)
     .setIssuer(config.OIDC_ISSUER)
     .setAudience(config.OIDC_AUDIENCE)
     .setIssuedAt()
@@ -75,13 +76,15 @@ async function buildApp() {
 }
 
 describe('protected domain routes', () => {
+  const formId = mockForms[0]!.id;
+
   it('returns 401 when accessing protected routes without a token', async () => {
     const { app } = await buildApp();
 
     const [connections, forms, shares] = await Promise.all([
       app.inject({ method: 'GET', url: '/connections' }),
       app.inject({ method: 'GET', url: '/forms' }),
-      app.inject({ method: 'GET', url: '/forms/mock-form-id/shares' }),
+      app.inject({ method: 'GET', url: `/forms/${formId}/shares` }),
     ]);
 
     expect(connections.statusCode).toBe(401);
@@ -102,7 +105,7 @@ describe('protected domain routes', () => {
       app.inject({ method: 'GET', url: '/forms', headers: { authorization: `Bearer ${token}` } }),
       app.inject({
         method: 'GET',
-        url: '/forms/mock-form-id/shares',
+        url: `/forms/${formId}/shares`,
         headers: { authorization: `Bearer ${token}` },
       }),
     ]);
@@ -110,5 +113,32 @@ describe('protected domain routes', () => {
     expect(connections.statusCode).toBe(200);
     expect(forms.statusCode).toBe(200);
     expect(shares.statusCode).toBe(200);
+  });
+
+  it('returns 404 for sharing routes when requester does not own the form', async () => {
+    const { app, config } = await buildApp();
+    const token = await signAccessToken(config, 'other-user');
+
+    const [getShares, createShare, deleteShare] = await Promise.all([
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/shares`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      app.inject({
+        method: 'POST',
+        url: `/forms/${formId}/shares`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      app.inject({
+        method: 'DELETE',
+        url: `/forms/${formId}/shares/share-mock-1`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+    ]);
+
+    expect(getShares.statusCode).toBe(404);
+    expect(createShare.statusCode).toBe(404);
+    expect(deleteShare.statusCode).toBe(404);
   });
 });

@@ -165,23 +165,26 @@ Trigger a manual synchronization job for the specified form.
 ## 5. Sharing
 Manages access grants to resources.
 
-Current implementation note: route surface is present and currently mock-backed.
+Current implementation note: route surface is present and currently mock-backed, with owner-scoped access checks on form shares.
 
 ### `GET /api/v1/forms/:id/shares`
 List all users/groups who have access to this form.
 - **Status:** `Partial` (currently mock-backed)
 - **200 OK**: Returns collection of `Share` objects.
+- **404 Not Found**: Form not found or not accessible to requester.
 
 ### `POST /api/v1/forms/:id/shares`
 Grant access to another user in the organization.
 - **Status:** `Partial` (currently mock-backed)
 - **Body:** `{ "grantee_user_id": "user-uuid", "permission_level": "read" }`
 - **201 Created**: Returns the created `Share`.
+- **404 Not Found**: Form not found or not accessible to requester.
 
 ### `DELETE /api/v1/forms/:id/shares/:share_id`
 Revoke access.
 - **Status:** `Partial` (currently mock-backed)
 - **204 No Content**: Successfully revoked.
+- **404 Not Found**: Form or share not found, or not accessible to requester.
 
 ---
 

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { getPrincipal } from '../../server/principal';
+import { mockForms } from '../forms/forms.mock.js';
 
 const mockShares = [
   {
@@ -12,10 +13,28 @@ const mockShares = [
 ];
 
 export async function sharingRoutes(app: FastifyInstance) {
+  function canAccessFormShares(formId: string, userId: string): boolean {
+    return mockForms.some((form) => form.id === formId && form.ownerId === userId);
+  }
+
   // GET /forms/:id/shares
   app.get('/forms/:id/shares', async (request, reply) => {
-    getPrincipal(request);
+    const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
+
+    if (!canAccessFormShares(id, principal.userId)) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Form not found',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
     const shares = mockShares.filter((share) => share.form_id === id);
 
     return reply.send({
@@ -29,8 +48,22 @@ export async function sharingRoutes(app: FastifyInstance) {
 
   // POST /forms/:id/shares
   app.post('/forms/:id/shares', async (request, reply) => {
-    getPrincipal(request);
+    const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
+
+    if (!canAccessFormShares(id, principal.userId)) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Form not found',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
     const createdShare = {
       ...mockShares[0],
       id: `share-${Date.now()}`,
@@ -49,8 +82,22 @@ export async function sharingRoutes(app: FastifyInstance) {
 
   // DELETE /forms/:id/shares/:share_id
   app.delete('/forms/:id/shares/:share_id', async (request, reply) => {
-    getPrincipal(request);
+    const principal = getPrincipal(request);
     const { id, share_id } = request.params as { id: string; share_id: string };
+
+    if (!canAccessFormShares(id, principal.userId)) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Form not found',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
     const existingIndex = mockShares.findIndex(
       (share) => share.form_id === id && share.id === share_id,
     );
