@@ -24,6 +24,7 @@ function makeOAuthClient() {
   return {
     generateAuthUrl: vi.fn(() => 'https://accounts.google.com/o/oauth2/v2/auth?mock=1'),
     getToken: vi.fn(),
+    verifyIdToken: vi.fn(),
     setCredentials: vi.fn(),
     refreshAccessToken: vi.fn(),
   };
@@ -68,8 +69,14 @@ describe('GoogleFormsConnector', () => {
         expiry_date: Date.now() + 3600 * 1000,
         scope: 'forms.body.readonly',
         token_type: 'Bearer',
+        id_token: 'google-id-token',
       },
     });
+    vi.mocked(oauthClient.verifyIdToken).mockResolvedValueOnce({
+      getPayload: () => ({
+        sub: 'google-subject-1',
+      }),
+    } as any);
 
     const connector = new GoogleFormsConnector(config, httpClient, oauthClient as any);
     const result = await connector.exchangeAuthorizationCode({
@@ -78,14 +85,45 @@ describe('GoogleFormsConnector', () => {
       codeVerifier: 'verifier-123',
     });
 
-    expect(result.provider).toBe('google');
-    expect(result.accessToken).toBe('access-token');
-    expect(result.refreshToken).toBe('refresh-token');
-    expect(result.expiresAt.length).toBeGreaterThan(10);
+    expect(result.tokenSet.provider).toBe('google');
+    expect(result.tokenSet.accessToken).toBe('access-token');
+    expect(result.tokenSet.refreshToken).toBe('refresh-token');
+    expect(result.idToken).toBe('google-id-token');
+    expect(result.externalAccountId).toBe('google-subject-1');
+    expect(result.tokenSet.expiresAt.length).toBeGreaterThan(10);
     expect(oauthClient.getToken).toHaveBeenCalledWith({
       code: 'oauth-code',
       redirect_uri: 'https://app.example.com/callback',
       codeVerifier: 'verifier-123',
+    });
+    expect(oauthClient.verifyIdToken).toHaveBeenCalledWith({
+      idToken: 'google-id-token',
+      audience: 'google-client-id',
+    });
+  });
+
+  it('rejects token exchange when google id_token is missing', async () => {
+    const httpClient = makeHttpClient();
+    const oauthClient = makeOAuthClient();
+    vi.mocked(oauthClient.getToken).mockResolvedValueOnce({
+      tokens: {
+        access_token: 'access-token',
+      },
+    });
+
+    const connector = new GoogleFormsConnector(config, httpClient, oauthClient as any);
+
+    await expect(
+      connector.exchangeAuthorizationCode({
+        code: 'oauth-code',
+        redirectUri: 'https://app.example.com/callback',
+        codeVerifier: 'verifier-123',
+      }),
+    ).rejects.toMatchObject({
+      provider: 'google',
+      code: 'invalid_id_token',
+      retryable: false,
+      status: 400,
     });
   });
 

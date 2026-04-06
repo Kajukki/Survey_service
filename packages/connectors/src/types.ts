@@ -6,6 +6,12 @@ import type {
   ProviderTokenSet,
 } from '@survey-service/contracts';
 
+export interface ProviderAuthCodeExchangeResult {
+  tokenSet: ProviderTokenSet;
+  idToken: string;
+  externalAccountId: string;
+}
+
 export interface ProviderConnector {
   readonly provider: 'google' | 'microsoft';
   buildAuthorizationUrl(input: ProviderAuthStartInput): ProviderAuthStartResult;
@@ -13,7 +19,7 @@ export interface ProviderConnector {
     code: string;
     redirectUri: string;
     codeVerifier: string;
-  }): Promise<ProviderTokenSet>;
+  }): Promise<ProviderAuthCodeExchangeResult>;
   refreshAccessToken(input: { refreshToken: string }): Promise<ProviderTokenSet>;
   listForms(input: { accessToken: string; pageToken?: string }): Promise<{
     items: ProviderFormSummary[];
