@@ -17,10 +17,17 @@ import { SessionService } from './session.service';
 
         <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
           <label for="username">Username</label>
-          <input id="username" type="text" formControlName="username" autocomplete="username" />
+          <input
+            class="text-input"
+            id="username"
+            type="text"
+            formControlName="username"
+            autocomplete="username"
+          />
 
           <label for="password">Password</label>
           <input
+            class="text-input"
             id="password"
             type="password"
             formControlName="password"
@@ -32,12 +39,12 @@ import { SessionService } from './session.service';
           }
 
           <div class="actions">
-            <button type="submit" [disabled]="form.invalid || isSubmitting()">
+            <button class="btn-primary" type="submit" [disabled]="form.invalid || isSubmitting()">
               {{ isSubmitting() ? 'Working...' : mode() === 'login' ? 'Sign in' : 'Register' }}
             </button>
             <button
               type="button"
-              class="secondary"
+              class="btn-secondary"
               (click)="toggleMode()"
               [disabled]="isSubmitting()"
             >

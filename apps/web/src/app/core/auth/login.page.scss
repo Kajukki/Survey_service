@@ -9,13 +9,19 @@
   width: min(480px, 100%);
   background: var(--panel-bg);
   border: 1px solid var(--line-color);
-  border-radius: 1rem;
+  border-radius: var(--radius-md);
   padding: 1.2rem;
+  box-shadow: var(--shadow-card);
 }
 
 .auth-card h1 {
-  margin-top: 0;
   font-family: 'DM Serif Display', Georgia, serif;
+  color: var(--text-strong);
+}
+
+.auth-card p {
+  margin-top: 0.35rem;
+  color: var(--text-muted);
 }
 
 form {
@@ -26,28 +32,8 @@ form {
 label {
   font-weight: 600;
   margin-top: 0.5rem;
-}
-
-input {
-  border: 1px solid var(--line-color);
-  border-radius: 0.6rem;
-  padding: 0.65rem 0.75rem;
-  background: #fff;
-}
-
-button {
-  border: 0;
-  border-radius: 0.6rem;
-  padding: 0.65rem 1rem;
-  background: var(--accent);
-  color: white;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  color: var(--text-subtle);
+  font-size: 0.85rem;
 }
 
 .actions {
@@ -56,13 +42,7 @@ button:disabled {
   margin-top: 0.75rem;
 }
 
-.secondary {
-  background: transparent;
-  color: var(--text-color);
-  border: 1px solid var(--line-color);
-}
-
 .error {
-  color: #b42318;
+  color: var(--danger);
   margin: 0.25rem 0 0;
 }
