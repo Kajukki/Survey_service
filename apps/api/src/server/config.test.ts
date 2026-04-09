@@ -11,6 +11,8 @@ describe('Configuration', () => {
     // Snapshot current env
     process.env = { ...originalEnv };
     process.env.AUTH_JWT_SECRET = 'test-secret-test-secret-test-secret';
+    process.env.CREDENTIAL_ENCRYPTION_KEY_B64 = 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=';
+    process.env.CREDENTIAL_ENCRYPTION_KEY_VERSION = 'v1';
     process.env.GOOGLE_OAUTH_CLIENT_ID = 'google-client-id';
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'google-client-secret';
   });
@@ -117,6 +119,17 @@ describe('Configuration', () => {
     process.env.OIDC_AUDIENCE = 'api.example.com';
     process.env.OIDC_JWKS_URI = 'https://idp.example.com/.well-known/jwks.json';
     delete process.env.GOOGLE_OAUTH_CLIENT_ID;
+
+    expect(() => loadConfig()).toThrow();
+  });
+
+  it('should throw when CREDENTIAL_ENCRYPTION_KEY_B64 is missing', () => {
+    process.env.DATABASE_URL = 'postgresql://localhost/test';
+    process.env.RABBITMQ_URL = 'amqp://localhost';
+    process.env.OIDC_ISSUER = 'https://idp.example.com';
+    process.env.OIDC_AUDIENCE = 'api.example.com';
+    process.env.OIDC_JWKS_URI = 'https://idp.example.com/.well-known/jwks.json';
+    delete process.env.CREDENTIAL_ENCRYPTION_KEY_B64;
 
     expect(() => loadConfig()).toThrow();
   });

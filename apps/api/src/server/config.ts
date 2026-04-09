@@ -30,6 +30,21 @@ const envSchema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
 
+  // Application-layer credential encryption
+  CREDENTIAL_ENCRYPTION_KEY_B64: z
+    .string()
+    .min(1, 'CREDENTIAL_ENCRYPTION_KEY_B64 is required')
+    .refine((value) => {
+      try {
+        return Buffer.from(value, 'base64').length === 32;
+      } catch {
+        return false;
+      }
+    }, 'CREDENTIAL_ENCRYPTION_KEY_B64 must be a base64-encoded 32-byte key'),
+  CREDENTIAL_ENCRYPTION_KEY_VERSION: z
+    .string()
+    .min(1, 'CREDENTIAL_ENCRYPTION_KEY_VERSION is required'),
+
   // Google OAuth (provider auth flow)
   GOOGLE_OAUTH_CLIENT_ID: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_ID is required'),
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_SECRET is required'),

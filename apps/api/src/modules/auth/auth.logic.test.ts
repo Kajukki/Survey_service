@@ -112,6 +112,8 @@ function buildConfig(): Config {
     AUTH_JWT_SECRET: 'test-secret-test-secret-test-secret',
     ACCESS_TOKEN_TTL_SECONDS: 900,
     REFRESH_TOKEN_TTL_SECONDS: 604800,
+    CREDENTIAL_ENCRYPTION_KEY_B64: 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
+    CREDENTIAL_ENCRYPTION_KEY_VERSION: 'v1',
     GOOGLE_OAUTH_CLIENT_ID: 'google-client-id',
     GOOGLE_OAUTH_CLIENT_SECRET: 'google-client-secret',
     GOOGLE_OAUTH_AUTH_BASE_URL: 'https://accounts.google.com/o/oauth2/v2/auth',

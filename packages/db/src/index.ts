@@ -59,6 +59,10 @@ export interface ProviderConnectionsTable {
   provider: 'google' | 'microsoft';
   external_account_id: string;
   name: string;
+  encrypted_token_payload: string | null;
+  encrypted_token_iv: string | null;
+  encrypted_token_tag: string | null;
+  encrypted_token_key_version: string | null;
   access_token: string;
   refresh_token: string | null;
   id_token: string | null;
