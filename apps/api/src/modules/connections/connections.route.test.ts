@@ -70,6 +70,25 @@ function createFakeDbReturning(rows: unknown[]) {
   };
 }
 
+function createFakeDbDeleteResult(deletedId: string | null) {
+  const executeTakeFirst = vi.fn(async () => (deletedId ? { id: deletedId } : undefined));
+  const returning = vi.fn(() => ({ executeTakeFirst }));
+  const whereSecond = vi.fn(() => ({ returning }));
+  const whereFirst = vi.fn(() => ({ where: whereSecond }));
+  const deleteFrom = vi.fn(() => ({ where: whereFirst }));
+
+  return {
+    deleteFrom,
+    whereFirst,
+    whereSecond,
+    returning,
+    executeTakeFirst,
+    db: {
+      deleteFrom,
+    },
+  };
+}
+
 async function buildApp(db?: unknown) {
   const config = buildConfig();
   const app = Fastify();
@@ -145,5 +164,41 @@ describe('connections routes', () => {
     expect(payload.success).toBe(true);
     expect(Array.isArray(payload.data)).toBe(true);
     expect(payload.data.length).toBeGreaterThan(0);
+  });
+
+  it('deletes DB-backed connection for owner', async () => {
+    const fakeDb = createFakeDbDeleteResult('conn-db-1');
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config);
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/connections/conn-db-1',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(204);
+    expect(fakeDb.deleteFrom).toHaveBeenCalledWith('provider_connections');
+    expect(fakeDb.whereFirst).toHaveBeenCalledWith('id', '=', 'conn-db-1');
+    expect(fakeDb.whereSecond).toHaveBeenCalledWith('owner_id', '=', 'user-one');
+  });
+
+  it('returns 404 when DB-backed connection is outside owner scope', async () => {
+    const fakeDb = createFakeDbDeleteResult(null);
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config);
+
+    const response = await app.inject({
+      method: 'DELETE',
+      url: '/connections/conn-db-missing',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(fakeDb.deleteFrom).toHaveBeenCalledWith('provider_connections');
   });
 });

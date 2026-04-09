@@ -108,9 +108,16 @@ export async function connectionsRoutes(app: FastifyInstance, deps?: { db?: Kyse
       });
     }
 
-    const existing = mockConnections.find(
-      (connection) => connection.id === id && connection.ownerId === principal.userId,
-    );
+    const existing = deps?.db
+      ? await deps.db
+          .deleteFrom('provider_connections')
+          .where('id', '=', id)
+          .where('owner_id', '=', principal.userId)
+          .returning('id')
+          .executeTakeFirst()
+      : mockConnections.find(
+          (connection) => connection.id === id && connection.ownerId === principal.userId,
+        );
 
     if (!existing) {
       return reply.status(404).send({
