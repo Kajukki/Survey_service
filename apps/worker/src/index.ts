@@ -357,7 +357,7 @@ function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient 
         if (!response.ok) {
           const body = await response.json().catch(() => undefined);
           throw {
-            message: `Google API request failed with status ${response.status}`,
+            message: `Google API request failed with status ${response.status} for ${input.method} ${url.toString()}`,
             response: {
               status: response.status,
               data: body,
