@@ -118,7 +118,7 @@ export async function formsRoutes(
 
     return Array.from({ length: boundedTotal }, (_, index) => {
       const ordinal = index + 1;
-      const completion = ordinal % 4 === 0 ? 'partial' : 'completed';
+      const completion: 'completed' | 'partial' = ordinal % 4 === 0 ? 'partial' : 'completed';
       const submittedAt = new Date(now - ordinal * 6 * 60 * 60 * 1000).toISOString();
       const score = ((ordinal % 5) + 1).toString();
       const channel = ['Organic', 'Referral', 'Paid', 'Social'][ordinal % 4]!;
@@ -147,6 +147,71 @@ export async function formsRoutes(
         ],
       };
     });
+  }
+
+  type FormResponseRecord = {
+    id: string;
+    submittedAt?: string;
+    completion: 'completed' | 'partial';
+    answerPreview: Array<{ questionId: string; questionLabel: string; valuePreview: string }>;
+  };
+
+  function normalizeAnswerPreviewJson(value: unknown): FormResponseRecord['answerPreview'] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+
+        const candidate = item as Record<string, unknown>;
+        if (
+          typeof candidate.questionId !== 'string' ||
+          typeof candidate.questionLabel !== 'string' ||
+          typeof candidate.valuePreview !== 'string'
+        ) {
+          return null;
+        }
+
+        return {
+          questionId: candidate.questionId,
+          questionLabel: candidate.questionLabel,
+          valuePreview: candidate.valuePreview,
+        };
+      })
+      .filter((item): item is FormResponseRecord['answerPreview'][number] => Boolean(item));
+  }
+
+  async function loadFormResponses(formId: string, fallbackCount: number): Promise<FormResponseRecord[]> {
+    if (!db) {
+      return buildMockResponses(formId, fallbackCount);
+    }
+
+    const rows = await db
+      .selectFrom('form_responses')
+      .select([
+        'external_response_id',
+        'submitted_at',
+        'completion',
+        'answer_preview_json',
+      ])
+      .where('form_id', '=', formId)
+      .orderBy('submitted_at', 'desc')
+      .execute();
+
+    if (rows.length === 0) {
+      return [];
+    }
+
+    return rows.map((row) => ({
+      id: row.external_response_id,
+      submittedAt: row.submitted_at ? new Date(row.submitted_at).toISOString() : undefined,
+      completion: row.completion,
+      answerPreview: normalizeAnswerPreviewJson(row.answer_preview_json),
+    }));
   }
 
   type AnalyticsGranularity = 'day' | 'week' | 'month';
@@ -487,7 +552,7 @@ export async function formsRoutes(
     const completion =
       query.completion === 'completed' || query.completion === 'partial' ? query.completion : undefined;
 
-    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
     const filteredResponses = allResponses.filter((response) => {
       if (completion && response.completion !== completion) {
         return false;
@@ -573,7 +638,7 @@ export async function formsRoutes(
     const granularity = parseAnalyticsGranularity(query.granularity);
     const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
 
-    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
     const filteredResponses = allResponses.filter((response) => {
       if (!response.submittedAt) {
         return false;
@@ -661,7 +726,7 @@ export async function formsRoutes(
     const granularity = parseAnalyticsGranularity(query.granularity);
     const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
 
-    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
     const filteredResponses = allResponses.filter((response) => {
       if (!response.submittedAt) {
         return false;
@@ -719,7 +784,7 @@ export async function formsRoutes(
     const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
     const segmentBy = query.segmentBy === 'channel' ? 'channel' : 'completion';
 
-    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
     const filteredResponses = allResponses.filter((response) => {
       if (!response.submittedAt) {
         return false;

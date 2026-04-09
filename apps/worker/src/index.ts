@@ -102,7 +102,9 @@ interface SyncJobProcessingContext {
     | 'refresh-token'
     | 'persist-refreshed-token'
     | 'list-forms'
-    | 'persist-forms';
+    | 'persist-forms'
+    | 'list-responses'
+    | 'persist-responses';
   effectiveConnectionId?: string;
   provider?: 'google' | 'microsoft';
 }
@@ -552,6 +554,61 @@ function isTokenExpiringSoon(expiresAt: string, thresholdMs: number = 60_000): b
   return value <= Date.now() + thresholdMs;
 }
 
+function toPreviewString(value: unknown): string {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toPreviewString(item)).filter((item) => item.length > 0).join(', ');
+  }
+
+  if (typeof value === 'object') {
+    const candidate = value as Record<string, unknown>;
+    const choiceAnswers = candidate.choiceAnswers as { answers?: unknown[] } | undefined;
+    if (choiceAnswers?.answers && Array.isArray(choiceAnswers.answers)) {
+      return choiceAnswers.answers.map((item) => toPreviewString(item)).join(', ');
+    }
+
+    const textAnswers = candidate.textAnswers as { answers?: Array<{ value?: string }> } | undefined;
+    if (textAnswers?.answers && Array.isArray(textAnswers.answers)) {
+      return textAnswers.answers
+        .map((item) => (typeof item?.value === 'string' ? item.value : ''))
+        .filter((item) => item.length > 0)
+        .join(' | ');
+    }
+
+    try {
+      return JSON.stringify(candidate);
+    } catch {
+      return '[object]';
+    }
+  }
+
+  return String(value);
+}
+
+function buildAnswerPreview(answers: Record<string, unknown>) {
+  return Object.entries(answers)
+    .map(([questionId, rawValue]) => {
+      const preview = toPreviewString(rawValue).trim();
+      return {
+        questionId,
+        questionLabel: questionId,
+        valuePreview: preview.length > 0 ? preview.slice(0, 160) : '(no answer)',
+      };
+    })
+    .slice(0, 8);
+}
+
+function resolveCompletion(answers: Record<string, unknown>): 'completed' | 'partial' {
+  return Object.keys(answers).length > 0 ? 'completed' : 'partial';
+}
+
 async function processSyncJob(
   payload: SyncJobMessage,
   pool: Pool,
@@ -669,7 +726,7 @@ async function processSyncJob(
 
     stage = 'persist-forms';
     for (const form of formsPage.items) {
-      await pool.query(
+      const persistedFormResult = await pool.query<{ id: string }>(
         `
           INSERT INTO forms (
             owner_id,
@@ -687,6 +744,7 @@ async function processSyncJob(
             description = EXCLUDED.description,
             response_count = EXCLUDED.response_count,
             updated_at = NOW()
+          RETURNING id
         `,
         [
           connection.owner_id,
@@ -696,6 +754,79 @@ async function processSyncJob(
           form.description ?? null,
           form.responseCount,
         ],
+      );
+
+      const persistedFormId = persistedFormResult.rows[0]?.id;
+      if (!persistedFormId) {
+        continue;
+      }
+
+      stage = 'list-responses';
+      let nextPageToken: string | undefined;
+      let pageCount = 0;
+
+      do {
+        const responsePage = await connector.listFormResponses({
+          accessToken: tokenSet.accessToken,
+          externalFormId: form.externalFormId,
+          pageToken: nextPageToken,
+        });
+
+        stage = 'persist-responses';
+        for (const response of responsePage.responses) {
+          const answers = response.answers ?? {};
+          const answerPreview = buildAnswerPreview(answers);
+
+          await pool.query(
+            `
+              INSERT INTO form_responses (
+                owner_id,
+                form_id,
+                external_response_id,
+                submitted_at,
+                completion,
+                answers_json,
+                answer_preview_json,
+                updated_at
+              )
+              VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, NOW())
+              ON CONFLICT (form_id, external_response_id)
+              DO UPDATE SET
+                submitted_at = EXCLUDED.submitted_at,
+                completion = EXCLUDED.completion,
+                answers_json = EXCLUDED.answers_json,
+                answer_preview_json = EXCLUDED.answer_preview_json,
+                updated_at = NOW()
+            `,
+            [
+              connection.owner_id,
+              persistedFormId,
+              response.externalResponseId,
+              response.submittedAt ?? null,
+              resolveCompletion(answers),
+              JSON.stringify(answers),
+              JSON.stringify(answerPreview),
+            ],
+          );
+        }
+
+        nextPageToken = responsePage.nextPageToken;
+        pageCount += 1;
+      } while (nextPageToken && pageCount < 50);
+
+      await pool.query(
+        `
+          UPDATE forms
+          SET
+            response_count = (
+              SELECT COUNT(*)::int
+              FROM form_responses
+              WHERE form_id = $1
+            ),
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [persistedFormId],
       );
     }
 

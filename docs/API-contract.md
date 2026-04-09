@@ -152,6 +152,7 @@ Revoke and remove a provider connection.
 Manages ingested survey configurations and metadata.
 
 Current implementation note: list/detail and form-level sync trigger are DB-backed in runtime.
+Response and analytics endpoints are backed by persisted `form_responses` records when available.
 
 ### `GET /api/v1/forms`
 List forms owned by or shared with the user.
