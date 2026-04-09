@@ -270,6 +270,77 @@ export async function formsRoutes(
     return breakdowns.filter((item) => item.questionId === questionId);
   }
 
+  function groupResponsesBySegment(
+    responses: Array<{
+      completion: string;
+      answerPreview: Array<{ questionId: string; valuePreview: string }>;
+    }>,
+    segmentBy: string,
+  ) {
+    const grouped = new Map<
+      string,
+      {
+        responses: number;
+        completed: number;
+        scoreTotal: number;
+        scoreCount: number;
+      }
+    >();
+
+    for (const response of responses) {
+      let key = 'unknown';
+
+      if (segmentBy === 'completion') {
+        key = response.completion;
+      } else if (segmentBy === 'channel') {
+        key = response.answerPreview.find((item) => item.questionId === 'q-channel')?.valuePreview ?? 'unknown';
+      }
+
+      const current = grouped.get(key) ?? {
+        responses: 0,
+        completed: 0,
+        scoreTotal: 0,
+        scoreCount: 0,
+      };
+
+      current.responses += 1;
+      if (response.completion === 'completed') {
+        current.completed += 1;
+      }
+
+      const scoreValue = response.answerPreview.find((item) => item.questionId === 'q-overall')?.valuePreview;
+      const score = scoreValue ? Number.parseInt(scoreValue.split('/')[0] ?? '', 10) : Number.NaN;
+      if (Number.isFinite(score)) {
+        current.scoreTotal += score;
+        current.scoreCount += 1;
+      }
+
+      grouped.set(key, current);
+    }
+
+    return [...grouped.entries()]
+      .map(([segmentKey, value]) => ({
+        segmentKey,
+        segmentLabel:
+          segmentKey === 'completed'
+            ? 'Completed'
+            : segmentKey === 'partial'
+              ? 'Partial'
+              : segmentKey === 'unknown'
+                ? 'Unknown'
+                : segmentKey,
+        responses: value.responses,
+        completionRate: value.responses > 0 ? value.completed / value.responses : 0,
+        metrics: [
+          {
+            label: 'avgSatisfaction',
+            value: value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
+          },
+        ],
+      }))
+      .sort((left, right) => right.responses - left.responses);
+  }
+
   const jobsService = deps?.db
     ? createJobsService({
         repository: createJobsRepository(deps.db),
@@ -608,6 +679,74 @@ export async function formsRoutes(
           from: from.toISOString(),
           to: to.toISOString(),
           granularity,
+          ...(questionId ? { questionId } : {}),
+        },
+        dataFreshness: {
+          generatedAt: new Date().toISOString(),
+          lastSuccessfulSyncAt: resolvedForm.updatedAt.toISOString(),
+          lastAttemptedSyncAt: resolvedForm.updatedAt.toISOString(),
+        },
+      },
+      meta: {
+        requestId: request.id,
+      },
+    });
+  });
+
+  // GET /forms/:id/analytics/segments
+  zApp.get('/forms/:id/analytics/segments', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const { id } = request.params as { id: string };
+    const query = request.query as Record<string, string | undefined>;
+
+    const resolvedForm = await resolveAccessibleForm(id, principal.userId);
+    if (!resolvedForm) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
+    }
+
+    const now = new Date();
+    const defaultTo = normalizeUtcDay(now);
+    const defaultFrom = new Date(defaultTo);
+    defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 29);
+
+    const from = parseDateParam(query.from) ?? defaultFrom;
+    const to = parseDateParam(query.to) ?? defaultTo;
+    const granularity = parseAnalyticsGranularity(query.granularity);
+    const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
+    const segmentBy = query.segmentBy === 'channel' ? 'channel' : 'completion';
+
+    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const filteredResponses = allResponses.filter((response) => {
+      if (!response.submittedAt) {
+        return false;
+      }
+
+      const submittedAt = new Date(response.submittedAt).getTime();
+      const inRange = submittedAt >= from.getTime() && submittedAt <= to.getTime();
+      if (!inRange) {
+        return false;
+      }
+
+      if (questionId) {
+        return response.answerPreview.some((item) => item.questionId === questionId);
+      }
+
+      return true;
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        segments: groupResponsesBySegment(filteredResponses, segmentBy),
+        appliedFilters: {
+          from: from.toISOString(),
+          to: to.toISOString(),
+          granularity,
+          segmentBy,
           ...(questionId ? { questionId } : {}),
         },
         dataFreshness: {

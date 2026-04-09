@@ -280,13 +280,24 @@
             <option value="month">Month</option>
           </select>
         </label>
+
+        <label>
+          Segment by
+          <select
+            [value]="workspaceState().analyticsSegmentBy"
+            (change)="updateAnalyticsSegmentBy($any($event.target).value)"
+          >
+            <option value="completion">Completion</option>
+            <option value="channel">Channel</option>
+          </select>
+        </label>
       </section>
 
-      @if (analyticsOverviewResource.isLoading() || analyticsQuestionsResource.isLoading()) {
+      @if (analyticsOverviewResource.isLoading() || analyticsQuestionsResource.isLoading() || analyticsSegmentsResource.isLoading()) {
         <section class="card empty-state">
           <h3>Loading analytics...</h3>
         </section>
-      } @else if (analyticsOverviewResource.error() || analyticsQuestionsResource.error()) {
+      } @else if (analyticsOverviewResource.error() || analyticsQuestionsResource.error() || analyticsSegmentsResource.error()) {
         <section class="card empty-state">
           <h3>Unable to load analytics</h3>
           <p>Try refreshing or broadening the selected date range.</p>
@@ -347,6 +358,34 @@
             </article>
           } @empty {
             <p class="empty-inline">No analytics question data is available for this filter range.</p>
+          }
+        </section>
+
+        <section class="card analytics-segments">
+          <h3>Segment Insights</h3>
+
+          @for (segment of analyticsSegments()?.segments ?? []; track segment.segmentKey) {
+            <article>
+              <header>
+                <h4>{{ segment.segmentLabel }}</h4>
+                <span>{{ segment.responses }} responses</span>
+              </header>
+              @if (segment.completionRate !== undefined) {
+                <p>Completion rate: {{ (segment.completionRate * 100).toFixed(0) }}%</p>
+              }
+              @if (segment.metrics.length) {
+                <ul>
+                  @for (metric of segment.metrics; track metric.label) {
+                    <li>
+                      <span>{{ metric.label }}</span>
+                      <strong>{{ metric.value }}</strong>
+                    </li>
+                  }
+                </ul>
+              }
+            </article>
+          } @empty {
+            <p class="empty-inline">No segment data is available for this filter range.</p>
           }
         </section>
       }

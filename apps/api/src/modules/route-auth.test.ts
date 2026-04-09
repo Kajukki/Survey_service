@@ -110,7 +110,7 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config);
 
-    const [connections, forms, shares, structure, responses, analyticsOverview, analyticsQuestions] = await Promise.all([
+    const [connections, forms, shares, structure, responses, analyticsOverview, analyticsQuestions, analyticsSegments] = await Promise.all([
       app.inject({
         method: 'GET',
         url: '/connections',
@@ -142,6 +142,11 @@ describe('protected domain routes', () => {
         url: `/forms/${formId}/analytics/questions?from=2026-03-01&to=2026-03-31&granularity=week`,
         headers: { authorization: `Bearer ${token}` },
       }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/analytics/segments?from=2026-03-01&to=2026-03-31&granularity=week&segmentBy=completion`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
     ]);
 
     expect(connections.statusCode).toBe(200);
@@ -151,6 +156,7 @@ describe('protected domain routes', () => {
     expect(responses.statusCode).toBe(200);
     expect(analyticsOverview.statusCode).toBe(200);
     expect(analyticsQuestions.statusCode).toBe(200);
+    expect(analyticsSegments.statusCode).toBe(200);
   });
 
   it('returns 404 for sharing routes when requester does not own the form', async () => {
@@ -184,7 +190,7 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config, 'other-user');
 
-    const [deleteConnection, syncForm, structure, responses, analyticsOverview, analyticsQuestions] = await Promise.all([
+    const [deleteConnection, syncForm, structure, responses, analyticsOverview, analyticsQuestions, analyticsSegments] = await Promise.all([
       app.inject({
         method: 'DELETE',
         url: `/connections/${connectionId}`,
@@ -215,6 +221,11 @@ describe('protected domain routes', () => {
         url: `/forms/${formId}/analytics/questions?from=2026-03-01&to=2026-03-31&granularity=week`,
         headers: { authorization: `Bearer ${token}` },
       }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/analytics/segments?from=2026-03-01&to=2026-03-31&granularity=week&segmentBy=completion`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
     ]);
 
     expect(deleteConnection.statusCode).toBe(404);
@@ -223,5 +234,6 @@ describe('protected domain routes', () => {
     expect(responses.statusCode).toBe(404);
     expect(analyticsOverview.statusCode).toBe(404);
     expect(analyticsQuestions.statusCode).toBe(404);
+    expect(analyticsSegments.statusCode).toBe(404);
   });
 });

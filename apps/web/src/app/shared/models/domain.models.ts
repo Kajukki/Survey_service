@@ -147,6 +147,35 @@ export interface FormAnalyticsQuestionsRecord {
   };
 }
 
+export interface FormAnalyticsSegmentMetricRecord {
+  label: string;
+  value: number;
+}
+
+export interface FormAnalyticsSegmentRecord {
+  segmentKey: string;
+  segmentLabel: string;
+  responses: number;
+  completionRate?: number;
+  metrics: FormAnalyticsSegmentMetricRecord[];
+}
+
+export interface FormAnalyticsSegmentsRecord {
+  segments: FormAnalyticsSegmentRecord[];
+  appliedFilters: {
+    from: string;
+    to: string;
+    granularity: FormAnalyticsGranularity;
+    segmentBy: string;
+    questionId?: string;
+  };
+  dataFreshness: {
+    generatedAt: string;
+    lastSuccessfulSyncAt?: string;
+    lastAttemptedSyncAt?: string;
+  };
+}
+
 export interface SyncJob {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';

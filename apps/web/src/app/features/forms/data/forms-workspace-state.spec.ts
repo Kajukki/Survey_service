@@ -15,6 +15,7 @@ describe('forms workspace state', () => {
       responseQuestionId: 'q-overall',
       completion: 'completed',
       analyticsQuestionId: 'q-comment',
+      analyticsSegmentBy: 'channel',
       analyticsFrom: '2026-03-01',
       analyticsTo: '2026-03-31',
       analyticsGranularity: 'week',
@@ -30,6 +31,7 @@ describe('forms workspace state', () => {
       responseQuestionId: 'q-overall',
       completion: 'completed',
       analyticsQuestionId: 'q-comment',
+      analyticsSegmentBy: 'channel',
       analyticsFrom: '2026-03-01',
       analyticsTo: '2026-03-31',
       analyticsGranularity: 'week',
@@ -52,6 +54,7 @@ describe('forms workspace state', () => {
     expect(parsed.analyticsFrom).toBe(defaults.analyticsFrom);
     expect(parsed.analyticsTo).toBe(defaults.analyticsTo);
     expect(parsed.analyticsGranularity).toBe(defaults.analyticsGranularity);
+    expect(parsed.analyticsSegmentBy).toBe(defaults.analyticsSegmentBy);
   });
 
   it('builds query params from state', () => {
@@ -63,6 +66,7 @@ describe('forms workspace state', () => {
       responseSearch: 'hello',
       completion: 'partial',
       analyticsQuestionId: 'q2',
+      analyticsSegmentBy: 'completion',
       analyticsFrom: '2026-03-01',
       analyticsTo: '2026-03-31',
       analyticsGranularity: 'month',
@@ -78,6 +82,7 @@ describe('forms workspace state', () => {
       responseSearch: 'hello',
       completion: 'partial',
       analyticsQuestionId: 'q2',
+      analyticsSegmentBy: 'completion',
       analyticsFrom: '2026-03-01',
       analyticsTo: '2026-03-31',
       analyticsGranularity: 'month',

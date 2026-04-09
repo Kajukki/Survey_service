@@ -17,6 +17,7 @@ export interface FormsWorkspaceState {
   responseQuestionId?: string;
   completion?: 'completed' | 'partial';
   analyticsQuestionId?: string;
+  analyticsSegmentBy: 'completion' | 'channel';
   analyticsFrom: string;
   analyticsTo: string;
   analyticsGranularity: 'day' | 'week' | 'month';
@@ -36,6 +37,7 @@ export function defaultFormsWorkspaceState(): FormsWorkspaceState {
 
   return {
     tab: 'overview',
+    analyticsSegmentBy: 'completion',
     analyticsFrom: formatDateOnly(defaultFrom),
     analyticsTo: formatDateOnly(defaultTo),
     analyticsGranularity: 'day',
@@ -95,6 +97,10 @@ export function parseFormsWorkspaceState(params: Params): FormsWorkspaceState {
         : typeof params['questionId'] === 'string'
           ? params['questionId']
           : undefined,
+    analyticsSegmentBy:
+      params['analyticsSegmentBy'] === 'completion' || params['analyticsSegmentBy'] === 'channel'
+        ? params['analyticsSegmentBy']
+        : defaults.analyticsSegmentBy,
     analyticsFrom:
       typeof params['analyticsFrom'] === 'string' && params['analyticsFrom'].length > 0
         ? params['analyticsFrom']
@@ -144,6 +150,8 @@ export function buildFormsWorkspaceQueryParams(state: FormsWorkspaceState): Para
   if (state.analyticsQuestionId) {
     params['analyticsQuestionId'] = state.analyticsQuestionId;
   }
+
+  params['analyticsSegmentBy'] = state.analyticsSegmentBy;
 
   params['analyticsFrom'] = state.analyticsFrom;
   params['analyticsTo'] = state.analyticsTo;
