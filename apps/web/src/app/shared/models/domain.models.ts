@@ -48,6 +48,33 @@ export interface FormRecord {
   updatedAt: string;
 }
 
+export interface FormQuestionRecord {
+  id: string;
+  label: string;
+  description?: string;
+  type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  required: boolean;
+}
+
+export interface FormSectionRecord {
+  id: string;
+  title: string;
+  description?: string;
+  questions: FormQuestionRecord[];
+}
+
+export interface FormStructureRecord {
+  formId: string;
+  title: string;
+  ownerId: string;
+  description?: string;
+  responseCount: number;
+  updatedAt: string;
+  lastSyncedAt?: string;
+  sections: FormSectionRecord[];
+  questionCount: number;
+}
+
 export interface SyncJob {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';

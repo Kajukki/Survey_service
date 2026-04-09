@@ -165,6 +165,12 @@ Get detailed metadata for a specific form.
 - **200 OK**: Returns the `Form` object.
 - **403 / 404**: Unauthorized or not found.
 
+### `GET /api/v1/forms/:id/structure`
+Get ordered form structure (sections + questions) for the specified form.
+- **Status:** `Implemented`
+- **200 OK**: Returns `{ form, sections, questionCount }`.
+- **404 Not Found**: Form not found or not accessible to requester.
+
 ### `POST /api/v1/forms/:id/sync`
 Trigger a manual synchronization job for the specified form.
 - **Status:** `Implemented`

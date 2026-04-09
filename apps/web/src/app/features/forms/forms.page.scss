@@ -43,6 +43,14 @@ td {
   color: var(--text-body);
 }
 
+.actions {
+  width: 180px;
+}
+
+.actions .btn-secondary {
+  text-decoration: none;
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

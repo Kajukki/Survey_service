@@ -2,6 +2,8 @@ import {
   Connection,
   ExportRecord,
   FormRecord,
+  FormSectionRecord,
+  FormStructureRecord,
   SharingRecord,
   SyncJob,
 } from '../../shared/models/domain.models';
@@ -19,6 +21,37 @@ export interface FormDto {
   title: string;
   ownerId: string;
   updatedAt: string;
+}
+
+export interface FormQuestionDto {
+  id: string;
+  label: string;
+  description?: string;
+  type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  required?: boolean;
+  order: number;
+}
+
+export interface FormSectionDto {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  questions: FormQuestionDto[];
+}
+
+export interface FormStructureDto {
+  form: {
+    id: string;
+    ownerId: string;
+    title: string;
+    description?: string;
+    responseCount: number;
+    updatedAt: string;
+    lastSyncedAt?: string;
+  };
+  sections: FormSectionDto[];
+  questionCount: number;
 }
 
 export interface JobDto {
@@ -64,6 +97,39 @@ export function mapForms(items: FormDto[]): FormRecord[] {
     visibility: item.ownerId === CURRENT_USER_ID ? 'owned' : 'shared',
     updatedAt: item.updatedAt,
   }));
+}
+
+export function mapFormStructure(input: FormStructureDto): FormStructureRecord {
+  const sections: FormSectionRecord[] = input.sections
+    .slice()
+    .sort((left, right) => left.order - right.order)
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      questions: section.questions
+        .slice()
+        .sort((left, right) => left.order - right.order)
+        .map((question) => ({
+          id: question.id,
+          label: question.label,
+          description: question.description,
+          type: question.type,
+          required: question.required ?? false,
+        })),
+    }));
+
+  return {
+    formId: input.form.id,
+    title: input.form.title,
+    ownerId: input.form.ownerId,
+    description: input.form.description,
+    responseCount: input.form.responseCount,
+    updatedAt: input.form.updatedAt,
+    lastSyncedAt: input.form.lastSyncedAt,
+    sections,
+    questionCount: input.questionCount,
+  };
 }
 
 export function mapJobs(items: JobDto[]): SyncJob[] {

@@ -110,7 +110,7 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config);
 
-    const [connections, forms, shares] = await Promise.all([
+    const [connections, forms, shares, structure] = await Promise.all([
       app.inject({
         method: 'GET',
         url: '/connections',
@@ -122,11 +122,17 @@ describe('protected domain routes', () => {
         url: `/forms/${formId}/shares`,
         headers: { authorization: `Bearer ${token}` },
       }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/structure`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
     ]);
 
     expect(connections.statusCode).toBe(200);
     expect(forms.statusCode).toBe(200);
     expect(shares.statusCode).toBe(200);
+    expect(structure.statusCode).toBe(200);
   });
 
   it('returns 404 for sharing routes when requester does not own the form', async () => {
@@ -160,7 +166,7 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config, 'other-user');
 
-    const [deleteConnection, syncForm] = await Promise.all([
+    const [deleteConnection, syncForm, structure] = await Promise.all([
       app.inject({
         method: 'DELETE',
         url: `/connections/${connectionId}`,
@@ -171,9 +177,15 @@ describe('protected domain routes', () => {
         url: `/forms/${formId}/sync`,
         headers: { authorization: `Bearer ${token}` },
       }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/structure`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
     ]);
 
     expect(deleteConnection.statusCode).toBe(404);
     expect(syncForm.statusCode).toBe(404);
+    expect(structure.statusCode).toBe(404);
   });
 });

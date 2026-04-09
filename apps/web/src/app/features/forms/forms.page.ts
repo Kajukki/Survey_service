@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { httpResource } from '@angular/common/http';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 
 import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
@@ -10,7 +11,7 @@ import { FormRecord } from '../../shared/models/domain.models';
 @Component({
   selector: 'app-forms-page',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   template: `
     <section class="card page">
       <header class="header">
@@ -33,6 +34,7 @@ import { FormRecord } from '../../shared/models/domain.models';
               <th>Owner</th>
               <th>Visibility</th>
               <th>Updated</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -44,10 +46,13 @@ import { FormRecord } from '../../shared/models/domain.models';
                   <span class="badge">{{ form.visibility }}</span>
                 </td>
                 <td>{{ form.updatedAt | date: 'mediumDate' }}</td>
+                <td class="actions">
+                  <a class="btn-secondary" [routerLink]="['/forms', form.id]">Open workspace</a>
+                </td>
               </tr>
             } @empty {
               <tr>
-                <td colspan="4">No forms found.</td>
+                <td colspan="5">No forms found.</td>
               </tr>
             }
           </tbody>
