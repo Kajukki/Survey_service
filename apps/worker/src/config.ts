@@ -8,6 +8,7 @@ import { CONSUMER_PREFETCH } from '@survey-service/messaging';
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  WORKER_ROLE: z.enum(['all', 'sync', 'export']).default('all'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   RABBITMQ_URL: z.string().min(1, 'RABBITMQ_URL is required'),
   RABBITMQ_PREFETCH: z.coerce.number().int().positive().default(CONSUMER_PREFETCH),
