@@ -5,7 +5,8 @@ import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { mockForms } from './forms.mock.js';
 import { getPrincipal } from '../../server/principal';
 import { createJobsRepository } from '../jobs/jobs.repository';
-import { createJobsService } from '../jobs/jobs.service';
+import { createJobsCommandService } from '../jobs/jobs.command-service';
+import { resolveOwnedFormForSync } from './forms-sync.query-service';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
@@ -1003,8 +1004,8 @@ export async function formsRoutes(
     return buckets.map(({ date, count }) => ({ date, count }));
   }
 
-  const jobsService = deps?.db
-    ? createJobsService({
+  const jobsCommandService = deps?.db
+    ? createJobsCommandService({
         repository: createJobsRepository(deps.db),
         publishSyncJob: deps.rabbitmq.publishSyncJob,
       })
@@ -1486,21 +1487,7 @@ export async function formsRoutes(
   zApp.post('/forms/:id/sync', async (request, reply) => {
     const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const mockForm = mockForms.find((item) => item.id === id && item.ownerId === principal.userId);
-    const form = db
-      ? await db
-          .selectFrom('forms')
-          .select(['id', 'connection_id', 'owner_id'])
-          .where('id', '=', id)
-          .where('owner_id', '=', principal.userId)
-          .executeTakeFirst()
-      : mockForm
-        ? {
-            id,
-            connection_id: mockForm.connectionId,
-            owner_id: principal.userId,
-          }
-        : null;
+    const form = await resolveOwnedFormForSync(db, id, principal.userId);
 
     if (!form) {
       return reply.status(404).send({
@@ -1510,7 +1497,7 @@ export async function formsRoutes(
       });
     }
 
-    if (!jobsService) {
+    if (!jobsCommandService) {
       return reply.status(202).send({
         success: true,
         data: {
@@ -1524,9 +1511,9 @@ export async function formsRoutes(
       });
     }
 
-    const job = await jobsService.enqueueSyncJob({
+    const job = await jobsCommandService.enqueueSyncJob({
       requestedBy: principal.userId,
-      connectionId: form.connection_id,
+      connectionId: form.connectionId,
       formId: form.id,
       trigger: 'manual',
       forceFullSync: false,
@@ -1545,3 +1532,4 @@ export async function formsRoutes(
     });
   });
 }
+

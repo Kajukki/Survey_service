@@ -4,6 +4,7 @@ import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
 import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { createJobsRepository } from './jobs.repository';
+import { createJobsCommandService } from './jobs.command-service';
 import { createJobsService } from './jobs.service';
 import { getPrincipal } from '../../server/principal';
 
@@ -26,6 +27,10 @@ export async function jobsRoutes(
   },
 ) {
   const repository = createJobsRepository(deps.db);
+  const commandService = createJobsCommandService({
+    repository,
+    publishSyncJob: deps.rabbitmq.publishSyncJob,
+  });
   const service = createJobsService({
     repository,
     publishSyncJob: deps.rabbitmq.publishSyncJob,
@@ -96,7 +101,7 @@ export async function jobsRoutes(
     }
 
     const body = bodyResult.data;
-    const job = await service.enqueueSyncJob({
+    const job = await commandService.enqueueSyncJob({
       requestedBy: principal.userId,
       connectionId: body.connectionId,
       formId: body.formId,
@@ -152,3 +157,4 @@ export async function jobsRoutes(
     });
   });
 }
+
