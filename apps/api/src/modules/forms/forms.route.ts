@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
+import type { Logger } from 'pino';
 import type { Database } from '@survey-service/db';
+import type { Metrics } from '../../infra/metrics';
 import { mockForms } from './forms.mock.js';
 import { getPrincipal } from '../../server/principal';
 import { createJobsRepository, type JobsRepository, type SyncJobRecord } from '../jobs/jobs.repository';
@@ -14,6 +16,8 @@ export async function formsRoutes(
   app: FastifyInstance,
   deps?: {
     db?: Kysely<Database>;
+    logger?: Logger;
+    metrics?: Metrics;
   },
 ) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
@@ -467,6 +471,8 @@ export async function formsRoutes(
   const jobsCommandService = createJobsCommandService({
     repository: db ? createJobsRepository(db) : mockJobsRepository,
     syncTargetQuery: createJobsSyncTargetQueryService(db),
+    logger: deps?.logger,
+    metrics: deps?.metrics,
   });
 
   // GET /forms
@@ -843,6 +849,7 @@ export async function formsRoutes(
       formId: id,
       trigger: 'manual',
       forceFullSync: false,
+      requestId: request.id,
     });
 
     return reply.status(202).send({
@@ -858,3 +865,4 @@ export async function formsRoutes(
     });
   });
 }
+

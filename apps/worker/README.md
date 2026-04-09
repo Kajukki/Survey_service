@@ -62,3 +62,16 @@ Behavior:
 - `WORKER_ROLE=all`: runs both sync and export behavior below
 - `WORKER_ROLE=sync`: consumes from `survey.sync.jobs`, validates payloads, updates `jobs` status, and dead-letters invalid messages
 - `WORKER_ROLE=export`: polls queued `export_jobs` rows and transitions them to `ready` with generated `download_url`
+
+## Operational Alignment With API Enqueue Semantics
+
+The API always returns asynchronous enqueue semantics (`202 Accepted`) for sync commands, independent of active worker role.
+
+- With `WORKER_ROLE=sync` or `WORKER_ROLE=all`, sync jobs should progress from `queued` to terminal states.
+- With `WORKER_ROLE=export`, sync jobs will remain queued until a sync-capable worker is started.
+
+When debugging queued-job buildup, correlate worker logs with API metrics and logs:
+
+- API command latency: `sync_enqueue_duration_seconds`
+- Outbox dispatch lag: `outbox_lag_seconds`
+- Outbox publish failures: `outbox_publish_failures_total`

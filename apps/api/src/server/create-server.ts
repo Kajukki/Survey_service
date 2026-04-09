@@ -110,12 +110,16 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
       });
       await formsRoutes(_api, {
         db: context.db,
+        logger: context.logger,
+        metrics: context.metrics,
       });
       await sharingRoutes(_api, {
         db: context.db,
       });
       await jobsRoutes(_api, {
         db: context.db,
+        logger: context.logger,
+        metrics: context.metrics,
       });
       await exportsRoutes(_api, {
         db: context.db,
@@ -198,4 +202,5 @@ export async function closeServer(app: FastifyInstance, logger: Logger): Promise
   await app.close();
   logger.info('Server closed');
 }
+
 

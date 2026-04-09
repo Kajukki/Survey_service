@@ -1,7 +1,9 @@
 import { sql, type Kysely } from 'kysely';
+import { QUEUES } from '@survey-service/messaging';
 import type { Database } from '@survey-service/db';
 import type { SyncJobMessage } from '@survey-service/messaging';
 import type { Logger } from 'pino';
+import type { Metrics } from './metrics';
 import type { RabbitMQClient } from './rabbitmq';
 
 interface ClaimedOutboxEventRow {
@@ -16,10 +18,24 @@ export interface OutboxPublisher {
   processOnce(): Promise<number>;
 }
 
+function parseOutboxLagSeconds(payload: unknown): number | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return null;
+  }
+
+  const candidate = payload as Record<string, unknown>;
+  if (typeof candidate.timestamp !== 'number' || !Number.isFinite(candidate.timestamp)) {
+    return null;
+  }
+
+  return Math.max(0, (Date.now() - candidate.timestamp) / 1000);
+}
+
 export function createOutboxPublisher(deps: {
   db: Kysely<Database>;
   rabbitmq: RabbitMQClient;
   logger: Logger;
+  metrics?: Metrics;
   batchSize: number;
   pollIntervalMs: number;
   maxAttempts: number;
@@ -27,6 +43,7 @@ export function createOutboxPublisher(deps: {
 }): OutboxPublisher {
   let timer: NodeJS.Timeout | undefined;
   let processing = false;
+  const eventType = 'sync_job.queued';
 
   const computeBackoff = (attemptCount: number) => {
     const exponent = Math.min(attemptCount, 6);
@@ -101,14 +118,43 @@ export function createOutboxPublisher(deps: {
       }
 
       for (const event of claimed) {
+        const message = event.payload_json as SyncJobMessage;
+        const publishStartedAt = process.hrtime.bigint();
+
+        const lagSeconds = parseOutboxLagSeconds(event.payload_json);
+        if (lagSeconds !== null) {
+          deps.metrics?.outboxLagSeconds.labels(eventType).observe(lagSeconds);
+        }
+
         try {
-          const message = event.payload_json as SyncJobMessage;
           await deps.rabbitmq.publishSyncJob(message);
           await markPublished(event.id);
+
+          const durationSeconds = Number(process.hrtime.bigint() - publishStartedAt) / 1_000_000_000;
+          deps.metrics?.queuePublishDuration.labels(QUEUES.SYNC_JOBS, 'success').observe(durationSeconds);
+
+          deps.logger.info(
+            {
+              outboxEventId: event.id,
+              jobId: message.jobId,
+              requesterId: message.requestedBy,
+              attempts: event.attempt_count + 1,
+            },
+            'Outbox event published',
+          );
         } catch (error) {
+          const durationSeconds = Number(process.hrtime.bigint() - publishStartedAt) / 1_000_000_000;
+          const errorCode = error instanceof Error ? error.name : 'unknown_error';
+
+          deps.metrics?.queuePublishDuration.labels(QUEUES.SYNC_JOBS, 'error').observe(durationSeconds);
+          deps.metrics?.queuePublishErrorCount.labels(QUEUES.SYNC_JOBS, errorCode).inc();
+          deps.metrics?.outboxPublishFailureCount.labels(eventType, errorCode).inc();
+
           deps.logger.warn(
             {
               outboxEventId: event.id,
+              jobId: message.jobId,
+              requesterId: message.requestedBy,
               attempts: event.attempt_count + 1,
               err: error,
             },
@@ -164,3 +210,4 @@ export function createOutboxPublisher(deps: {
     processOnce,
   };
 }
+
