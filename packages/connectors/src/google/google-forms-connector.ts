@@ -21,6 +21,7 @@ export interface GoogleConnectorConfig {
   authBaseUrl: string;
   tokenUrl: string;
   formsApiBaseUrl: string;
+  driveApiBaseUrl?: string;
 }
 
 interface GoogleOAuthCredentials {
@@ -262,33 +263,32 @@ export class GoogleFormsConnector implements ProviderConnector {
   }> {
     try {
       const response = await this.httpClient.request<{
-        forms?: Array<{
-          formId: string;
-          info?: {
-            title?: string;
-            description?: string;
-            documentTitle?: string;
-          };
-          revisionId?: string;
+        files?: Array<{
+          id: string;
+          name?: string;
+          description?: string;
         }>;
         nextPageToken?: string;
       }>({
         method: 'GET',
-        url: `${this.config.formsApiBaseUrl}/forms`,
+        url: `${this.config.driveApiBaseUrl ?? 'https://www.googleapis.com/drive/v3'}/files`,
         headers: {
           authorization: `Bearer ${input.accessToken}`,
         },
         query: {
+          q: "mimeType='application/vnd.google-apps.form' and trashed=false",
+          fields: 'nextPageToken,files(id,name,description)',
+          pageSize: '100',
           pageToken: input.pageToken,
         },
       });
 
-      const items = (response.forms ?? []).map((form) =>
+      const items = (response.files ?? []).map((file) =>
         ProviderFormSummarySchema.parse({
           provider: this.provider,
-          externalFormId: form.formId,
-          title: form.info?.title ?? form.info?.documentTitle ?? 'Untitled form',
-          description: form.info?.description,
+          externalFormId: file.id,
+          title: file.name ?? 'Untitled form',
+          description: file.description,
           responseCount: 0,
         }),
       );

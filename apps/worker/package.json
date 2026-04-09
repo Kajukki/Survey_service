@@ -13,6 +13,7 @@
     "format:check": "prettier --check \"src/**/*.ts\""
   },
   "dependencies": {
+    "@survey-service/connectors": "file:../../packages/connectors",
     "@survey-service/messaging": "file:../../packages/messaging",
     "amqplib": "^0.10.3",
     "dotenv": "^17.4.0",

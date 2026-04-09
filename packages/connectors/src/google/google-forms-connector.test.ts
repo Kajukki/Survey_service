@@ -154,13 +154,11 @@ describe('GoogleFormsConnector', () => {
   it('maps form list payload into provider-neutral summaries', async () => {
     const httpClient = makeHttpClient();
     vi.mocked(httpClient.request).mockResolvedValueOnce({
-      forms: [
+      files: [
         {
-          formId: 'form-ext-1',
-          info: {
-            title: 'Customer Survey',
-            description: 'Quarterly pulse',
-          },
+          id: 'form-ext-1',
+          name: 'Customer Survey',
+          description: 'Quarterly pulse',
         },
       ],
       nextPageToken: 'next-page',
@@ -173,6 +171,12 @@ describe('GoogleFormsConnector', () => {
     expect(result.items[0]?.externalFormId).toBe('form-ext-1');
     expect(result.items[0]?.title).toBe('Customer Survey');
     expect(result.nextPageToken).toBe('next-page');
+    expect(httpClient.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET',
+        url: 'https://www.googleapis.com/drive/v3/files',
+      }),
+    );
   });
 
   it('maps response list payload into provider-neutral response page', async () => {
