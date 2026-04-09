@@ -5,6 +5,7 @@ import type { Database } from '@survey-service/db';
 import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { createJobsRepository } from './jobs.repository';
 import { createJobsCommandService } from './jobs.command-service';
+import { createJobsSyncTargetQueryService } from './jobs-sync-target.query-service';
 import { createJobsService } from './jobs.service';
 import { getPrincipal } from '../../server/principal';
 
@@ -13,11 +14,16 @@ const JobsQuerySchema = z.object({
   perPage: z.coerce.number().int().positive().max(100).default(20),
 });
 
-const CreateSyncJobBodySchema = z.object({
-  connectionId: z.string().uuid(),
-  formId: z.string().uuid().optional(),
-  forceFullSync: z.boolean().optional(),
-});
+const CreateSyncJobBodySchema = z
+  .object({
+    connectionId: z.string().uuid().optional(),
+    formId: z.string().uuid().optional(),
+    forceFullSync: z.boolean().optional(),
+  })
+  .refine((value) => Boolean(value.connectionId || value.formId), {
+    message: 'connectionId or formId is required',
+    path: ['connectionId'],
+  });
 
 export async function jobsRoutes(
   app: FastifyInstance,
@@ -29,6 +35,7 @@ export async function jobsRoutes(
   const repository = createJobsRepository(deps.db);
   const commandService = createJobsCommandService({
     repository,
+    syncTargetQuery: createJobsSyncTargetQueryService(deps.db),
     publishSyncJob: deps.rabbitmq.publishSyncJob,
   });
   const service = createJobsService({
@@ -157,4 +164,6 @@ export async function jobsRoutes(
     });
   });
 }
+
+
 
