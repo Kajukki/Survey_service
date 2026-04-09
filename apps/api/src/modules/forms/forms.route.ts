@@ -4,9 +4,9 @@ import type { Database } from '@survey-service/db';
 import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { mockForms } from './forms.mock.js';
 import { getPrincipal } from '../../server/principal';
-import { createJobsRepository } from '../jobs/jobs.repository';
+import { createJobsRepository, type JobsRepository, type SyncJobRecord } from '../jobs/jobs.repository';
 import { createJobsCommandService } from '../jobs/jobs.command-service';
-import { resolveOwnedFormForSync } from './forms-sync.query-service';
+import { createJobsSyncTargetQueryService } from '../jobs/jobs-sync-target.query-service';
 import { createFormsAnalyticsQueryService } from './forms-analytics.query-service';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
@@ -438,12 +438,39 @@ export async function formsRoutes(
     loadFormStructure,
   });
 
-  const jobsCommandService = deps?.db
-    ? createJobsCommandService({
-        repository: createJobsRepository(deps.db),
-        publishSyncJob: deps.rabbitmq.publishSyncJob,
-      })
-    : null;
+  const mockJobsRepository: JobsRepository = {
+    async createSyncJob(input) {
+      const createdAt = new Date().toISOString();
+      const record: SyncJobRecord = {
+        id: input.id,
+        type: 'sync',
+        status: 'queued',
+        requestedBy: input.requestedBy,
+        connectionId: input.connectionId,
+        formId: input.formId,
+        trigger: input.trigger,
+        source: input.trigger === 'manual' ? 'manual_sync' : 'scheduled_sync',
+        createdAt,
+        startedAt: null,
+        completedAt: null,
+        error: null,
+      };
+
+      return record;
+    },
+    async listJobs() {
+      return { items: [], total: 0 };
+    },
+    async getJobById() {
+      return null;
+    },
+  };
+
+  const jobsCommandService = createJobsCommandService({
+    repository: db ? createJobsRepository(db) : mockJobsRepository,
+    syncTargetQuery: createJobsSyncTargetQueryService(db),
+    publishSyncJob: deps?.rabbitmq?.publishSyncJob ?? (async () => undefined),
+  });
 
   // GET /forms
   zApp.get('/forms', async (request, reply) => {
@@ -814,34 +841,9 @@ export async function formsRoutes(
   zApp.post('/forms/:id/sync', async (request, reply) => {
     const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const form = await resolveOwnedFormForSync(db, id, principal.userId);
-
-    if (!form) {
-      return reply.status(404).send({
-        success: false,
-        error: { code: 'not_found', message: 'Form not found' },
-        meta: { requestId: request.id },
-      });
-    }
-
-    if (!jobsCommandService) {
-      return reply.status(202).send({
-        success: true,
-        data: {
-          job_id: `job-mock-${form.id}`,
-          status: 'queued',
-          type: 'sync_form',
-        },
-        meta: {
-          requestId: request.id,
-        },
-      });
-    }
-
     const job = await jobsCommandService.enqueueSyncJob({
       requestedBy: principal.userId,
-      connectionId: form.connectionId,
-      formId: form.id,
+      formId: id,
       trigger: 'manual',
       forceFullSync: false,
     });
@@ -859,6 +861,8 @@ export async function formsRoutes(
     });
   });
 }
+
+
 
 
 
