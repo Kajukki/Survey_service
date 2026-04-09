@@ -1,6 +1,7 @@
 import {
   Connection,
   ExportRecord,
+  FormResponseSummaryRecord,
   FormRecord,
   FormSectionRecord,
   FormStructureRecord,
@@ -52,6 +53,30 @@ export interface FormStructureDto {
   };
   sections: FormSectionDto[];
   questionCount: number;
+}
+
+export interface FormResponseAnswerPreviewDto {
+  questionId: string;
+  questionLabel: string;
+  valuePreview: string;
+}
+
+export interface FormResponseSummaryDto {
+  id: string;
+  submittedAt?: string;
+  completion: 'completed' | 'partial';
+  answerPreview: FormResponseAnswerPreviewDto[];
+}
+
+export interface FormResponsesListDto {
+  responses: FormResponseSummaryDto[];
+  appliedFilters: {
+    from?: string;
+    to?: string;
+    questionId?: string;
+    answerContains?: string;
+    completion?: 'completed' | 'partial';
+  };
 }
 
 export interface JobDto {
@@ -130,6 +155,19 @@ export function mapFormStructure(input: FormStructureDto): FormStructureRecord {
     sections,
     questionCount: input.questionCount,
   };
+}
+
+export function mapFormResponses(input: FormResponsesListDto): FormResponseSummaryRecord[] {
+  return input.responses.map((response) => ({
+    id: response.id,
+    submittedAt: response.submittedAt,
+    completion: response.completion,
+    answerPreview: response.answerPreview.map((preview) => ({
+      questionId: preview.questionId,
+      questionLabel: preview.questionLabel,
+      valuePreview: preview.valuePreview,
+    })),
+  }));
 }
 
 export function mapJobs(items: JobDto[]): SyncJob[] {

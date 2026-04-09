@@ -14,6 +14,7 @@ export interface FormsWorkspaceState {
   questionType?: string;
   search?: string;
   questionId?: string;
+  completion?: 'completed' | 'partial';
   responsesPage: number;
   responsesPerPage: number;
 }
@@ -51,6 +52,10 @@ export function parseFormsWorkspaceState(params: Params): FormsWorkspaceState {
     questionType: typeof params['questionType'] === 'string' ? params['questionType'] : undefined,
     search: typeof params['search'] === 'string' ? params['search'] : undefined,
     questionId: typeof params['questionId'] === 'string' ? params['questionId'] : undefined,
+    completion:
+      params['completion'] === 'completed' || params['completion'] === 'partial'
+        ? params['completion']
+        : undefined,
     responsesPage: parsePositiveInt(params['responsesPage'], defaults.responsesPage),
     responsesPerPage: Math.min(parsePositiveInt(params['responsesPerPage'], defaults.responsesPerPage), 100),
   };
@@ -73,6 +78,10 @@ export function buildFormsWorkspaceQueryParams(state: FormsWorkspaceState): Para
 
   if (state.questionId) {
     params['questionId'] = state.questionId;
+  }
+
+  if (state.completion) {
+    params['completion'] = state.completion;
   }
 
   return params;

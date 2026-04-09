@@ -171,6 +171,13 @@ Get ordered form structure (sections + questions) for the specified form.
 - **200 OK**: Returns `{ form, sections, questionCount }`.
 - **404 Not Found**: Form not found or not accessible to requester.
 
+### `GET /api/v1/forms/:id/responses`
+List response summaries for a form with server-side filtering and pagination.
+- **Status:** `Implemented`
+- **Query Params:** `page`, `perPage`, `from`, `to`, `questionId`, `answerContains`, `completion`
+- **200 OK**: Returns `{ responses, appliedFilters }` with pagination metadata.
+- **404 Not Found**: Form not found or not accessible to requester.
+
 ### `POST /api/v1/forms/:id/sync`
 Trigger a manual synchronization job for the specified form.
 - **Status:** `Implemented`
