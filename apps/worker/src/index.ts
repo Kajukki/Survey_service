@@ -1,4 +1,5 @@
 import amqplib, { type Channel, type ConsumeMessage } from 'amqplib';
+import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -6,6 +7,7 @@ import { config as loadDotenv } from 'dotenv';
 import { pino, type Logger } from 'pino';
 import { Pool } from 'pg';
 import { z } from 'zod';
+import { GoogleFormsConnector, type ConnectorHttpClient } from '@survey-service/connectors';
 import {
   BINDINGS,
   CONSUMER_PREFETCH,
@@ -22,6 +24,33 @@ const configSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   RABBITMQ_URL: z.string().min(1, 'RABBITMQ_URL is required'),
   RABBITMQ_PREFETCH: z.coerce.number().int().positive().default(CONSUMER_PREFETCH),
+  CREDENTIAL_ENCRYPTION_KEY_B64: z
+    .string()
+    .min(1, 'CREDENTIAL_ENCRYPTION_KEY_B64 is required')
+    .refine((value) => {
+      try {
+        return Buffer.from(value, 'base64').length === 32;
+      } catch {
+        return false;
+      }
+    }, 'CREDENTIAL_ENCRYPTION_KEY_B64 must be a base64-encoded 32-byte key'),
+  CREDENTIAL_ENCRYPTION_KEY_VERSION: z
+    .string()
+    .min(1, 'CREDENTIAL_ENCRYPTION_KEY_VERSION is required'),
+  GOOGLE_OAUTH_CLIENT_ID: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_ID is required'),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_SECRET is required'),
+  GOOGLE_OAUTH_AUTH_BASE_URL: z
+    .string()
+    .url('GOOGLE_OAUTH_AUTH_BASE_URL must be a valid URL')
+    .default('https://accounts.google.com/o/oauth2/v2/auth'),
+  GOOGLE_OAUTH_TOKEN_URL: z
+    .string()
+    .url('GOOGLE_OAUTH_TOKEN_URL must be a valid URL')
+    .default('https://oauth2.googleapis.com/token'),
+  GOOGLE_FORMS_API_BASE_URL: z
+    .string()
+    .url('GOOGLE_FORMS_API_BASE_URL must be a valid URL')
+    .default('https://forms.googleapis.com/v1'),
 });
 
 type WorkerConfig = z.infer<typeof configSchema>;
@@ -37,6 +66,35 @@ let currentState: WorkerState = {
 };
 
 export const getWorkerState = (): WorkerState => currentState;
+
+interface ProviderTokenSetLike {
+  accessToken: string;
+  refreshToken?: string;
+  expiresAt: string;
+  scope?: string;
+  tokenType?: string;
+}
+
+interface EncryptedCredentialPayload {
+  tokenSet: ProviderTokenSetLike;
+  idToken: string;
+}
+
+interface ProviderConnectionRow {
+  id: string;
+  owner_id: string;
+  provider: 'google' | 'microsoft';
+  encrypted_token_payload: string | null;
+  encrypted_token_iv: string | null;
+  encrypted_token_tag: string | null;
+  encrypted_token_key_version: string | null;
+  expires_at: Date | string;
+  scope: string | null;
+  token_type: string;
+}
+
+const ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH_BYTES = 12;
 
 function loadEnvironmentFiles(): void {
   const currentFilePath = fileURLToPath(import.meta.url);
@@ -125,10 +183,234 @@ async function markJobFailed(pool: Pool, jobId: string, errorMessage: string): P
   );
 }
 
-async function processSyncJob(payload: SyncJobMessage): Promise<void> {
-  // Provider sync logic will be added in connector-specific phases.
-  // This keeps the queue lifecycle and status transitions fully testable.
-  void payload;
+function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient {
+  return {
+    async request<T>(input: {
+      method: 'GET' | 'POST';
+      url: string;
+      headers?: Record<string, string>;
+      query?: Record<string, string | undefined>;
+      body?: unknown;
+    }) {
+      const url = new URL(input.url);
+
+      if (input.query) {
+        for (const [key, value] of Object.entries(input.query)) {
+          if (value !== undefined && value !== null) {
+            url.searchParams.set(key, String(value));
+          }
+        }
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const response = await fetch(url, {
+          method: input.method,
+          headers: input.headers,
+          body: input.body ? JSON.stringify(input.body) : undefined,
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => undefined);
+          throw {
+            message: `Google API request failed with status ${response.status}`,
+            response: {
+              status: response.status,
+              data: body,
+            },
+          };
+        }
+
+        return (await response.json()) as T;
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
+  };
+}
+
+function decryptCredentialPayload(
+  config: WorkerConfig,
+  connection: ProviderConnectionRow,
+): EncryptedCredentialPayload {
+  if (
+    !connection.encrypted_token_payload ||
+    !connection.encrypted_token_iv ||
+    !connection.encrypted_token_tag
+  ) {
+    throw new Error('Provider connection is missing encrypted credential payload fields');
+  }
+
+  const key = Buffer.from(config.CREDENTIAL_ENCRYPTION_KEY_B64, 'base64');
+  const decipher = createDecipheriv(
+    ALGORITHM,
+    key,
+    Buffer.from(connection.encrypted_token_iv, 'base64'),
+  );
+  decipher.setAuthTag(Buffer.from(connection.encrypted_token_tag, 'base64'));
+
+  const plaintext = Buffer.concat([
+    decipher.update(Buffer.from(connection.encrypted_token_payload, 'base64')),
+    decipher.final(),
+  ]).toString('utf8');
+
+  const parsed = JSON.parse(plaintext) as EncryptedCredentialPayload;
+  if (!parsed?.tokenSet?.accessToken || !parsed?.tokenSet?.expiresAt || !parsed?.idToken) {
+    throw new Error('Decrypted provider credentials payload is invalid');
+  }
+
+  return parsed;
+}
+
+function encryptCredentialPayload(
+  config: WorkerConfig,
+  payload: EncryptedCredentialPayload,
+): {
+  encryptedTokenPayload: string;
+  encryptedTokenIv: string;
+  encryptedTokenTag: string;
+  encryptedTokenKeyVersion: string;
+} {
+  const iv = randomBytes(IV_LENGTH_BYTES);
+  const key = Buffer.from(config.CREDENTIAL_ENCRYPTION_KEY_B64, 'base64');
+  const cipher = createCipheriv(ALGORITHM, key, iv);
+
+  const encoded = JSON.stringify(payload);
+  const ciphertext = Buffer.concat([cipher.update(encoded, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return {
+    encryptedTokenPayload: ciphertext.toString('base64'),
+    encryptedTokenIv: iv.toString('base64'),
+    encryptedTokenTag: authTag.toString('base64'),
+    encryptedTokenKeyVersion: config.CREDENTIAL_ENCRYPTION_KEY_VERSION,
+  };
+}
+
+function isTokenExpiringSoon(expiresAt: string, thresholdMs: number = 60_000): boolean {
+  const value = Date.parse(expiresAt);
+  if (!Number.isFinite(value)) {
+    return true;
+  }
+
+  return value <= Date.now() + thresholdMs;
+}
+
+async function processSyncJob(
+  payload: SyncJobMessage,
+  pool: Pool,
+  config: WorkerConfig,
+  logger: Logger,
+): Promise<void> {
+  const connectionResult = await pool.query<ProviderConnectionRow>(
+    `
+      SELECT
+        id,
+        owner_id,
+        provider,
+        encrypted_token_payload,
+        encrypted_token_iv,
+        encrypted_token_tag,
+        encrypted_token_key_version,
+        expires_at,
+        scope,
+        token_type
+      FROM provider_connections
+      WHERE id = $1 AND owner_id = $2
+      LIMIT 1
+    `,
+    [payload.connectionId, payload.requestedBy],
+  );
+
+  const connection = connectionResult.rows[0];
+  if (!connection) {
+    throw new Error('Provider connection not found for sync job and requester');
+  }
+
+  if (connection.provider !== 'google') {
+    throw new Error(`Provider ${connection.provider} is not supported by this worker slice`);
+  }
+
+  const connector = new GoogleFormsConnector(
+    {
+      clientId: config.GOOGLE_OAUTH_CLIENT_ID,
+      clientSecret: config.GOOGLE_OAUTH_CLIENT_SECRET,
+      authBaseUrl: config.GOOGLE_OAUTH_AUTH_BASE_URL,
+      tokenUrl: config.GOOGLE_OAUTH_TOKEN_URL,
+      formsApiBaseUrl: config.GOOGLE_FORMS_API_BASE_URL,
+    },
+    createFetchHttpClient(),
+  );
+
+  const decrypted = decryptCredentialPayload(config, connection);
+  let tokenSet = decrypted.tokenSet;
+
+  if (isTokenExpiringSoon(tokenSet.expiresAt)) {
+    if (!tokenSet.refreshToken) {
+      throw new Error('Google access token is expired and no refresh token is available');
+    }
+
+    const refreshedTokenSet = await connector.refreshAccessToken({
+      refreshToken: tokenSet.refreshToken,
+    });
+
+    tokenSet = {
+      accessToken: refreshedTokenSet.accessToken,
+      refreshToken: refreshedTokenSet.refreshToken,
+      expiresAt: refreshedTokenSet.expiresAt,
+      scope: refreshedTokenSet.scope,
+      tokenType: refreshedTokenSet.tokenType,
+    };
+
+    const encrypted = encryptCredentialPayload(config, {
+      tokenSet,
+      idToken: decrypted.idToken,
+    });
+
+    await pool.query(
+      `
+        UPDATE provider_connections
+        SET
+          encrypted_token_payload = $2,
+          encrypted_token_iv = $3,
+          encrypted_token_tag = $4,
+          encrypted_token_key_version = $5,
+          expires_at = $6,
+          scope = $7,
+          token_type = $8,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [
+        connection.id,
+        encrypted.encryptedTokenPayload,
+        encrypted.encryptedTokenIv,
+        encrypted.encryptedTokenTag,
+        encrypted.encryptedTokenKeyVersion,
+        tokenSet.expiresAt,
+        tokenSet.scope ?? null,
+        tokenSet.tokenType ?? 'Bearer',
+      ],
+    );
+  }
+
+  const formsPage = await connector.listForms({
+    accessToken: tokenSet.accessToken,
+  });
+
+  logger.info(
+    {
+      jobId: payload.jobId,
+      connectionId: payload.connectionId,
+      fetchedForms: formsPage.items.length,
+      hasNextPage: Boolean(formsPage.nextPageToken),
+      forcedFullSync: payload.forceFullSync,
+    },
+    'Processed Google sync job using provider API',
+  );
 }
 
 async function handleMessage(
@@ -136,6 +418,7 @@ async function handleMessage(
   channel: Channel,
   pool: Pool,
   logger: Logger,
+  config: WorkerConfig,
 ): Promise<void> {
   let parsedMessage: SyncJobMessage;
 
@@ -150,7 +433,7 @@ async function handleMessage(
 
   try {
     await markJobRunning(pool, parsedMessage.jobId);
-    await processSyncJob(parsedMessage);
+    await processSyncJob(parsedMessage, pool, config, logger);
     await markJobSucceeded(pool, parsedMessage.jobId);
     channel.ack(message);
   } catch (error) {
@@ -192,7 +475,7 @@ async function main(): Promise<void> {
       return;
     }
 
-    await handleMessage(message, channel, pool, logger);
+    await handleMessage(message, channel, pool, logger, config);
   });
 
   logger.info(
