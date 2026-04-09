@@ -89,12 +89,29 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
     }
 
     const query = queryResult.data;
-    const form = await deps.db
+    let form = await deps.db
       .selectFrom('forms')
       .select(['id', 'title', 'response_count'])
       .where('id', '=', query.formId)
       .where('owner_id', '=', principal.userId)
       .executeTakeFirst();
+
+    if (!form) {
+      const share = await deps.db
+        .selectFrom('form_shares')
+        .select('form_id')
+        .where('form_id', '=', query.formId)
+        .where('grantee_user_id', '=', principal.userId)
+        .executeTakeFirst();
+
+      if (share) {
+        form = await deps.db
+          .selectFrom('forms')
+          .select(['id', 'title', 'response_count'])
+          .where('id', '=', query.formId)
+          .executeTakeFirst();
+      }
+    }
 
     if (!form) {
       return reply.status(404).send({
@@ -113,7 +130,6 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
       deps.db
         .selectFrom('jobs')
         .select(['id', 'status', 'trigger', 'created_at'])
-        .where('requested_by', '=', principal.userId)
         .where('form_id', '=', query.formId)
         .where('created_at', '>=', query.from)
         .where('created_at', '<=', query.to)
