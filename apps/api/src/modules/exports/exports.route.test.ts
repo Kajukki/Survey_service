@@ -76,7 +76,12 @@ function createFakeExportsDb(input: {
     download_url: string | null;
   } | null;
   ownedFormId: string | null;
-  insertedExportJob?: { id: string; format: 'csv' | 'json' | 'excel'; status: 'queued'; requested_at: string };
+  insertedExportJob?: {
+    id: string;
+    format: 'csv' | 'json' | 'excel';
+    status: 'queued';
+    requested_at: string;
+  };
 }) {
   const exportJobsExecute = vi.fn(async () => input.exportJobs);
   const exportJobsOrderBy = vi.fn(() => ({ execute: exportJobsExecute }));
@@ -86,7 +91,9 @@ function createFakeExportsDb(input: {
   const exportDetailWhereId = vi.fn(() => ({ where: exportDetailWhereOwner }));
 
   const exportDownloadExecuteTakeFirst = vi.fn(async () => input.exportDownload ?? undefined);
-  const exportDownloadWhereOwner = vi.fn(() => ({ executeTakeFirst: exportDownloadExecuteTakeFirst }));
+  const exportDownloadWhereOwner = vi.fn(() => ({
+    executeTakeFirst: exportDownloadExecuteTakeFirst,
+  }));
   const exportDownloadWhereId = vi.fn(() => ({ where: exportDownloadWhereOwner }));
 
   const exportJobsSelect = vi.fn((columns: unknown) => {
@@ -110,15 +117,18 @@ function createFakeExportsDb(input: {
   const formWhereId = vi.fn(() => ({ where: formWhereOwner }));
   const formSelect = vi.fn(() => ({ where: formWhereId }));
 
-  const exportInsertExecuteTakeFirstOrThrow = vi.fn(async () =>
-    input.insertedExportJob ?? {
-      id: 'exp-new-1',
-      format: 'csv',
-      status: 'queued',
-      requested_at: '2026-04-09T12:00:00.000Z',
-    },
+  const exportInsertExecuteTakeFirstOrThrow = vi.fn(
+    async () =>
+      input.insertedExportJob ?? {
+        id: 'exp-new-1',
+        format: 'csv',
+        status: 'queued',
+        requested_at: '2026-04-09T12:00:00.000Z',
+      },
   );
-  const exportInsertReturning = vi.fn(() => ({ executeTakeFirstOrThrow: exportInsertExecuteTakeFirstOrThrow }));
+  const exportInsertReturning = vi.fn(() => ({
+    executeTakeFirstOrThrow: exportInsertExecuteTakeFirstOrThrow,
+  }));
   const exportInsertValues = vi.fn(() => ({ returning: exportInsertReturning }));
   const exportInsertInto = vi.fn(() => ({ values: exportInsertValues }));
 
@@ -303,7 +313,11 @@ describe('exports routes', () => {
 
     expect(response.statusCode).toBe(200);
     expect(fakeDb.spies.exportDetailWhereId).toHaveBeenCalledWith('id', '=', exportId);
-    expect(fakeDb.spies.exportDetailWhereOwner).toHaveBeenCalledWith('requested_by', '=', 'user-one');
+    expect(fakeDb.spies.exportDetailWhereOwner).toHaveBeenCalledWith(
+      'requested_by',
+      '=',
+      'user-one',
+    );
     const payload = response.json();
     expect(payload.success).toBe(true);
     expect(payload.data.id).toBe(exportId);
@@ -355,7 +369,11 @@ describe('exports routes', () => {
 
     expect(response.statusCode).toBe(200);
     expect(fakeDb.spies.exportDownloadWhereId).toHaveBeenCalledWith('id', '=', exportId);
-    expect(fakeDb.spies.exportDownloadWhereOwner).toHaveBeenCalledWith('requested_by', '=', 'user-one');
+    expect(fakeDb.spies.exportDownloadWhereOwner).toHaveBeenCalledWith(
+      'requested_by',
+      '=',
+      'user-one',
+    );
     const payload = response.json();
     expect(payload.success).toBe(true);
     expect(payload.data.download_url).toBe('https://example.com/export.csv');

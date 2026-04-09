@@ -81,10 +81,14 @@ function createFakeDashboardDb(input: {
   const jobsSelect = vi.fn(() => ({ where: jobsWhereForm }));
 
   const sharesExecute = vi.fn(async () => input.shares);
-  const shareAccessExecuteTakeFirst = vi.fn(async () => (input.shareAccess ? { form_id: 'form' } : undefined));
+  const shareAccessExecuteTakeFirst = vi.fn(async () =>
+    input.shareAccess ? { form_id: 'form' } : undefined,
+  );
 
   const sharesWhereForList = vi.fn(() => ({ execute: sharesExecute }));
-  const sharesWhereForAccessSecond = vi.fn(() => ({ executeTakeFirst: shareAccessExecuteTakeFirst }));
+  const sharesWhereForAccessSecond = vi.fn(() => ({
+    executeTakeFirst: shareAccessExecuteTakeFirst,
+  }));
   const sharesWhereForAccessFirst = vi.fn(() => ({ where: sharesWhereForAccessSecond }));
 
   const sharesSelect = vi.fn((selection: unknown) => {

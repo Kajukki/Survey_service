@@ -7,7 +7,11 @@ import { config as loadDotenv } from 'dotenv';
 import { pino, type Logger } from 'pino';
 import { Pool } from 'pg';
 import { z } from 'zod';
-import { GoogleFormsConnector, type ConnectorHttpClient } from '@survey-service/connectors';
+import {
+  GoogleFormsConnector,
+  type ConnectorHttpClient,
+  type ProviderFormDefinition,
+} from '@survey-service/connectors';
 import {
   BINDINGS,
   CONSUMER_PREFETCH,
@@ -17,6 +21,7 @@ import {
   SyncJobMessageSchema,
   type SyncJobMessage,
 } from '@survey-service/messaging';
+import { listAllProviderForms } from './sync-utils.js';
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
@@ -102,9 +107,11 @@ interface SyncJobProcessingContext {
     | 'refresh-token'
     | 'persist-refreshed-token'
     | 'list-forms'
+    | 'fetch-form-definition'
     | 'persist-forms'
     | 'list-responses'
-    | 'persist-responses';
+    | 'persist-responses'
+    | 'persist-analytics';
   effectiveConnectionId?: string;
   provider?: 'google' | 'microsoft';
 }
@@ -564,7 +571,10 @@ function toPreviewString(value: unknown): string {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => toPreviewString(item)).filter((item) => item.length > 0).join(', ');
+    return value
+      .map((item) => toPreviewString(item))
+      .filter((item) => item.length > 0)
+      .join(', ');
   }
 
   if (typeof value === 'object') {
@@ -574,7 +584,9 @@ function toPreviewString(value: unknown): string {
       return choiceAnswers.answers.map((item) => toPreviewString(item)).join(', ');
     }
 
-    const textAnswers = candidate.textAnswers as { answers?: Array<{ value?: string }> } | undefined;
+    const textAnswers = candidate.textAnswers as
+      | { answers?: Array<{ value?: string }> }
+      | undefined;
     if (textAnswers?.answers && Array.isArray(textAnswers.answers)) {
       return textAnswers.answers
         .map((item) => (typeof item?.value === 'string' ? item.value : ''))
@@ -592,13 +604,168 @@ function toPreviewString(value: unknown): string {
   return String(value);
 }
 
-function buildAnswerPreview(answers: Record<string, unknown>) {
+type PersistedFormSchema = {
+  source: 'google_forms_api';
+  sections: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    order: number;
+    questions: Array<{
+      id: string;
+      externalQuestionId: string;
+      sectionId: string;
+      label: string;
+      description?: string;
+      required: boolean;
+      type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+      order: number;
+      options?: Array<{ value: string; label: string }>;
+    }>;
+  }>;
+  questionCount: number;
+};
+
+type QuestionLookup = Map<
+  string,
+  {
+    label: string;
+    type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  }
+>;
+
+type SyncedResponse = {
+  submittedAt?: string;
+  completion: 'completed' | 'partial';
+  answers: Record<string, unknown>;
+};
+
+type NumericStats = {
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  standardDeviation: number;
+};
+
+type PersistedAnalyticsQuestion = {
+  questionId: string;
+  questionTitle: string;
+  questionType: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  answerCount: number;
+  skippedCount: number;
+  scaleAnalytics?: {
+    distribution: Record<string, number>;
+    stats: NumericStats;
+  };
+  selectAnalytics?: {
+    isMultiChoice: boolean;
+    optionCounts: Record<string, number>;
+    optionPercentages: Record<string, number>;
+    mostPopular: string[];
+    totalSelections: number;
+  };
+  textAnalytics?: {
+    responses: string[];
+    wordCountStats: NumericStats;
+    charCountStats: NumericStats;
+  };
+};
+
+type PersistedAnalyticsSnapshot = {
+  totalResponses: number;
+  firstResponseTime?: string;
+  lastResponseTime?: string;
+  scoreStats?: NumericStats;
+  questionAnalytics: PersistedAnalyticsQuestion[];
+  generatedAt: string;
+};
+
+function buildPersistedFormSchema(definition: ProviderFormDefinition): PersistedFormSchema {
+  const sectionMap = new Map<string, PersistedFormSchema['sections'][number]>();
+
+  for (const section of definition.sections) {
+    sectionMap.set(section.id, {
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      order: section.order,
+      questions: [],
+    });
+  }
+
+  if (!sectionMap.has('section-0')) {
+    sectionMap.set('section-0', {
+      id: 'section-0',
+      title: 'General',
+      order: 0,
+      questions: [],
+    });
+  }
+
+  for (const question of definition.questions) {
+    const sectionId = question.sectionId ?? 'section-0';
+    const section = sectionMap.get(sectionId);
+    if (!section) {
+      sectionMap.set(sectionId, {
+        id: sectionId,
+        title: 'General',
+        order: sectionMap.size,
+        questions: [],
+      });
+    }
+
+    const resolvedSection = sectionMap.get(sectionId)!;
+    resolvedSection.questions.push({
+      id: question.id,
+      externalQuestionId: question.id,
+      sectionId,
+      label: question.label,
+      description: question.description,
+      required: question.required,
+      type: question.type,
+      order: question.order,
+      options: question.options,
+    });
+  }
+
+  const sections = [...sectionMap.values()]
+    .sort((left, right) => left.order - right.order)
+    .map((section) => ({
+      ...section,
+      questions: section.questions.sort((left, right) => left.order - right.order),
+    }));
+
+  return {
+    source: 'google_forms_api',
+    sections,
+    questionCount: sections.reduce((total, section) => total + section.questions.length, 0),
+  };
+}
+
+function buildQuestionLookup(schema: PersistedFormSchema): QuestionLookup {
+  const map: QuestionLookup = new Map();
+  for (const section of schema.sections) {
+    for (const question of section.questions) {
+      map.set(question.id, {
+        label: question.label,
+        type: question.type,
+      });
+    }
+  }
+
+  return map;
+}
+
+function buildAnswerPreview(answers: Record<string, unknown>, questionLookup: QuestionLookup) {
   return Object.entries(answers)
     .map(([questionId, rawValue]) => {
+      const question = questionLookup.get(questionId);
       const preview = toPreviewString(rawValue).trim();
       return {
         questionId,
-        questionLabel: questionId,
+        questionLabel: question?.label ?? questionId,
+        questionType: question?.type ?? 'text',
         valuePreview: preview.length > 0 ? preview.slice(0, 160) : '(no answer)',
       };
     })
@@ -607,6 +774,200 @@ function buildAnswerPreview(answers: Record<string, unknown>) {
 
 function resolveCompletion(answers: Record<string, unknown>): 'completed' | 'partial' {
   return Object.keys(answers).length > 0 ? 'completed' : 'partial';
+}
+
+function extractAnswerValues(value: unknown): string[] {
+  if (value === null || value === undefined) {
+    return [];
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    const normalized = String(value).trim();
+    return normalized.length > 0 ? [normalized] : [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => extractAnswerValues(item));
+  }
+
+  if (typeof value === 'object') {
+    const candidate = value as Record<string, unknown>;
+    const choiceAnswers = candidate.choiceAnswers as { answers?: unknown[] } | undefined;
+    if (choiceAnswers?.answers && Array.isArray(choiceAnswers.answers)) {
+      return choiceAnswers.answers.flatMap((item) => extractAnswerValues(item));
+    }
+
+    const textAnswers = candidate.textAnswers as { answers?: Array<{ value?: string }> } | undefined;
+    if (textAnswers?.answers && Array.isArray(textAnswers.answers)) {
+      return textAnswers.answers
+        .map((item) => (typeof item?.value === 'string' ? item.value.trim() : ''))
+        .filter((item) => item.length > 0);
+    }
+  }
+
+  return [];
+}
+
+function computeNumericStats(values: number[]): NumericStats | null {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const sorted = [...values].sort((left, right) => left - right);
+  const sum = values.reduce((total, value) => total + value, 0);
+  const mean = sum / values.length;
+  const median =
+    sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1]! + sorted[sorted.length / 2]!) / 2
+      : sorted[Math.floor(sorted.length / 2)]!;
+  const variance =
+    values.reduce((total, value) => total + (value - mean) * (value - mean), 0) / values.length;
+
+  return {
+    mean: Number(mean.toFixed(2)),
+    median: Number(median.toFixed(2)),
+    min: sorted[0]!,
+    max: sorted[sorted.length - 1]!,
+    standardDeviation: Number(Math.sqrt(variance).toFixed(2)),
+  };
+}
+
+function buildAnalyticsSnapshot(
+  schema: PersistedFormSchema,
+  responses: SyncedResponse[],
+): PersistedAnalyticsSnapshot {
+  const responseTimes = responses
+    .map((response) => (response.submittedAt ? Date.parse(response.submittedAt) : Number.NaN))
+    .filter((value) => Number.isFinite(value))
+    .sort((left, right) => left - right);
+
+  const flattenedQuestions = schema.sections
+    .flatMap((section) => section.questions)
+    .sort((left, right) => left.order - right.order);
+
+  const questionAnalytics: PersistedAnalyticsQuestion[] = flattenedQuestions.map((question) => {
+    const valuesByResponse = responses.map((response) => extractAnswerValues(response.answers[question.id]));
+    const answeredValues = valuesByResponse.flatMap((value) => value);
+    const answerCount = valuesByResponse.filter((values) => values.length > 0).length;
+    const skippedCount = Math.max(0, responses.length - answerCount);
+
+    if (question.type === 'rating' || question.type === 'number') {
+      const numericValues = answeredValues
+        .map((value) => Number.parseFloat(value))
+        .filter((value) => Number.isFinite(value));
+      const stats = computeNumericStats(numericValues);
+      const distribution = new Map<string, number>();
+      for (const numericValue of numericValues) {
+        const key = String(numericValue);
+        distribution.set(key, (distribution.get(key) ?? 0) + 1);
+      }
+
+      return {
+        questionId: question.id,
+        questionTitle: question.label,
+        questionType: question.type,
+        answerCount,
+        skippedCount,
+        ...(stats
+          ? {
+              scaleAnalytics: {
+                distribution: Object.fromEntries(distribution.entries()),
+                stats,
+              },
+            }
+          : {}),
+      };
+    }
+
+    if (question.type === 'single_choice' || question.type === 'multi_choice') {
+      const optionCounts = new Map<string, number>();
+      for (const value of answeredValues) {
+        optionCounts.set(value, (optionCounts.get(value) ?? 0) + 1);
+      }
+
+      const totalSelections = answeredValues.length;
+      const optionPercentages = Object.fromEntries(
+        [...optionCounts.entries()].map(([option, count]) => [
+          option,
+          totalSelections > 0 ? Number(((count / totalSelections) * 100).toFixed(1)) : 0,
+        ]),
+      );
+      const mostPopular = [...optionCounts.entries()]
+        .sort((left, right) => right[1] - left[1])
+        .slice(0, 3)
+        .map(([option]) => option);
+
+      return {
+        questionId: question.id,
+        questionTitle: question.label,
+        questionType: question.type,
+        answerCount,
+        skippedCount,
+        selectAnalytics: {
+          isMultiChoice: question.type === 'multi_choice',
+          optionCounts: Object.fromEntries(optionCounts.entries()),
+          optionPercentages,
+          mostPopular,
+          totalSelections,
+        },
+      };
+    }
+
+    const textResponses = answeredValues.filter((value) => value.trim().length > 0).slice(0, 200);
+    const wordCounts = textResponses.map((text) =>
+      text
+        .trim()
+        .split(/\s+/)
+        .filter((token) => token.length > 0).length,
+    );
+    const charCounts = textResponses.map((text) => text.length);
+
+    return {
+      questionId: question.id,
+      questionTitle: question.label,
+      questionType: question.type,
+      answerCount,
+      skippedCount,
+      ...(textResponses.length > 0
+        ? {
+            textAnalytics: {
+              responses: textResponses,
+              wordCountStats:
+                computeNumericStats(wordCounts) ?? {
+                  mean: 0,
+                  median: 0,
+                  min: 0,
+                  max: 0,
+                  standardDeviation: 0,
+                },
+              charCountStats:
+                computeNumericStats(charCounts) ?? {
+                  mean: 0,
+                  median: 0,
+                  min: 0,
+                  max: 0,
+                  standardDeviation: 0,
+                },
+            },
+          }
+        : {}),
+    };
+  });
+
+  const primaryScoreQuestion = questionAnalytics.find(
+    (question) => question.questionType === 'rating' || question.questionType === 'number',
+  );
+
+  return {
+    totalResponses: responses.length,
+    firstResponseTime:
+      responseTimes.length > 0 ? new Date(responseTimes[0]!).toISOString() : undefined,
+    lastResponseTime:
+      responseTimes.length > 0 ? new Date(responseTimes[responseTimes.length - 1]!).toISOString() : undefined,
+    scoreStats: primaryScoreQuestion?.scaleAnalytics?.stats,
+    questionAnalytics,
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 async function processSyncJob(
@@ -720,12 +1081,19 @@ async function processSyncJob(
     }
 
     stage = 'list-forms';
-    const formsPage = await connector.listForms({
-      accessToken: tokenSet.accessToken,
-    });
+    const formsResult = await listAllProviderForms(connector, tokenSet.accessToken);
 
     stage = 'persist-forms';
-    for (const form of formsPage.items) {
+    for (const form of formsResult.items) {
+      stage = 'fetch-form-definition';
+      const formDefinition = await connector.getFormDefinition({
+        accessToken: tokenSet.accessToken,
+        externalFormId: form.externalFormId,
+      });
+      const persistedSchema = buildPersistedFormSchema(formDefinition);
+      const questionLookup = buildQuestionLookup(persistedSchema);
+
+      stage = 'persist-forms';
       const persistedFormResult = await pool.query<{ id: string }>(
         `
           INSERT INTO forms (
@@ -734,14 +1102,16 @@ async function processSyncJob(
             external_form_id,
             title,
             description,
+            form_schema_json,
             response_count,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, NOW())
           ON CONFLICT (owner_id, connection_id, external_form_id)
           DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description,
+            form_schema_json = EXCLUDED.form_schema_json,
             response_count = EXCLUDED.response_count,
             updated_at = NOW()
           RETURNING id
@@ -750,8 +1120,9 @@ async function processSyncJob(
           connection.owner_id,
           connection.id,
           form.externalFormId,
-          form.title,
-          form.description ?? null,
+          formDefinition.title,
+          formDefinition.description ?? null,
+          JSON.stringify(persistedSchema),
           form.responseCount,
         ],
       );
@@ -760,6 +1131,8 @@ async function processSyncJob(
       if (!persistedFormId) {
         continue;
       }
+
+      const syncedResponses: SyncedResponse[] = [];
 
       stage = 'list-responses';
       let nextPageToken: string | undefined;
@@ -775,7 +1148,12 @@ async function processSyncJob(
         stage = 'persist-responses';
         for (const response of responsePage.responses) {
           const answers = response.answers ?? {};
-          const answerPreview = buildAnswerPreview(answers);
+          const answerPreview = buildAnswerPreview(answers, questionLookup);
+          syncedResponses.push({
+            submittedAt: response.submittedAt,
+            completion: resolveCompletion(answers),
+            answers,
+          });
 
           await pool.query(
             `
@@ -828,6 +1206,34 @@ async function processSyncJob(
         `,
         [persistedFormId],
       );
+
+      stage = 'persist-analytics';
+      const analyticsSnapshot = buildAnalyticsSnapshot(persistedSchema, syncedResponses);
+      await pool.query(
+        `
+          INSERT INTO form_analytics_snapshots (
+            owner_id,
+            form_id,
+            total_responses,
+            generated_at,
+            analytics_json,
+            updated_at
+          )
+          VALUES ($1, $2, $3, NOW(), $4::jsonb, NOW())
+          ON CONFLICT (form_id)
+          DO UPDATE SET
+            total_responses = EXCLUDED.total_responses,
+            generated_at = NOW(),
+            analytics_json = EXCLUDED.analytics_json,
+            updated_at = NOW()
+        `,
+        [
+          connection.owner_id,
+          persistedFormId,
+          analyticsSnapshot.totalResponses,
+          JSON.stringify(analyticsSnapshot),
+        ],
+      );
     }
 
     logger.info(
@@ -835,8 +1241,8 @@ async function processSyncJob(
         jobId: payload.jobId,
         connectionId: payload.connectionId,
         effectiveConnectionId,
-        fetchedForms: formsPage.items.length,
-        hasNextPage: Boolean(formsPage.nextPageToken),
+        fetchedForms: formsResult.items.length,
+        hasMoreFormPages: formsResult.hasMorePages,
         forcedFullSync: payload.forceFullSync,
       },
       'Processed Google sync job using provider API',
@@ -986,7 +1392,7 @@ async function main(): Promise<void> {
       await pool.end();
       process.exit(0);
     } catch (error) {
-        logger.error({ error: serializeError(error) }, 'Worker shutdown failed');
+      logger.error({ error: serializeError(error) }, 'Worker shutdown failed');
       process.exit(1);
     }
   };

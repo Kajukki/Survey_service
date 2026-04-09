@@ -1,7 +1,12 @@
 <form class="filter-bar card" (ngSubmit)="apply()">
   <label>
     Form
-    <select class="text-input" [ngModel]="formId()" (ngModelChange)="formId.set($event)" name="formId">
+    <select
+      class="text-input"
+      [ngModel]="formId()"
+      (ngModelChange)="formId.set($event)"
+      name="formId"
+    >
       <option value="">Choose form</option>
       @for (form of forms(); track form.id) {
         <option [value]="form.id">{{ form.title }}</option>
@@ -22,7 +27,13 @@
 
   <label>
     To
-    <input class="text-input" type="date" [ngModel]="to()" (ngModelChange)="to.set($event)" name="to" />
+    <input
+      class="text-input"
+      type="date"
+      [ngModel]="to()"
+      (ngModelChange)="to.set($event)"
+      name="to"
+    />
   </label>
 
   <label>

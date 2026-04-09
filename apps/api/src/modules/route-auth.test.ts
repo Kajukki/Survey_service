@@ -110,7 +110,17 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config);
 
-    const [connections, forms, shares, structure, responses, analyticsOverview, analyticsQuestions, analyticsSegments] = await Promise.all([
+    const [
+      connections,
+      forms,
+      shares,
+      structure,
+      analytics,
+      responses,
+      analyticsOverview,
+      analyticsQuestions,
+      analyticsSegments,
+    ] = await Promise.all([
       app.inject({
         method: 'GET',
         url: '/connections',
@@ -125,6 +135,11 @@ describe('protected domain routes', () => {
       app.inject({
         method: 'GET',
         url: `/forms/${formId}/structure`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/analytics`,
         headers: { authorization: `Bearer ${token}` },
       }),
       app.inject({
@@ -153,6 +168,7 @@ describe('protected domain routes', () => {
     expect(forms.statusCode).toBe(200);
     expect(shares.statusCode).toBe(200);
     expect(structure.statusCode).toBe(200);
+    expect(analytics.statusCode).toBe(200);
     expect(responses.statusCode).toBe(200);
     expect(analyticsOverview.statusCode).toBe(200);
     expect(analyticsQuestions.statusCode).toBe(200);
@@ -190,7 +206,16 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config, 'other-user');
 
-    const [deleteConnection, syncForm, structure, responses, analyticsOverview, analyticsQuestions, analyticsSegments] = await Promise.all([
+    const [
+      deleteConnection,
+      syncForm,
+      structure,
+      analytics,
+      responses,
+      analyticsOverview,
+      analyticsQuestions,
+      analyticsSegments,
+    ] = await Promise.all([
       app.inject({
         method: 'DELETE',
         url: `/connections/${connectionId}`,
@@ -204,6 +229,11 @@ describe('protected domain routes', () => {
       app.inject({
         method: 'GET',
         url: `/forms/${formId}/structure`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/analytics`,
         headers: { authorization: `Bearer ${token}` },
       }),
       app.inject({
@@ -231,6 +261,7 @@ describe('protected domain routes', () => {
     expect(deleteConnection.statusCode).toBe(404);
     expect(syncForm.statusCode).toBe(404);
     expect(structure.statusCode).toBe(404);
+    expect(analytics.statusCode).toBe(404);
     expect(responses.statusCode).toBe(404);
     expect(analyticsOverview.statusCode).toBe(404);
     expect(analyticsQuestions.statusCode).toBe(404);

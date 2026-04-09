@@ -170,7 +170,7 @@ Get detailed metadata for a specific form.
 Get ordered form structure (sections + questions) for the specified form.
 - **Status:** `Implemented`
 - **200 OK**: Returns `{ form, sections, questionCount }`.
-- **Implementation note:** Sections/questions may be inferred from persisted response previews when provider-native structure metadata is unavailable.
+- **Implementation note:** Structure is sourced from provider schema fetched during sync and persisted in `forms.form_schema_json`.
 - **404 Not Found**: Form not found or not accessible to requester.
 
 ### `GET /api/v1/forms/:id/responses`
@@ -185,6 +185,7 @@ Get response-centered KPI and time-series analytics for a form.
 - **Status:** `Implemented`
 - **Query Params:** `from`, `to`, `granularity`, `questionId`
 - **200 OK**: Returns `{ kpis, series, appliedFilters, dataFreshness }`.
+- **Implementation note:** KPI value aggregation is derived from persisted schema metadata (`forms.form_schema_json`) and persisted responses.
 - **404 Not Found**: Form not found or not accessible to requester.
 
 ### `GET /api/v1/forms/:id/analytics/questions`
@@ -192,6 +193,7 @@ Get per-question breakdown analytics for a form.
 - **Status:** `Implemented`
 - **Query Params:** `from`, `to`, `granularity`, `questionId`
 - **200 OK**: Returns `{ questions, appliedFilters, dataFreshness }`.
+- **Implementation note:** Question breakdowns are built dynamically from persisted schema and answers, without hardcoded question IDs.
 - **404 Not Found**: Form not found or not accessible to requester.
 
 ### `GET /api/v1/forms/:id/analytics/segments`
@@ -199,12 +201,14 @@ Get segmented analytics comparisons for a form.
 - **Status:** `Implemented`
 - **Query Params:** `from`, `to`, `granularity`, `segmentBy`, `questionId`
 - **200 OK**: Returns `{ segments, appliedFilters, dataFreshness }`.
+- **Implementation note:** Segment calculations use persisted response data and schema metadata (completion and schema-backed question segments).
 - **404 Not Found**: Form not found or not accessible to requester.
 
 ### `POST /api/v1/forms/:id/sync`
 Trigger a manual synchronization job for the specified form.
 - **Status:** `Implemented`
 - **202 Accepted**: Enqueues a job to RabbitMQ.
+- **Implementation note:** Sync fetches all paginated provider forms, then form schema and responses for each fetched form.
 - **404 Not Found**: Form not found or not accessible to requester.
 - **Response:**
   ```json

@@ -4,25 +4,26 @@ import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
 import type { Config } from '../../../server/config';
 import { getPrincipal } from '../../../server/principal';
-import {
-  createDefaultGoogleAuthService,
-  type GoogleAuthService,
-} from './google-auth.service';
+import { createDefaultGoogleAuthService, type GoogleAuthService } from './google-auth.service';
 
-const GoogleAuthStartBodySchema = z.object({
-  redirectUri: z.string().url(),
-  codeChallenge: z.string().min(1),
-  codeChallengeMethod: z.literal('S256'),
-  scopes: z.array(z.string().min(1)).optional(),
-}).strict();
+const GoogleAuthStartBodySchema = z
+  .object({
+    redirectUri: z.string().url(),
+    codeChallenge: z.string().min(1),
+    codeChallengeMethod: z.literal('S256'),
+    scopes: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
 
-const GoogleAuthCallbackBodySchema = z.object({
-  code: z.string().min(1),
-  state: z.string().min(1),
-  codeVerifier: z.string().min(1),
-  redirectUri: z.string().url(),
-  connectionName: z.string().min(1).max(255).optional(),
-}).strict();
+const GoogleAuthCallbackBodySchema = z
+  .object({
+    code: z.string().min(1),
+    state: z.string().min(1),
+    codeVerifier: z.string().min(1),
+    redirectUri: z.string().url(),
+    connectionName: z.string().min(1).max(255).optional(),
+  })
+  .strict();
 
 export async function registerGoogleAuthRoutes(
   app: FastifyInstance,

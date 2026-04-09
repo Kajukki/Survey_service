@@ -50,13 +50,18 @@ import { Connection } from '../../shared/models/domain.models';
       } @else {
         <ul class="surface-list">
           @for (connection of connectionItems(); track connection.id) {
-            <li class="surface-list-item connection-item" [class]="connectionItemClass(connection.status)">
+            <li
+              class="surface-list-item connection-item"
+              [class]="connectionItemClass(connection.status)"
+            >
               <strong class="connection-provider">{{ connection.provider }}</strong>
               <span class="status-badge" [class]="connectionBadgeClass(connection.status)">
                 <span class="status-badge__dot" aria-hidden="true"></span>
                 {{ connection.status }}
               </span>
-              <span class="surface-list-item__time">{{ connection.updatedAt | date: 'mediumDate' }}</span>
+              <span class="surface-list-item__time">{{
+                connection.updatedAt | date: 'mediumDate'
+              }}</span>
             </li>
           } @empty {
             <li class="surface-list-item empty-state">No connector configured yet.</li>
@@ -173,11 +178,19 @@ export class ConnectionsPageComponent {
 
   private toStatusTone(status: string): 'connected' | 'connecting' | 'disconnected' | 'queued' {
     const normalized = status.toLowerCase();
-    if (normalized.includes('active') || normalized.includes('connected') || normalized.includes('ready')) {
+    if (
+      normalized.includes('active') ||
+      normalized.includes('connected') ||
+      normalized.includes('ready')
+    ) {
       return 'connected';
     }
 
-    if (normalized.includes('pending') || normalized.includes('authorizing') || normalized.includes('syncing')) {
+    if (
+      normalized.includes('pending') ||
+      normalized.includes('authorizing') ||
+      normalized.includes('syncing')
+    ) {
       return 'connecting';
     }
 
