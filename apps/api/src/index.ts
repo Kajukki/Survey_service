@@ -31,6 +31,7 @@ async function main(): Promise<void> {
       db,
       rabbitmq,
       logger,
+      metrics,
       batchSize: config.OUTBOX_BATCH_SIZE,
       pollIntervalMs: config.OUTBOX_POLL_INTERVAL_MS,
       maxAttempts: config.OUTBOX_MAX_ATTEMPTS,
@@ -78,3 +79,4 @@ async function main(): Promise<void> {
 
 // Start the application
 main();
+

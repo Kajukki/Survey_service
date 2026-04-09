@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
+import type { Logger } from 'pino';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
+import type { Metrics } from '../../infra/metrics';
 import { createJobsRepository } from './jobs.repository';
 import { createJobsCommandService } from './jobs.command-service';
 import { createJobsSyncTargetQueryService } from './jobs-sync-target.query-service';
@@ -28,12 +30,16 @@ export async function jobsRoutes(
   app: FastifyInstance,
   deps: {
     db: Kysely<Database>;
+    logger: Logger;
+    metrics: Metrics;
   },
 ) {
   const repository = createJobsRepository(deps.db);
   const commandService = createJobsCommandService({
     repository,
     syncTargetQuery: createJobsSyncTargetQueryService(deps.db),
+    logger: deps.logger,
+    metrics: deps.metrics,
   });
   const service = createJobsService({
     repository,
@@ -110,6 +116,7 @@ export async function jobsRoutes(
       formId: body.formId,
       trigger: 'manual',
       forceFullSync: body.forceFullSync ?? false,
+      requestId: request.id,
     });
 
     return reply.status(202).send({

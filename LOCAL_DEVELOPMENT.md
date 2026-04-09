@@ -329,3 +329,36 @@ This removes containers and local PostgreSQL/RabbitMQ data. Be careful—this de
 - [API Architecture](docs/architecture.md)
 - [Repository Structure](docs/repository-structure.md)
 - [API Implementation Guide](IMPLEMENTATION_GUIDE.md)
+
+## Worker Role Scenarios and Expected API Behavior
+
+Use `WORKER_ROLE` to validate API behavior under partial processing availability.
+
+### Scenario A: `WORKER_ROLE=sync`
+
+- `/api/v1/jobs/sync` and `/api/v1/forms/:id/sync` continue returning `202` with queued job metadata.
+- Sync jobs are consumed and eventually transition to terminal status.
+- Export jobs remain queued because the export loop is intentionally disabled.
+
+### Scenario B: `WORKER_ROLE=export`
+
+- Sync enqueue endpoints still return `202` and persist jobs/outbox events.
+- Sync jobs do not progress beyond queued while sync consumers are disabled.
+- Outbox lag and publish-failure metrics should be monitored to avoid silent buildup.
+
+### Scenario C: `WORKER_ROLE=all`
+
+- Both sync and export flows process normally.
+- This is the baseline local mode for end-to-end verification.
+
+## Observability Checks for Enqueue-to-Process Path
+
+After generating sync traffic, inspect `GET /metrics` and verify these metric families are present and moving:
+
+- `sync_enqueue_duration_seconds`
+- `outbox_lag_seconds`
+- `outbox_publish_failures_total`
+- `queue_publish_duration_seconds`
+- `queue_publish_errors_total`
+
+Use these together to detect whether failures happen at API command time, outbox dispatch, or downstream worker processing.

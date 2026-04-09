@@ -18,6 +18,10 @@ export interface Metrics {
   // Queue metrics
   queuePublishDuration: Histogram;
   queuePublishErrorCount: Counter;
+  // Sync/outbox metrics
+  syncEnqueueDuration: Histogram;
+  outboxLagSeconds: Histogram;
+  outboxPublishFailureCount: Counter;
 }
 
 /**
@@ -75,6 +79,29 @@ export function createMetrics(): Metrics {
     registers: [registry],
   });
 
+  const syncEnqueueDuration = new Histogram({
+    name: 'sync_enqueue_duration_seconds',
+    help: 'End-to-end API command latency to enqueue a sync job',
+    labelNames: ['trigger', 'target'],
+    registers: [registry],
+    buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5],
+  });
+
+  const outboxLagSeconds = new Histogram({
+    name: 'outbox_lag_seconds',
+    help: 'Lag between command enqueue time and outbox publish attempt',
+    labelNames: ['event_type'],
+    registers: [registry],
+    buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300],
+  });
+
+  const outboxPublishFailureCount = new Counter({
+    name: 'outbox_publish_failures_total',
+    help: 'Total outbox publish attempts that failed',
+    labelNames: ['event_type', 'error_code'],
+    registers: [registry],
+  });
+
   return {
     registry,
     httpRequestDuration,
@@ -84,5 +111,8 @@ export function createMetrics(): Metrics {
     authzFailureCount,
     queuePublishDuration,
     queuePublishErrorCount,
+    syncEnqueueDuration,
+    outboxLagSeconds,
+    outboxPublishFailureCount,
   };
 }

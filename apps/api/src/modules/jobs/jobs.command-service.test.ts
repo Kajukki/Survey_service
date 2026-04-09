@@ -80,6 +80,54 @@ describe('createJobsCommandService', () => {
     expect(result.id).toBe(created.id);
   });
 
+  it('records enqueue latency metric and emits correlation logs', async () => {
+    const repository = makeRepo();
+    const syncTargetQuery = makeSyncTargetQuery();
+
+    vi.mocked(syncTargetQuery.resolveOwnedConnectionForSync).mockResolvedValue({
+      id: '11111111-1111-1111-1111-111111111111',
+      ownerId: 'test-user',
+    });
+
+    const created = makeCreatedJob();
+    vi.mocked(repository.createSyncJob).mockResolvedValue(created);
+
+    const observe = vi.fn();
+    const labels = vi.fn().mockReturnValue({ observe });
+    const logger = { info: vi.fn() };
+
+    const service = createJobsCommandService({
+      repository,
+      syncTargetQuery,
+      logger: logger as any,
+      metrics: {
+        syncEnqueueDuration: {
+          labels,
+        },
+      } as any,
+    });
+
+    await service.enqueueSyncJob({
+      requestedBy: 'test-user',
+      connectionId: '11111111-1111-1111-1111-111111111111',
+      trigger: 'manual',
+      forceFullSync: false,
+      requestId: 'req-123',
+    });
+
+    expect(labels).toHaveBeenCalledWith('manual', 'connection');
+    expect(observe).toHaveBeenCalledTimes(1);
+    expect(logger.info).toHaveBeenCalledTimes(2);
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-123', userId: 'test-user' }),
+      'Sync enqueue command received',
+    );
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: 'req-123', jobId: created.id }),
+      'Sync enqueue command persisted',
+    );
+  });
+
   it('derives connection from owned form when formId is provided', async () => {
     const repository = makeRepo();
     const syncTargetQuery = makeSyncTargetQuery();

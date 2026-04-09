@@ -203,3 +203,22 @@ curl http://localhost:3000/api/v1/jobs/<job_id>
 - [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) — detailed API specification
 - [skills/api-design/SKILL.md](../../skills/api-design/SKILL.md) — REST API patterns
 - [skills/backend-patterns/SKILL.md](../../skills/backend-patterns/SKILL.md) — backend architecture
+
+## Sync Enqueue Observability (Phase 5)
+
+The API emits command and outbox telemetry to monitor enqueue-to-process health:
+
+- `sync_enqueue_duration_seconds` with labels `trigger` and `target`
+- `outbox_lag_seconds` with label `event_type`
+- `outbox_publish_failures_total` with labels `event_type` and `error_code`
+- `queue_publish_duration_seconds` and `queue_publish_errors_total`
+
+Structured logs include request and job correlation fields (`requestId`, `jobId`) for both sync command acceptance and outbox publish attempts.
+
+## Worker Role Compatibility Notes
+
+API sync endpoints remain available and return `202` even when only a subset of worker roles is active.
+
+- `WORKER_ROLE=sync`: sync jobs are consumed.
+- `WORKER_ROLE=export`: sync jobs stay queued until sync workers resume.
+- `WORKER_ROLE=all`: sync and export pipelines both active.
