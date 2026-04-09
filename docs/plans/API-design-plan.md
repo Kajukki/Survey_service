@@ -81,7 +81,7 @@ Design objective:
 
 ### Planned
 
-- Export lifecycle completion endpoints and persistence model.
+- Export generation completion path to terminal downloadable artifacts.
 - Analytics/dashboard endpoints.
 
 ## Phased Delivery

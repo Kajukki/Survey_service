@@ -25,10 +25,14 @@ This document is the execution backlog for API delivery, based on the current im
 - Request principal extraction from bearer access tokens is wired in API runtime.
 - Protected jobs/connections/forms/sharing routes now consume principal from request context.
 
+5. Domain persistence parity for core modules
+- Connections/forms/sharing routes are DB-backed in runtime with owner/share-scoped access checks.
+
 ### In Progress
 
-1. Domain persistence parity
-- Connections/forms/sharing routes still rely on mock-backed behavior.
+1. Export workflow completion
+- Export enqueue/list/detail/download API surface is implemented with owner-scoped reads.
+- Export generation worker path and terminal status transitions to ready/downloadable are still pending.
 
 2. Authorization parity
 - Principal extraction is active on protected routes.
@@ -46,9 +50,7 @@ This document is the execution backlog for API delivery, based on the current im
 
 ### Not Started
 
-1. Export workflow completion.
-2. Analytics endpoints for dashboard.
-3. Environment-ready enterprise IdP auth mode.
+1. Environment-ready enterprise IdP auth mode.
 
 ## Priority Backlog
 

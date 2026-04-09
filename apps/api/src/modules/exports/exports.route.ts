@@ -1,8 +1,13 @@
 import { FastifyInstance } from 'fastify';
 import { CreateExportSchema } from '@survey-service/contracts';
+import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
 import { getPrincipal } from '../../server/principal';
+
+const ExportIdParamsSchema = z.object({
+  id: z.string().uuid(),
+});
 
 const mockExports = [
   {
@@ -10,12 +15,18 @@ const mockExports = [
     format: 'csv',
     status: 'ready',
     requested_at: new Date(Date.now() - 3600_000).toISOString(),
+    download_url: 'https://example.com/downloads/export-mock-1.csv',
+    error: null,
+    completed_at: new Date(Date.now() - 3000_000).toISOString(),
   },
   {
     id: 'export-mock-2',
     format: 'excel',
     status: 'queued',
     requested_at: new Date().toISOString(),
+    download_url: null,
+    error: null,
+    completed_at: null,
   },
 ];
 
@@ -45,6 +56,194 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       meta: {
         requestId: request.id,
         pagination: { page: 1, perPage: 20, total: exportsList.length, totalPages: 1 },
+      },
+    });
+  });
+
+  // GET /exports/:id
+  app.get('/exports/:id', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const paramsResult = ExportIdParamsSchema.safeParse(request.params ?? {});
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'validation_error',
+          message: 'Invalid export id',
+          details: {
+            issues: paramsResult.error.issues,
+          },
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const db = deps?.db;
+    if (db) {
+      const exportJob = await db
+        .selectFrom('export_jobs')
+        .select(['id', 'format', 'status', 'requested_at', 'download_url', 'error', 'completed_at'])
+        .where('id', '=', paramsResult.data.id)
+        .where('requested_by', '=', principal.userId)
+        .executeTakeFirst();
+
+      if (!exportJob) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'not_found',
+            message: 'Export not found',
+          },
+          meta: {
+            requestId: request.id,
+          },
+        });
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          id: exportJob.id,
+          format: exportJob.format,
+          status: exportJob.status,
+          requested_at: new Date(exportJob.requested_at).toISOString(),
+          download_url: exportJob.download_url,
+          error: exportJob.error,
+          completed_at: exportJob.completed_at ? new Date(exportJob.completed_at).toISOString() : null,
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const exportJob = mockExports.find((item) => item.id === paramsResult.data.id);
+    if (!exportJob) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Export not found',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    return reply.send({
+      success: true,
+      data: exportJob,
+      meta: {
+        requestId: request.id,
+      },
+    });
+  });
+
+  // GET /exports/:id/download
+  app.get('/exports/:id/download', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const paramsResult = ExportIdParamsSchema.safeParse(request.params ?? {});
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        success: false,
+        error: {
+          code: 'validation_error',
+          message: 'Invalid export id',
+          details: {
+            issues: paramsResult.error.issues,
+          },
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const db = deps?.db;
+    if (db) {
+      const exportJob = await db
+        .selectFrom('export_jobs')
+        .select(['id', 'status', 'download_url'])
+        .where('id', '=', paramsResult.data.id)
+        .where('requested_by', '=', principal.userId)
+        .executeTakeFirst();
+
+      if (!exportJob) {
+        return reply.status(404).send({
+          success: false,
+          error: {
+            code: 'not_found',
+            message: 'Export not found',
+          },
+          meta: {
+            requestId: request.id,
+          },
+        });
+      }
+
+      if (!exportJob.download_url || exportJob.status !== 'ready') {
+        return reply.status(409).send({
+          success: false,
+          error: {
+            code: 'export_not_ready',
+            message: 'Export is not ready for download',
+          },
+          meta: {
+            requestId: request.id,
+          },
+        });
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          id: exportJob.id,
+          download_url: exportJob.download_url,
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const exportJob = mockExports.find((item) => item.id === paramsResult.data.id);
+    if (!exportJob) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Export not found',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    if (!exportJob.download_url || exportJob.status !== 'ready') {
+      return reply.status(409).send({
+        success: false,
+        error: {
+          code: 'export_not_ready',
+          message: 'Export is not ready for download',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        id: exportJob.id,
+        download_url: exportJob.download_url,
+      },
+      meta: {
+        requestId: request.id,
       },
     });
   });
@@ -124,6 +323,9 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       format: bodyResult.data.format,
       status: 'queued',
       requested_at: new Date().toISOString(),
+      download_url: null,
+      error: null,
+      completed_at: null,
     };
     mockExports.unshift(exportJob);
 
