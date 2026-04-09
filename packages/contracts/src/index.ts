@@ -103,6 +103,95 @@ export const FormSchema = z.object({
 
 export type Form = z.infer<typeof FormSchema>
 
+export const FormQuestionTypeSchema = z.enum([
+  'single_choice',
+  'multi_choice',
+  'text',
+  'rating',
+  'date',
+  'number',
+])
+
+export const FormQuestionOptionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+})
+
+const BaseFormQuestionSchema = z.object({
+  id: z.string().min(1),
+  externalQuestionId: z.string().min(1).optional(),
+  sectionId: z.string().min(1).optional(),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  required: z.boolean().default(false),
+  order: z.number().int().nonnegative(),
+})
+
+export const ChoiceFormQuestionSchema = BaseFormQuestionSchema.extend({
+  type: z.enum(['single_choice', 'multi_choice']),
+  options: z.array(FormQuestionOptionSchema).min(1),
+})
+
+export const TextFormQuestionSchema = BaseFormQuestionSchema.extend({
+  type: z.literal('text'),
+  multiline: z.boolean().default(true),
+})
+
+export const RatingFormQuestionSchema = BaseFormQuestionSchema.extend({
+  type: z.literal('rating'),
+  minScale: z.number().int().default(1),
+  maxScale: z.number().int().default(5),
+  step: z.number().int().positive().default(1),
+})
+
+export const DateFormQuestionSchema = BaseFormQuestionSchema.extend({
+  type: z.literal('date'),
+  includeTime: z.boolean().default(false),
+})
+
+export const NumberFormQuestionSchema = BaseFormQuestionSchema.extend({
+  type: z.literal('number'),
+  minValue: z.number().optional(),
+  maxValue: z.number().optional(),
+})
+
+export const FormQuestionSchema = z.discriminatedUnion('type', [
+  ChoiceFormQuestionSchema,
+  TextFormQuestionSchema,
+  RatingFormQuestionSchema,
+  DateFormQuestionSchema,
+  NumberFormQuestionSchema,
+])
+
+export const FormSectionSchema = z.object({
+  id: z.string().min(1),
+  externalSectionId: z.string().min(1).optional(),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  order: z.number().int().nonnegative(),
+  questions: z.array(FormQuestionSchema).default([]),
+})
+
+export const FormStructureSchema = z.object({
+  form: z.object({
+    id: IdSchema,
+    ownerId: UserIdSchema,
+    title: z.string().min(1),
+    description: z.string().optional(),
+    responseCount: z.number().int().nonnegative().default(0),
+    updatedAt: z.string().datetime(),
+    lastSyncedAt: z.string().datetime().optional(),
+  }),
+  sections: z.array(FormSectionSchema),
+  questionCount: z.number().int().nonnegative().default(0),
+})
+
+export type FormQuestionType = z.infer<typeof FormQuestionTypeSchema>
+export type FormQuestionOption = z.infer<typeof FormQuestionOptionSchema>
+export type FormQuestion = z.infer<typeof FormQuestionSchema>
+export type FormSection = z.infer<typeof FormSectionSchema>
+export type FormStructure = z.infer<typeof FormStructureSchema>
+
 /**
  * Provider connector schemas (Google/Microsoft boundary contracts).
  */
@@ -171,6 +260,234 @@ export type ProviderFormSummary = z.infer<typeof ProviderFormSummarySchema>
 export type ProviderFormResponseItem = z.infer<typeof ProviderFormResponseItemSchema>
 export type ProviderFormResponsePage = z.infer<typeof ProviderFormResponsePageSchema>
 export type ProviderError = z.infer<typeof ProviderErrorSchema>
+
+/**
+ * Form response browser schemas.
+ */
+export const FormResponseCompletionSchema = z.enum(['completed', 'partial'])
+
+export const FormResponseAnswerValueSchema = z.union([
+  z.string(),
+  z.number(),
+  z.boolean(),
+  z.array(z.string()),
+  z.array(z.number()),
+  z.null(),
+  z.record(z.string(), z.unknown()),
+])
+
+export const FormResponseAnswerSchema = z.object({
+  questionId: z.string().min(1),
+  questionLabel: z.string().min(1),
+  questionType: FormQuestionTypeSchema,
+  value: FormResponseAnswerValueSchema,
+})
+
+export const FormResponseAnswerPreviewSchema = z.object({
+  questionId: z.string().min(1),
+  questionLabel: z.string().min(1),
+  valuePreview: z.string().min(1),
+})
+
+export const FormResponseSummarySchema = z.object({
+  id: z.string().min(1),
+  submittedAt: z.string().datetime().optional(),
+  completion: FormResponseCompletionSchema,
+  answerPreview: z.array(FormResponseAnswerPreviewSchema).max(8).default([]),
+})
+
+export const FormResponseDetailSchema = z.object({
+  id: z.string().min(1),
+  submittedAt: z.string().datetime().optional(),
+  completion: FormResponseCompletionSchema,
+  answers: z.array(FormResponseAnswerSchema),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+})
+
+export const FormResponsesFiltersSchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+  questionId: z.string().min(1).optional(),
+  answerContains: z.string().min(1).optional(),
+  completion: FormResponseCompletionSchema.optional(),
+})
+
+export const FormResponsesListQuerySchema = PaginationQuerySchema.merge(
+  z.object({
+    from: z.coerce.date().optional(),
+    to: z.coerce.date().optional(),
+    questionId: z.string().min(1).optional(),
+    answerContains: z.string().min(1).optional(),
+    completion: FormResponseCompletionSchema.optional(),
+  }),
+).superRefine((value, context) => {
+  if (value.from && value.to && value.from > value.to) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['from'],
+      message: 'from must be less than or equal to to',
+    })
+  }
+})
+
+export const FormResponsesListSchema = z.object({
+  responses: z.array(FormResponseSummarySchema),
+  appliedFilters: FormResponsesFiltersSchema.default({}),
+})
+
+export type FormResponseCompletion = z.infer<typeof FormResponseCompletionSchema>
+export type FormResponseAnswerValue = z.infer<typeof FormResponseAnswerValueSchema>
+export type FormResponseAnswer = z.infer<typeof FormResponseAnswerSchema>
+export type FormResponseAnswerPreview = z.infer<typeof FormResponseAnswerPreviewSchema>
+export type FormResponseSummary = z.infer<typeof FormResponseSummarySchema>
+export type FormResponseDetail = z.infer<typeof FormResponseDetailSchema>
+export type FormResponsesFilters = z.infer<typeof FormResponsesFiltersSchema>
+export type FormResponsesListQuery = z.infer<typeof FormResponsesListQuerySchema>
+export type FormResponsesList = z.infer<typeof FormResponsesListSchema>
+
+/**
+ * Form analytics schemas.
+ */
+export const FormAnalyticsGranularitySchema = z.enum(['day', 'week', 'month'])
+
+export const FormAnalyticsAppliedFiltersSchema = z.object({
+  from: z.string().datetime(),
+  to: z.string().datetime(),
+  granularity: FormAnalyticsGranularitySchema,
+  questionId: z.string().min(1).optional(),
+  segmentBy: z.string().min(1).optional(),
+})
+
+export const FormAnalyticsFreshnessSchema = z.object({
+  generatedAt: z.string().datetime(),
+  lastSuccessfulSyncAt: z.string().datetime().optional(),
+  lastAttemptedSyncAt: z.string().datetime().optional(),
+})
+
+export const FormAnalyticsKpiSchema = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1),
+  delta: z.string().optional(),
+})
+
+export const FormAnalyticsSeriesPointSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  count: z.number().int().nonnegative(),
+})
+
+export const FormAnalyticsDistributionItemSchema = z.object({
+  label: z.string().min(1),
+  value: z.number().int().nonnegative(),
+})
+
+export const FormAnalyticsQuestionBreakdownSchema = z.object({
+  questionId: z.string().min(1),
+  questionLabel: z.string().min(1),
+  questionType: FormQuestionTypeSchema,
+  responses: z.number().int().nonnegative(),
+  distribution: z.array(FormAnalyticsDistributionItemSchema).optional(),
+  numericStats: z
+    .object({
+      min: z.number(),
+      max: z.number(),
+      avg: z.number(),
+      median: z.number(),
+    })
+    .optional(),
+  topTerms: z
+    .array(
+      z.object({
+        term: z.string().min(1),
+        count: z.number().int().nonnegative(),
+      }),
+    )
+    .optional(),
+})
+
+export const FormAnalyticsOverviewSchema = z.object({
+  kpis: z.array(FormAnalyticsKpiSchema),
+  series: z.array(FormAnalyticsSeriesPointSchema),
+  appliedFilters: FormAnalyticsAppliedFiltersSchema,
+  dataFreshness: FormAnalyticsFreshnessSchema,
+})
+
+export const FormAnalyticsQuestionsSchema = z.object({
+  questions: z.array(FormAnalyticsQuestionBreakdownSchema),
+  appliedFilters: FormAnalyticsAppliedFiltersSchema,
+  dataFreshness: FormAnalyticsFreshnessSchema,
+})
+
+export const FormAnalyticsSegmentMetricSchema = z.object({
+  label: z.string().min(1),
+  value: z.number(),
+})
+
+export const FormAnalyticsSegmentItemSchema = z.object({
+  segmentKey: z.string().min(1),
+  segmentLabel: z.string().min(1),
+  responses: z.number().int().nonnegative(),
+  completionRate: z.number().min(0).max(1).optional(),
+  metrics: z.array(FormAnalyticsSegmentMetricSchema).default([]),
+})
+
+export const FormAnalyticsSegmentsSchema = z.object({
+  segments: z.array(FormAnalyticsSegmentItemSchema),
+  appliedFilters: FormAnalyticsAppliedFiltersSchema,
+  dataFreshness: FormAnalyticsFreshnessSchema,
+})
+
+export const FormAnalyticsOverviewQuerySchema = z
+  .object({
+    from: z.coerce.date(),
+    to: z.coerce.date(),
+    granularity: FormAnalyticsGranularitySchema.default('day'),
+    questionId: z.string().min(1).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.from > value.to) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['from'],
+        message: 'from must be less than or equal to to',
+      })
+    }
+  })
+
+export const FormAnalyticsQuestionsQuerySchema = FormAnalyticsOverviewQuerySchema
+
+export const FormAnalyticsSegmentsQuerySchema = z
+  .object({
+    from: z.coerce.date(),
+    to: z.coerce.date(),
+    granularity: FormAnalyticsGranularitySchema.default('day'),
+    segmentBy: z.string().min(1),
+    questionId: z.string().min(1).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.from > value.to) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['from'],
+        message: 'from must be less than or equal to to',
+      })
+    }
+  })
+
+export type FormAnalyticsGranularity = z.infer<typeof FormAnalyticsGranularitySchema>
+export type FormAnalyticsAppliedFilters = z.infer<typeof FormAnalyticsAppliedFiltersSchema>
+export type FormAnalyticsFreshness = z.infer<typeof FormAnalyticsFreshnessSchema>
+export type FormAnalyticsKpi = z.infer<typeof FormAnalyticsKpiSchema>
+export type FormAnalyticsSeriesPoint = z.infer<typeof FormAnalyticsSeriesPointSchema>
+export type FormAnalyticsDistributionItem = z.infer<typeof FormAnalyticsDistributionItemSchema>
+export type FormAnalyticsQuestionBreakdown = z.infer<typeof FormAnalyticsQuestionBreakdownSchema>
+export type FormAnalyticsOverview = z.infer<typeof FormAnalyticsOverviewSchema>
+export type FormAnalyticsQuestions = z.infer<typeof FormAnalyticsQuestionsSchema>
+export type FormAnalyticsSegmentMetric = z.infer<typeof FormAnalyticsSegmentMetricSchema>
+export type FormAnalyticsSegmentItem = z.infer<typeof FormAnalyticsSegmentItemSchema>
+export type FormAnalyticsSegments = z.infer<typeof FormAnalyticsSegmentsSchema>
+export type FormAnalyticsOverviewQuery = z.infer<typeof FormAnalyticsOverviewQuerySchema>
+export type FormAnalyticsQuestionsQuery = z.infer<typeof FormAnalyticsQuestionsQuerySchema>
+export type FormAnalyticsSegmentsQuery = z.infer<typeof FormAnalyticsSegmentsQuerySchema>
 
 /**
  * Job lifecycle schemas.

@@ -25,6 +25,12 @@ import {
   ProviderFormSummarySchema,
   ProviderFormResponsePageSchema,
   ProviderErrorSchema,
+  FormStructureSchema,
+  FormQuestionSchema,
+  FormResponsesListQuerySchema,
+  FormResponseDetailSchema,
+  FormAnalyticsOverviewSchema,
+  FormAnalyticsSegmentsQuerySchema,
 } from './index'
 
 describe('Connection Schemas', () => {
@@ -395,6 +401,141 @@ describe('Provider Connector Schemas', () => {
 
   it('rejects unsupported connector provider', () => {
     const result = ConnectorProviderSchema.safeParse('typeform')
+
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('Form Structure Schemas', () => {
+  it('validates form structure with sectioned questions', () => {
+    const result = FormStructureSchema.safeParse({
+      form: {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        ownerId: 'user-123',
+        title: 'Customer Satisfaction Survey',
+        description: 'Q2 CSAT collection',
+        responseCount: 128,
+        updatedAt: new Date().toISOString(),
+      },
+      sections: [
+        {
+          id: 'section-1',
+          title: 'General',
+          order: 0,
+          questions: [
+            {
+              id: 'question-1',
+              sectionId: 'section-1',
+              type: 'single_choice',
+              label: 'How satisfied are you?',
+              order: 0,
+              options: [
+                { value: 'very_satisfied', label: 'Very satisfied' },
+                { value: 'satisfied', label: 'Satisfied' },
+              ],
+            },
+          ],
+        },
+      ],
+      questionCount: 1,
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects invalid question discriminators', () => {
+    const result = FormQuestionSchema.safeParse({
+      id: 'q-invalid',
+      type: 'unsupported',
+      label: 'Invalid question',
+      order: 1,
+    })
+
+    expect(result.success).toBe(false)
+  })
+})
+
+describe('Form Responses Schemas', () => {
+  it('validates response list query filters', () => {
+    const result = FormResponsesListQuerySchema.safeParse({
+      page: 2,
+      perPage: 25,
+      from: '2026-01-01T00:00:00.000Z',
+      to: '2026-01-31T23:59:59.999Z',
+      questionId: 'question-1',
+      completion: 'completed',
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects inverted response date ranges', () => {
+    const result = FormResponsesListQuerySchema.safeParse({
+      from: '2026-02-01T00:00:00.000Z',
+      to: '2026-01-01T00:00:00.000Z',
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  it('validates detailed response payloads', () => {
+    const result = FormResponseDetailSchema.safeParse({
+      id: 'response-1',
+      submittedAt: new Date().toISOString(),
+      completion: 'completed',
+      answers: [
+        {
+          questionId: 'question-1',
+          questionLabel: 'How satisfied are you?',
+          questionType: 'single_choice',
+          value: 'very_satisfied',
+        },
+        {
+          questionId: 'question-2',
+          questionLabel: 'Comment',
+          questionType: 'text',
+          value: 'Great experience overall',
+        },
+      ],
+    })
+
+    expect(result.success).toBe(true)
+  })
+})
+
+describe('Form Analytics Schemas', () => {
+  it('validates analytics overview payload with filter metadata', () => {
+    const now = new Date().toISOString()
+    const result = FormAnalyticsOverviewSchema.safeParse({
+      kpis: [
+        { label: 'Responses', value: '128', delta: '+8%' },
+        { label: 'Completion rate', value: '0.92' },
+      ],
+      series: [
+        { date: '2026-01-01', count: 10 },
+        { date: '2026-01-02', count: 12 },
+      ],
+      appliedFilters: {
+        from: now,
+        to: now,
+        granularity: 'day',
+      },
+      dataFreshness: {
+        generatedAt: now,
+        lastSuccessfulSyncAt: now,
+      },
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  it('rejects invalid segment query date windows', () => {
+    const result = FormAnalyticsSegmentsQuerySchema.safeParse({
+      from: '2026-04-01T00:00:00.000Z',
+      to: '2026-03-01T00:00:00.000Z',
+      granularity: 'week',
+      segmentBy: 'completion',
+    })
 
     expect(result.success).toBe(false)
   })
