@@ -15,6 +15,7 @@ import {
 import { extractErrorMessage } from './sync/processor.js';
 import { handleSyncJobMessage, serializeError } from './messaging/handler.js';
 import { assertTopology } from './messaging/topology.js';
+import { shouldRunExport, shouldRunSync } from './runtime/roles.js';
 import { getWorkerState, setWorkerState, type WorkerState } from './state.js';
 
 export { getWorkerState };
@@ -68,6 +69,8 @@ async function processQueuedExportJobs(pool: Pool, logger: Logger): Promise<numb
 async function main(): Promise<void> {
   loadEnvironmentFiles();
   const config = loadConfig();
+  const runSyncRole = shouldRunSync(config.WORKER_ROLE);
+  const runExportRole = shouldRunExport(config.WORKER_ROLE);
   const logger = pino({
     level: config.LOG_LEVEL,
   });
@@ -78,13 +81,20 @@ async function main(): Promise<void> {
     min: 1,
   });
 
-  const connection = await amqplib.connect(config.RABBITMQ_URL, {
-    connectionTimeout: 10000,
-  });
-  const channel = await connection.createChannel();
+  let connection: amqplib.ChannelModel | null = null;
+  let channel: amqplib.Channel | null = null;
+  let consumerTag: string | null = null;
+  let exportInterval: NodeJS.Timeout | null = null;
 
-  await assertTopology(channel);
-  await channel.prefetch(config.RABBITMQ_PREFETCH);
+  if (runSyncRole) {
+    connection = await amqplib.connect(config.RABBITMQ_URL, {
+      connectionTimeout: 10000,
+    });
+    channel = await connection.createChannel();
+
+    await assertTopology(channel);
+    await channel.prefetch(config.RABBITMQ_PREFETCH);
+  }
 
   setWorkerState({
     service: 'worker',
@@ -105,25 +115,33 @@ async function main(): Promise<void> {
     }
   };
 
-  await runExportLifecycleTick();
-  const exportInterval = setInterval(() => {
-    void runExportLifecycleTick();
-  }, config.EXPORT_POLL_INTERVAL_MS);
+  if (runExportRole) {
+    await runExportLifecycleTick();
+    exportInterval = setInterval(() => {
+      void runExportLifecycleTick();
+    }, config.EXPORT_POLL_INTERVAL_MS);
+  }
 
-  const consumer = await channel.consume(QUEUES.SYNC_JOBS, async (message) => {
-    if (!message) {
-      return;
-    }
+  if (runSyncRole && channel) {
+    const consumer = await channel.consume(QUEUES.SYNC_JOBS, async (message) => {
+      if (!message) {
+        return;
+      }
 
-    await handleSyncJobMessage(message, channel, pool, logger, config);
-  });
+      await handleSyncJobMessage(message, channel!, pool, logger, config);
+    });
+    consumerTag = consumer.consumerTag;
+  }
 
   logger.info(
     {
-      queue: QUEUES.SYNC_JOBS,
+      workerRole: config.WORKER_ROLE,
+      runSyncRole,
+      runExportRole,
+      queue: runSyncRole ? QUEUES.SYNC_JOBS : null,
       prefetch: config.RABBITMQ_PREFETCH,
-      consumerTag: consumer.consumerTag,
-      exportPollIntervalMs: config.EXPORT_POLL_INTERVAL_MS,
+      consumerTag,
+      exportPollIntervalMs: runExportRole ? config.EXPORT_POLL_INTERVAL_MS : null,
     },
     'Worker started',
   );
@@ -135,10 +153,22 @@ async function main(): Promise<void> {
     });
 
     try {
-      clearInterval(exportInterval);
-      await channel.cancel(consumer.consumerTag);
-      await channel.close();
-      await connection.close();
+      if (exportInterval) {
+        clearInterval(exportInterval);
+      }
+
+      if (channel && consumerTag) {
+        await channel.cancel(consumerTag);
+      }
+
+      if (channel) {
+        await channel.close();
+      }
+
+      if (connection) {
+        await connection.close();
+      }
+
       await pool.end();
       process.exit(0);
     } catch (error) {
