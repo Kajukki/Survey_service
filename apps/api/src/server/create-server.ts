@@ -110,7 +110,9 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
         db: context.db,
         rabbitmq: context.rabbitmq,
       });
-      await sharingRoutes(_api);
+      await sharingRoutes(_api, {
+        db: context.db,
+      });
       await jobsRoutes(_api, {
         db: context.db,
         rabbitmq: context.rabbitmq,
