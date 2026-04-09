@@ -170,7 +170,7 @@ Get detailed metadata for a specific form.
 Get ordered form structure (sections + questions) for the specified form.
 - **Status:** `Implemented`
 - **200 OK**: Returns `{ form, sections, questionCount }`.
-- **Implementation note:** Sections/questions may be inferred from persisted response previews when provider-native structure metadata is unavailable.
+- **Implementation note:** Structure is sourced from provider schema fetched during sync and persisted in `forms.form_schema_json`.
 - **404 Not Found**: Form not found or not accessible to requester.
 
 ### `GET /api/v1/forms/:id/responses`

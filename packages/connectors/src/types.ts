@@ -6,6 +6,46 @@ import type {
   ProviderTokenSet,
 } from '@survey-service/contracts';
 
+export type ProviderQuestionType =
+  | 'single_choice'
+  | 'multi_choice'
+  | 'text'
+  | 'rating'
+  | 'date'
+  | 'number';
+
+export interface ProviderFormSectionDefinition {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+}
+
+export interface ProviderFormQuestionOptionDefinition {
+  value: string;
+  label: string;
+}
+
+export interface ProviderFormQuestionDefinition {
+  id: string;
+  sectionId?: string;
+  label: string;
+  description?: string;
+  required: boolean;
+  type: ProviderQuestionType;
+  order: number;
+  options?: ProviderFormQuestionOptionDefinition[];
+}
+
+export interface ProviderFormDefinition {
+  provider: 'google' | 'microsoft';
+  externalFormId: string;
+  title: string;
+  description?: string;
+  sections: ProviderFormSectionDefinition[];
+  questions: ProviderFormQuestionDefinition[];
+}
+
 export interface ProviderAuthCodeExchangeResult {
   tokenSet: ProviderTokenSet;
   idToken: string;
@@ -30,6 +70,10 @@ export interface ProviderConnector {
     externalFormId: string;
     pageToken?: string;
   }): Promise<ProviderFormResponsePage>;
+  getFormDefinition(input: {
+    accessToken: string;
+    externalFormId: string;
+  }): Promise<ProviderFormDefinition>;
 }
 
 export interface ConnectorHttpClient {

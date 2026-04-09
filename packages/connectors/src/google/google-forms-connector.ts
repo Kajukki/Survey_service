@@ -13,7 +13,12 @@ import {
   ProviderFormSummarySchema,
   ProviderTokenSetSchema,
 } from '@survey-service/contracts';
-import type { ConnectorHttpClient, ProviderConnector } from '../types.js';
+import type {
+  ConnectorHttpClient,
+  ProviderConnector,
+  ProviderFormDefinition,
+  ProviderQuestionType,
+} from '../types.js';
 
 export interface GoogleConnectorConfig {
   clientId: string;
@@ -74,6 +79,41 @@ interface GoogleHttpLikeError {
     data?: unknown;
   };
 }
+
+interface GoogleFormItem {
+  itemId?: string;
+  title?: string;
+  description?: string;
+  pageBreakItem?: Record<string, unknown>;
+  questionItem?: {
+    question?: {
+      questionId?: string;
+      required?: boolean;
+      choiceQuestion?: {
+        type?: string;
+        options?: Array<{ value?: string }>;
+      };
+      textQuestion?: Record<string, unknown>;
+      scaleQuestion?: {
+        low?: number;
+        high?: number;
+      };
+      dateQuestion?: Record<string, unknown>;
+      timeQuestion?: Record<string, unknown>;
+    };
+  };
+}
+
+interface GoogleFormDefinitionResponse {
+  formId?: string;
+  info?: {
+    title?: string;
+    description?: string;
+  };
+  items?: GoogleFormItem[];
+}
+
+type GoogleQuestionDefinition = NonNullable<NonNullable<GoogleFormItem['questionItem']>['question']>;
 
 function toErrorCode(input: unknown): string {
   if (typeof input !== 'string' || input.trim().length === 0) {
@@ -339,6 +379,108 @@ export class GoogleFormsConnector implements ProviderConnector {
     } catch (error) {
       throw mapGoogleProviderError(error);
     }
+  }
+
+  async getFormDefinition(input: {
+    accessToken: string;
+    externalFormId: string;
+  }): Promise<ProviderFormDefinition> {
+    try {
+      const response = await this.httpClient.request<GoogleFormDefinitionResponse>({
+        method: 'GET',
+        url: `${this.config.formsApiBaseUrl}/forms/${input.externalFormId}`,
+        headers: {
+          authorization: `Bearer ${input.accessToken}`,
+        },
+      });
+
+      const defaultSectionId = 'section-0';
+      const sections: ProviderFormDefinition['sections'] = [
+        {
+          id: defaultSectionId,
+          title: 'General',
+          order: 0,
+        },
+      ];
+
+      const questions: ProviderFormDefinition['questions'] = [];
+      let currentSectionId = defaultSectionId;
+      let sectionOrder = 1;
+      let questionOrder = 0;
+
+      for (const item of response.items ?? []) {
+        if (item.pageBreakItem) {
+          const sectionId = item.itemId?.trim() || `section-${sectionOrder}`;
+          sections.push({
+            id: sectionId,
+            title: item.title?.trim() || `Section ${sectionOrder + 1}`,
+            description: item.description?.trim() || undefined,
+            order: sectionOrder,
+          });
+          currentSectionId = sectionId;
+          sectionOrder += 1;
+          continue;
+        }
+
+        const question = item.questionItem?.question;
+        const questionId = question?.questionId?.trim();
+        if (!question || !questionId) {
+          continue;
+        }
+
+        const mappedType = this.mapQuestionType(question);
+        const options =
+          question.choiceQuestion?.options
+            ?.map((option) => option.value?.trim())
+            .filter((value): value is string => Boolean(value && value.length > 0))
+            .map((value) => ({ value, label: value })) ?? [];
+
+        questions.push({
+          id: questionId,
+          sectionId: currentSectionId,
+          label: item.title?.trim() || questionId,
+          description: item.description?.trim() || undefined,
+          required: Boolean(question.required),
+          type: mappedType,
+          order: questionOrder,
+          ...(options.length > 0 ? { options } : {}),
+        });
+
+        questionOrder += 1;
+      }
+
+      return {
+        provider: this.provider,
+        externalFormId: response.formId?.trim() || input.externalFormId,
+        title: response.info?.title?.trim() || 'Untitled form',
+        description: response.info?.description?.trim() || undefined,
+        sections,
+        questions,
+      };
+    } catch (error) {
+      throw mapGoogleProviderError(error);
+    }
+  }
+
+  private mapQuestionType(question: GoogleQuestionDefinition): ProviderQuestionType {
+    const choiceType = question.choiceQuestion?.type;
+    if (choiceType === 'CHECKBOX') {
+      return 'multi_choice';
+    }
+
+    if (choiceType === 'RADIO' || choiceType === 'DROP_DOWN') {
+      return 'single_choice';
+    }
+
+    if (question.scaleQuestion) {
+      return 'rating';
+    }
+
+    if (question.dateQuestion || question.timeQuestion) {
+      return 'date';
+    }
+
+    return 'text';
   }
 
   private toTokenSet(
