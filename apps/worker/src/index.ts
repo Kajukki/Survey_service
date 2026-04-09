@@ -25,25 +25,32 @@ import {
   encryptCredentialPayload,
   isTokenExpiringSoon,
 } from './crypto/credentials.js';
+import {
+  loadProviderConnection,
+  persistRefreshedProviderToken,
+} from './db/connections.js';
+import {
+  beginExportTransaction,
+  commitExportTransaction,
+  loadQueuedExportJobs,
+  markExportJobFailed,
+  markExportJobReady,
+  rollbackExportTransaction,
+  type ExportJobRow,
+} from './db/exports.js';
+import {
+  refreshFormResponseCount,
+  upsertAnalyticsSnapshot,
+  upsertForm,
+  upsertFormResponse,
+} from './db/forms.js';
+import { markJobFailed, markJobRunning, markJobSucceeded } from './db/jobs.js';
 import { assertTopology } from './messaging/topology.js';
 import { getWorkerState, setWorkerState, type WorkerState } from './state.js';
 import { listAllProviderForms } from './sync-utils.js';
 
 export { getWorkerState };
 export type { WorkerState };
-
-interface ProviderConnectionRow {
-  id: string;
-  owner_id: string;
-  provider: 'google' | 'microsoft';
-  encrypted_token_payload: string | null;
-  encrypted_token_iv: string | null;
-  encrypted_token_tag: string | null;
-  encrypted_token_key_version: string | null;
-  expires_at: Date | string;
-  scope: string | null;
-  token_type: string;
-}
 
 interface SyncJobProcessingContext {
   stage:
@@ -189,50 +196,6 @@ function createErrorSummary(error: unknown): string {
   return String(error);
 }
 
-async function markJobRunning(pool: Pool, jobId: string): Promise<void> {
-  await pool.query(
-    `
-      UPDATE jobs
-      SET status = 'running',
-          started_at = NOW(),
-          error = NULL
-      WHERE id = $1
-    `,
-    [jobId],
-  );
-}
-
-async function markJobSucceeded(pool: Pool, jobId: string): Promise<void> {
-  await pool.query(
-    `
-      UPDATE jobs
-      SET status = 'succeeded',
-          completed_at = NOW(),
-          error = NULL
-      WHERE id = $1
-    `,
-    [jobId],
-  );
-}
-
-async function markJobFailed(pool: Pool, jobId: string, errorMessage: string): Promise<void> {
-  await pool.query(
-    `
-      UPDATE jobs
-      SET status = 'failed',
-          completed_at = NOW(),
-          error = $2
-      WHERE id = $1
-    `,
-    [jobId, errorMessage],
-  );
-}
-
-type ExportJobRow = {
-  id: string;
-  format: 'csv' | 'json' | 'excel';
-};
-
 function getExportFileExtension(format: ExportJobRow['format']): string {
   if (format === 'excel') {
     return 'xlsx';
@@ -247,61 +210,29 @@ function buildExportDownloadUrl(exportId: string, format: ExportJobRow['format']
 }
 
 async function processQueuedExportJobs(pool: Pool, logger: Logger): Promise<number> {
-  const client = await pool.connect();
+  const client = await beginExportTransaction(pool);
   try {
-    await client.query('BEGIN');
+    const queued = await loadQueuedExportJobs(client);
 
-    const queued = await client.query<ExportJobRow>(
-      `
-        SELECT id, format
-        FROM export_jobs
-        WHERE status = 'queued'
-        ORDER BY requested_at ASC
-        FOR UPDATE SKIP LOCKED
-        LIMIT 20
-      `,
-    );
-
-    for (const job of queued.rows) {
+    for (const job of queued) {
       try {
         const downloadUrl = buildExportDownloadUrl(job.id, job.format);
-        await client.query(
-          `
-            UPDATE export_jobs
-            SET
-              status = 'ready',
-              download_url = $2,
-              error = NULL,
-              completed_at = NOW()
-            WHERE id = $1
-          `,
-          [job.id, downloadUrl],
-        );
+        await markExportJobReady(client, job.id, downloadUrl);
       } catch (error) {
-        await client.query(
-          `
-            UPDATE export_jobs
-            SET
-              status = 'failed',
-              error = $2,
-              completed_at = NOW()
-            WHERE id = $1
-          `,
-          [job.id, extractErrorMessage(error)],
-        );
+        await markExportJobFailed(client, job.id, extractErrorMessage(error));
       }
     }
 
-    await client.query('COMMIT');
+    await commitExportTransaction(client);
 
-    const processedCount = queued.rows.length;
+    const processedCount = queued.length;
     if (processedCount > 0) {
       logger.info({ processedExports: processedCount }, 'Processed queued export jobs');
     }
 
     return processedCount;
   } catch (error) {
-    await client.query('ROLLBACK');
+    await rollbackExportTransaction(client);
     logger.error({ error: serializeError(error) }, 'Failed processing queued export jobs');
     return 0;
   } finally {
@@ -462,27 +393,7 @@ async function processSyncJob(
   let provider: SyncJobProcessingContext['provider'];
 
   try {
-    const connectionResult = await pool.query<ProviderConnectionRow>(
-      `
-        SELECT
-          id,
-          owner_id,
-          provider,
-          encrypted_token_payload,
-          encrypted_token_iv,
-          encrypted_token_tag,
-          encrypted_token_key_version,
-          expires_at,
-          scope,
-          token_type
-        FROM provider_connections
-        WHERE id = $1 AND owner_id = $2
-        LIMIT 1
-      `,
-      [payload.connectionId, payload.requestedBy],
-    );
-
-    const connection = connectionResult.rows[0];
+    const connection = await loadProviderConnection(pool, payload.connectionId, payload.requestedBy);
     if (!connection) {
       throw new Error('Provider connection not found for sync job and requester');
     }
@@ -534,31 +445,16 @@ async function processSyncJob(
       });
 
       stage = 'persist-refreshed-token';
-      await pool.query(
-        `
-          UPDATE provider_connections
-          SET
-            encrypted_token_payload = $2,
-            encrypted_token_iv = $3,
-            encrypted_token_tag = $4,
-            encrypted_token_key_version = $5,
-            expires_at = $6,
-            scope = $7,
-            token_type = $8,
-            updated_at = NOW()
-          WHERE id = $1
-        `,
-        [
-          connection.id,
-          encrypted.encryptedTokenPayload,
-          encrypted.encryptedTokenIv,
-          encrypted.encryptedTokenTag,
-          encrypted.encryptedTokenKeyVersion,
-          tokenSet.expiresAt,
-          tokenSet.scope ?? null,
-          tokenSet.tokenType ?? 'Bearer',
-        ],
-      );
+      await persistRefreshedProviderToken(pool, {
+        connectionId: connection.id,
+        encryptedTokenPayload: encrypted.encryptedTokenPayload,
+        encryptedTokenIv: encrypted.encryptedTokenIv,
+        encryptedTokenTag: encrypted.encryptedTokenTag,
+        encryptedTokenKeyVersion: encrypted.encryptedTokenKeyVersion,
+        expiresAt: tokenSet.expiresAt,
+        scope: tokenSet.scope ?? null,
+        tokenType: tokenSet.tokenType ?? 'Bearer',
+      });
     }
 
     stage = 'list-forms';
@@ -575,40 +471,15 @@ async function processSyncJob(
       const questionLookup = buildQuestionLookup(persistedSchema);
 
       stage = 'persist-forms';
-      const persistedFormResult = await pool.query<{ id: string }>(
-        `
-          INSERT INTO forms (
-            owner_id,
-            connection_id,
-            external_form_id,
-            title,
-            description,
-            form_schema_json,
-            response_count,
-            updated_at
-          )
-          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, NOW())
-          ON CONFLICT (owner_id, connection_id, external_form_id)
-          DO UPDATE SET
-            title = EXCLUDED.title,
-            description = EXCLUDED.description,
-            form_schema_json = EXCLUDED.form_schema_json,
-            response_count = EXCLUDED.response_count,
-            updated_at = NOW()
-          RETURNING id
-        `,
-        [
-          connection.owner_id,
-          connection.id,
-          form.externalFormId,
-          formDefinition.title,
-          formDefinition.description ?? null,
-          JSON.stringify(persistedSchema),
-          form.responseCount,
-        ],
-      );
-
-      const persistedFormId = persistedFormResult.rows[0]?.id;
+      const persistedFormId = await upsertForm(pool, {
+        ownerId: connection.owner_id,
+        connectionId: connection.id,
+        externalFormId: form.externalFormId,
+        title: formDefinition.title,
+        description: formDefinition.description ?? null,
+        persistedSchema,
+        responseCount: form.responseCount,
+      });
       if (!persistedFormId) {
         continue;
       }
@@ -636,85 +507,26 @@ async function processSyncJob(
             answers,
           });
 
-          await pool.query(
-            `
-              INSERT INTO form_responses (
-                owner_id,
-                form_id,
-                external_response_id,
-                submitted_at,
-                completion,
-                answers_json,
-                answer_preview_json,
-                updated_at
-              )
-              VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, NOW())
-              ON CONFLICT (form_id, external_response_id)
-              DO UPDATE SET
-                submitted_at = EXCLUDED.submitted_at,
-                completion = EXCLUDED.completion,
-                answers_json = EXCLUDED.answers_json,
-                answer_preview_json = EXCLUDED.answer_preview_json,
-                updated_at = NOW()
-            `,
-            [
-              connection.owner_id,
-              persistedFormId,
-              response.externalResponseId,
-              response.submittedAt ?? null,
-              resolveCompletion(answers),
-              JSON.stringify(answers),
-              JSON.stringify(answerPreview),
-            ],
-          );
+          await upsertFormResponse(pool, {
+            ownerId: connection.owner_id,
+            formId: persistedFormId,
+            externalResponseId: response.externalResponseId,
+            submittedAt: response.submittedAt ?? null,
+            completion: resolveCompletion(answers),
+            answers,
+            answerPreview,
+          });
         }
 
         nextPageToken = responsePage.nextPageToken;
         pageCount += 1;
       } while (nextPageToken && pageCount < 50);
 
-      await pool.query(
-        `
-          UPDATE forms
-          SET
-            response_count = (
-              SELECT COUNT(*)::int
-              FROM form_responses
-              WHERE form_id = $1
-            ),
-            updated_at = NOW()
-          WHERE id = $1
-        `,
-        [persistedFormId],
-      );
+      await refreshFormResponseCount(pool, persistedFormId);
 
       stage = 'persist-analytics';
       const analyticsSnapshot = buildAnalyticsSnapshot(persistedSchema, syncedResponses);
-      await pool.query(
-        `
-          INSERT INTO form_analytics_snapshots (
-            owner_id,
-            form_id,
-            total_responses,
-            generated_at,
-            analytics_json,
-            updated_at
-          )
-          VALUES ($1, $2, $3, NOW(), $4::jsonb, NOW())
-          ON CONFLICT (form_id)
-          DO UPDATE SET
-            total_responses = EXCLUDED.total_responses,
-            generated_at = NOW(),
-            analytics_json = EXCLUDED.analytics_json,
-            updated_at = NOW()
-        `,
-        [
-          connection.owner_id,
-          persistedFormId,
-          analyticsSnapshot.totalResponses,
-          JSON.stringify(analyticsSnapshot),
-        ],
-      );
+      await upsertAnalyticsSnapshot(pool, connection.owner_id, persistedFormId, analyticsSnapshot);
     }
 
     logger.info(
