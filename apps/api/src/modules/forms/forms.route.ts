@@ -164,13 +164,7 @@ export async function formsRoutes(
     answerPreview: Array<{
       questionId: string;
       questionLabel: string;
-      questionType?:
-        | 'single_choice'
-        | 'multi_choice'
-        | 'text'
-        | 'rating'
-        | 'date'
-        | 'number';
+      questionType?: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
       valuePreview: string;
     }>;
     answers: Record<string, unknown>;
@@ -268,12 +262,12 @@ export async function formsRoutes(
         return {
           questionId: candidate.questionId,
           questionLabel: candidate.questionLabel,
-          ...((candidate.questionType === 'single_choice' ||
-            candidate.questionType === 'multi_choice' ||
-            candidate.questionType === 'text' ||
-            candidate.questionType === 'rating' ||
-            candidate.questionType === 'date' ||
-            candidate.questionType === 'number')
+          ...(candidate.questionType === 'single_choice' ||
+          candidate.questionType === 'multi_choice' ||
+          candidate.questionType === 'text' ||
+          candidate.questionType === 'rating' ||
+          candidate.questionType === 'date' ||
+          candidate.questionType === 'number'
             ? { questionType: candidate.questionType }
             : {}),
           valuePreview: candidate.valuePreview,
@@ -324,7 +318,9 @@ export async function formsRoutes(
     }));
   }
 
-  function normalizePersistedFormStructureJson(value: unknown): PersistedFormStructureRecord | null {
+  function normalizePersistedFormStructureJson(
+    value: unknown,
+  ): PersistedFormStructureRecord | null {
     if (!value || typeof value !== 'object') {
       return null;
     }
@@ -351,63 +347,74 @@ export async function formsRoutes(
         }
 
         const questions = sectionCandidate.questions
-          .map((question): PersistedFormStructureRecord['sections'][number]['questions'][number] | null => {
-            if (!question || typeof question !== 'object') {
-              return null;
-            }
+          .map(
+            (
+              question,
+            ): PersistedFormStructureRecord['sections'][number]['questions'][number] | null => {
+              if (!question || typeof question !== 'object') {
+                return null;
+              }
 
-            const questionCandidate = question as Record<string, unknown>;
-            if (
-              typeof questionCandidate.id !== 'string' ||
-              typeof questionCandidate.label !== 'string' ||
-              typeof questionCandidate.order !== 'number' ||
-              !['single_choice', 'multi_choice', 'text', 'rating', 'date', 'number'].includes(
-                String(questionCandidate.type),
-              )
-            ) {
-              return null;
-            }
+              const questionCandidate = question as Record<string, unknown>;
+              if (
+                typeof questionCandidate.id !== 'string' ||
+                typeof questionCandidate.label !== 'string' ||
+                typeof questionCandidate.order !== 'number' ||
+                !['single_choice', 'multi_choice', 'text', 'rating', 'date', 'number'].includes(
+                  String(questionCandidate.type),
+                )
+              ) {
+                return null;
+              }
 
-            const options = Array.isArray(questionCandidate.options)
-              ? questionCandidate.options
-                  .map((option) => {
-                    if (!option || typeof option !== 'object') {
-                      return null;
-                    }
+              const options = Array.isArray(questionCandidate.options)
+                ? questionCandidate.options
+                    .map((option) => {
+                      if (!option || typeof option !== 'object') {
+                        return null;
+                      }
 
-                    const optionCandidate = option as Record<string, unknown>;
-                    if (
-                      typeof optionCandidate.value !== 'string' ||
-                      typeof optionCandidate.label !== 'string'
-                    ) {
-                      return null;
-                    }
+                      const optionCandidate = option as Record<string, unknown>;
+                      if (
+                        typeof optionCandidate.value !== 'string' ||
+                        typeof optionCandidate.label !== 'string'
+                      ) {
+                        return null;
+                      }
 
-                    return {
-                      value: optionCandidate.value,
-                      label: optionCandidate.label,
-                    };
-                  })
-                  .filter((option): option is { value: string; label: string } => Boolean(option))
-              : undefined;
+                      return {
+                        value: optionCandidate.value,
+                        label: optionCandidate.label,
+                      };
+                    })
+                    .filter((option): option is { value: string; label: string } => Boolean(option))
+                : undefined;
 
-            return {
-              id: questionCandidate.id,
-              externalQuestionId:
-                typeof questionCandidate.externalQuestionId === 'string'
-                  ? questionCandidate.externalQuestionId
-                  : undefined,
-              sectionId:
-                typeof questionCandidate.sectionId === 'string' ? questionCandidate.sectionId : undefined,
-              label: questionCandidate.label,
-              description:
-                typeof questionCandidate.description === 'string' ? questionCandidate.description : undefined,
-              required: typeof questionCandidate.required === 'boolean' ? questionCandidate.required : false,
-              type: questionCandidate.type as PersistedFormStructureRecord['sections'][number]['questions'][number]['type'],
-              ...(options && options.length > 0 ? { options } : {}),
-              order: questionCandidate.order,
-            };
-          })
+              return {
+                id: questionCandidate.id,
+                externalQuestionId:
+                  typeof questionCandidate.externalQuestionId === 'string'
+                    ? questionCandidate.externalQuestionId
+                    : undefined,
+                sectionId:
+                  typeof questionCandidate.sectionId === 'string'
+                    ? questionCandidate.sectionId
+                    : undefined,
+                label: questionCandidate.label,
+                description:
+                  typeof questionCandidate.description === 'string'
+                    ? questionCandidate.description
+                    : undefined,
+                required:
+                  typeof questionCandidate.required === 'boolean'
+                    ? questionCandidate.required
+                    : false,
+                type: questionCandidate.type as PersistedFormStructureRecord['sections'][number]['questions'][number]['type'],
+                ...(options && options.length > 0 ? { options } : {}),
+                order: questionCandidate.order,
+              };
+            },
+          )
           .filter(
             (
               question,
@@ -420,12 +427,16 @@ export async function formsRoutes(
           id: sectionCandidate.id,
           title: sectionCandidate.title,
           description:
-            typeof sectionCandidate.description === 'string' ? sectionCandidate.description : undefined,
+            typeof sectionCandidate.description === 'string'
+              ? sectionCandidate.description
+              : undefined,
           order: sectionCandidate.order,
           questions,
         };
       })
-      .filter((section): section is PersistedFormStructureRecord['sections'][number] => Boolean(section))
+      .filter((section): section is PersistedFormStructureRecord['sections'][number] =>
+        Boolean(section),
+      )
       .sort((left, right) => left.order - right.order);
 
     const questionCountFromSections = sections.reduce(
@@ -433,7 +444,9 @@ export async function formsRoutes(
       0,
     );
     const questionCount =
-      typeof candidate.questionCount === 'number' ? candidate.questionCount : questionCountFromSections;
+      typeof candidate.questionCount === 'number'
+        ? candidate.questionCount
+        : questionCountFromSections;
 
     return {
       sections,
@@ -615,12 +628,15 @@ export async function formsRoutes(
           };
         }
 
-        const textResponses = answeredValues.filter((value) => value.trim().length > 0).slice(0, 200);
-        const wordCounts = textResponses.map((text) =>
-          text
-            .trim()
-            .split(/\s+/)
-            .filter((token) => token.length > 0).length,
+        const textResponses = answeredValues
+          .filter((value) => value.trim().length > 0)
+          .slice(0, 200);
+        const wordCounts = textResponses.map(
+          (text) =>
+            text
+              .trim()
+              .split(/\s+/)
+              .filter((token) => token.length > 0).length,
         );
         const charCounts = textResponses.map((text) => text.length);
 
@@ -634,22 +650,20 @@ export async function formsRoutes(
             ? {
                 textAnalytics: {
                   responses: textResponses,
-                  wordCountStats:
-                    computeNumericStats(wordCounts) ?? {
-                      mean: 0,
-                      median: 0,
-                      min: 0,
-                      max: 0,
-                      standardDeviation: 0,
-                    },
-                  charCountStats:
-                    computeNumericStats(charCounts) ?? {
-                      mean: 0,
-                      median: 0,
-                      min: 0,
-                      max: 0,
-                      standardDeviation: 0,
-                    },
+                  wordCountStats: computeNumericStats(wordCounts) ?? {
+                    mean: 0,
+                    median: 0,
+                    min: 0,
+                    max: 0,
+                    standardDeviation: 0,
+                  },
+                  charCountStats: computeNumericStats(charCounts) ?? {
+                    mean: 0,
+                    median: 0,
+                    min: 0,
+                    max: 0,
+                    standardDeviation: 0,
+                  },
                 },
               }
             : {}),
@@ -681,7 +695,10 @@ export async function formsRoutes(
     }
 
     const candidate = value as Record<string, unknown>;
-    if (typeof candidate.totalResponses !== 'number' || !Array.isArray(candidate.questionAnalytics)) {
+    if (
+      typeof candidate.totalResponses !== 'number' ||
+      !Array.isArray(candidate.questionAnalytics)
+    ) {
       return null;
     }
 
@@ -698,7 +715,10 @@ export async function formsRoutes(
   ): Promise<PersistedAnalyticsReport> {
     if (!db) {
       const mockResponses = buildMockResponses(formId, fallbackResponseCount);
-      return buildPersistedAnalyticsReportFromResponses({ sections: [], questionCount: 0 }, mockResponses);
+      return buildPersistedAnalyticsReportFromResponses(
+        { sections: [], questionCount: 0 },
+        mockResponses,
+      );
     }
 
     const analyticsDb = db as unknown as Kysely<{
@@ -794,7 +814,9 @@ export async function formsRoutes(
 
       for (const response of responses) {
         const rawAnswer = response.answers[selectedQuestionId];
-        const preview = response.answerPreview.find((item) => item.questionId === selectedQuestionId);
+        const preview = response.answerPreview.find(
+          (item) => item.questionId === selectedQuestionId,
+        );
         const values = [
           ...extractAnswerValues(rawAnswer),
           ...(rawAnswer === undefined && preview ? [preview.valuePreview] : []),
@@ -863,8 +885,8 @@ export async function formsRoutes(
           key = segmentValues[0]!;
         } else {
           key =
-            response.answerPreview.find((item) => item.questionId === segmentQuestionId)?.valuePreview ??
-            'unknown';
+            response.answerPreview.find((item) => item.questionId === segmentQuestionId)
+              ?.valuePreview ?? 'unknown';
         }
       }
 
@@ -910,7 +932,8 @@ export async function formsRoutes(
         metrics: [
           {
             label: 'avgValue',
-            value: value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
+            value:
+              value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
           },
         ],
       }))
@@ -979,7 +1002,6 @@ export async function formsRoutes(
 
     return buckets.map(({ date, count }) => ({ date, count }));
   }
-
 
   const jobsService = deps?.db
     ? createJobsService({
@@ -1082,7 +1104,6 @@ export async function formsRoutes(
         meta: { requestId: request.id },
       });
     }
-
 
     const formStructure = await loadFormStructure(id);
 
@@ -1436,7 +1457,12 @@ export async function formsRoutes(
     return reply.send({
       success: true,
       data: {
-        segments: groupResponsesBySegment(questionMetaMap, filteredResponses, segmentBy, questionId),
+        segments: groupResponsesBySegment(
+          questionMetaMap,
+          filteredResponses,
+          segmentBy,
+          questionId,
+        ),
         appliedFilters: {
           from: from.toISOString(),
           to: to.toISOString(),

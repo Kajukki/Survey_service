@@ -59,9 +59,9 @@ export class FormWorkspacePageComponent {
     () => this.buildResponsesEndpoint(),
   );
 
-  protected readonly analyticsReportResource = httpResource<ApiSuccessEnvelope<FormAnalyticsReportDto>>(
-    () => this.buildAnalyticsReportEndpoint(),
-  );
+  protected readonly analyticsReportResource = httpResource<
+    ApiSuccessEnvelope<FormAnalyticsReportDto>
+  >(() => this.buildAnalyticsReportEndpoint());
 
   protected readonly structure = computed<FormStructureRecord | null>(() => {
     const dto = this.structureResource.value()?.data;

@@ -797,7 +797,9 @@ function extractAnswerValues(value: unknown): string[] {
       return choiceAnswers.answers.flatMap((item) => extractAnswerValues(item));
     }
 
-    const textAnswers = candidate.textAnswers as { answers?: Array<{ value?: string }> } | undefined;
+    const textAnswers = candidate.textAnswers as
+      | { answers?: Array<{ value?: string }> }
+      | undefined;
     if (textAnswers?.answers && Array.isArray(textAnswers.answers)) {
       return textAnswers.answers
         .map((item) => (typeof item?.value === 'string' ? item.value.trim() : ''))
@@ -846,7 +848,9 @@ function buildAnalyticsSnapshot(
     .sort((left, right) => left.order - right.order);
 
   const questionAnalytics: PersistedAnalyticsQuestion[] = flattenedQuestions.map((question) => {
-    const valuesByResponse = responses.map((response) => extractAnswerValues(response.answers[question.id]));
+    const valuesByResponse = responses.map((response) =>
+      extractAnswerValues(response.answers[question.id]),
+    );
     const answeredValues = valuesByResponse.flatMap((value) => value);
     const answerCount = valuesByResponse.filter((values) => values.length > 0).length;
     const skippedCount = Math.max(0, responses.length - answerCount);
@@ -914,11 +918,12 @@ function buildAnalyticsSnapshot(
     }
 
     const textResponses = answeredValues.filter((value) => value.trim().length > 0).slice(0, 200);
-    const wordCounts = textResponses.map((text) =>
-      text
-        .trim()
-        .split(/\s+/)
-        .filter((token) => token.length > 0).length,
+    const wordCounts = textResponses.map(
+      (text) =>
+        text
+          .trim()
+          .split(/\s+/)
+          .filter((token) => token.length > 0).length,
     );
     const charCounts = textResponses.map((text) => text.length);
 
@@ -932,22 +937,20 @@ function buildAnalyticsSnapshot(
         ? {
             textAnalytics: {
               responses: textResponses,
-              wordCountStats:
-                computeNumericStats(wordCounts) ?? {
-                  mean: 0,
-                  median: 0,
-                  min: 0,
-                  max: 0,
-                  standardDeviation: 0,
-                },
-              charCountStats:
-                computeNumericStats(charCounts) ?? {
-                  mean: 0,
-                  median: 0,
-                  min: 0,
-                  max: 0,
-                  standardDeviation: 0,
-                },
+              wordCountStats: computeNumericStats(wordCounts) ?? {
+                mean: 0,
+                median: 0,
+                min: 0,
+                max: 0,
+                standardDeviation: 0,
+              },
+              charCountStats: computeNumericStats(charCounts) ?? {
+                mean: 0,
+                median: 0,
+                min: 0,
+                max: 0,
+                standardDeviation: 0,
+              },
             },
           }
         : {}),
@@ -963,7 +966,9 @@ function buildAnalyticsSnapshot(
     firstResponseTime:
       responseTimes.length > 0 ? new Date(responseTimes[0]!).toISOString() : undefined,
     lastResponseTime:
-      responseTimes.length > 0 ? new Date(responseTimes[responseTimes.length - 1]!).toISOString() : undefined,
+      responseTimes.length > 0
+        ? new Date(responseTimes[responseTimes.length - 1]!).toISOString()
+        : undefined,
     scoreStats: primaryScoreQuestion?.scaleAnalytics?.stats,
     questionAnalytics,
     generatedAt: new Date().toISOString(),
