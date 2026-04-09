@@ -85,6 +85,14 @@ export interface FormsTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface FormSharesTable {
+  id: ColumnType<string, string | undefined, string>;
+  form_id: string;
+  grantee_user_id: string;
+  permission_level: 'read' | 'write' | 'admin';
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface DatabaseSchema {
   jobs: JobsTable;
   users: UsersTable;
@@ -92,6 +100,7 @@ export interface DatabaseSchema {
   provider_auth_states: ProviderAuthStatesTable;
   provider_connections: ProviderConnectionsTable;
   forms: FormsTable;
+  form_shares: FormSharesTable;
 }
 
 export type Database = DatabaseSchema;
