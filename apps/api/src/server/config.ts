@@ -23,6 +23,12 @@ const envSchema = z
     RABBITMQ_URL: z.string().min(1, 'RABBITMQ_URL is required'),
     RABBITMQ_PREFETCH: z.coerce.number().default(10),
 
+    // Outbox dispatch
+    OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(1000),
+    OUTBOX_BATCH_SIZE: z.coerce.number().int().positive().default(50),
+    OUTBOX_MAX_ATTEMPTS: z.coerce.number().int().positive().default(8),
+    OUTBOX_RETRY_BASE_MS: z.coerce.number().int().positive().default(1000),
+
     // Authentication
     AUTH_MODE: z.enum(['local', 'oidc']).default('local'),
     OIDC_ISSUER: z.string().min(1, 'OIDC_ISSUER is required'),

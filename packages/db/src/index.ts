@@ -3,6 +3,7 @@ import type { ColumnType } from 'kysely';
 export type JobType = 'sync' | 'export' | 'analysis';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 export type JobTrigger = 'manual' | 'scheduled';
+export type OutboxEventStatus = 'pending' | 'processing' | 'published' | 'failed';
 
 type OptionalTimestampColumn = ColumnType<
   Date | null,
@@ -94,6 +95,20 @@ export interface FormSharesTable {
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+
+export interface OutboxEventsTable {
+  id: ColumnType<string, string | undefined, string>;
+  event_type: string;
+  payload_json: ColumnType<unknown, unknown, unknown>;
+  status: OutboxEventStatus;
+  attempt_count: number;
+  available_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  locked_at: OptionalTimestampColumn;
+  published_at: OptionalTimestampColumn;
+  last_error: string | null;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
 export interface ExportJobsTable {
   id: ColumnType<string, string | undefined, string>;
   requested_by: string;
@@ -141,6 +156,8 @@ export interface DatabaseSchema {
   form_responses: FormResponsesTable;
   form_analytics_snapshots: FormAnalyticsSnapshotsTable;
   export_jobs: ExportJobsTable;
+  outbox_events: OutboxEventsTable;
 }
 
 export type Database = DatabaseSchema;
+

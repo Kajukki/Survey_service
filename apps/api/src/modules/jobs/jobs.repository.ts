@@ -1,4 +1,5 @@
 import type { Kysely } from 'kysely';
+import type { SyncJobMessage } from '@survey-service/messaging';
 import type { Database } from '@survey-service/db';
 
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -25,6 +26,7 @@ export interface CreateSyncJobInput {
   connectionId: string | null;
   formId: string | null;
   trigger: JobTrigger;
+  outboxMessage: SyncJobMessage;
 }
 
 export interface JobsRepository {
@@ -77,22 +79,40 @@ function mapJobRow(row: {
 export function createJobsRepository(db: Kysely<Database>): JobsRepository {
   return {
     async createSyncJob(input: CreateSyncJobInput): Promise<SyncJobRecord> {
-      const inserted = await db
-        .insertInto('jobs')
-        .values({
-          id: input.id,
-          type: 'sync',
-          status: 'queued',
-          requested_by: input.requestedBy,
-          connection_id: input.connectionId,
-          form_id: input.formId,
-          trigger: input.trigger,
-          error: null,
-          started_at: null,
-          completed_at: null,
-        })
-        .returningAll()
-        .executeTakeFirstOrThrow();
+      const inserted = await db.transaction().execute(async (trx) => {
+        const createdJob = await trx
+          .insertInto('jobs')
+          .values({
+            id: input.id,
+            type: 'sync',
+            status: 'queued',
+            requested_by: input.requestedBy,
+            connection_id: input.connectionId,
+            form_id: input.formId,
+            trigger: input.trigger,
+            error: null,
+            started_at: null,
+            completed_at: null,
+          })
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        await trx
+          .insertInto('outbox_events')
+          .values({
+            event_type: 'sync_job.queued',
+            payload_json: input.outboxMessage,
+            status: 'pending',
+            attempt_count: 0,
+            available_at: new Date(),
+            locked_at: null,
+            published_at: null,
+            last_error: null,
+          })
+          .executeTakeFirstOrThrow();
+
+        return createdJob;
+      });
 
       return mapJobRow(inserted as any);
     },

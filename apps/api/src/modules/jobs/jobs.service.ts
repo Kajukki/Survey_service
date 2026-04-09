@@ -27,24 +27,12 @@ export interface JobsService {
   getJobById(requestedBy: string, id: string): Promise<SyncJobRecord | null>;
 }
 
-export function createJobsService(deps: {
-  repository: JobsRepository;
-  publishSyncJob: (message: SyncJobMessage) => Promise<void>;
-}): JobsService {
+export function createJobsService(deps: { repository: JobsRepository }): JobsService {
   return {
     async enqueueSyncJob(input: EnqueueSyncJobInput): Promise<SyncJobRecord> {
       const jobId = randomUUID();
-
-      const job = await deps.repository.createSyncJob({
-        id: jobId,
-        requestedBy: input.requestedBy,
-        connectionId: input.connectionId,
-        formId: input.formId ?? null,
-        trigger: input.trigger,
-      });
-
-      await deps.publishSyncJob({
-        jobId: job.id,
+      const outboxMessage: SyncJobMessage = {
+        jobId,
         connectionId: input.connectionId,
         formId: input.formId,
         requestedBy: input.requestedBy,
@@ -52,9 +40,16 @@ export function createJobsService(deps: {
         forceFullSync: input.forceFullSync,
         timestamp: Date.now(),
         retryCount: 0,
-      });
+      };
 
-      return job;
+      return deps.repository.createSyncJob({
+        id: jobId,
+        requestedBy: input.requestedBy,
+        connectionId: input.connectionId,
+        formId: input.formId ?? null,
+        trigger: input.trigger,
+        outboxMessage,
+      });
     },
 
     async listJobs(

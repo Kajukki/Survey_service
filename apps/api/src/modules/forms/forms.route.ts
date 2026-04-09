@@ -1,7 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
-import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { mockForms } from './forms.mock.js';
 import { getPrincipal } from '../../server/principal';
 import { createJobsRepository, type JobsRepository, type SyncJobRecord } from '../jobs/jobs.repository';
@@ -15,7 +14,6 @@ export async function formsRoutes(
   app: FastifyInstance,
   deps?: {
     db?: Kysely<Database>;
-    rabbitmq: RabbitMQClient;
   },
 ) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
@@ -469,7 +467,6 @@ export async function formsRoutes(
   const jobsCommandService = createJobsCommandService({
     repository: db ? createJobsRepository(db) : mockJobsRepository,
     syncTargetQuery: createJobsSyncTargetQueryService(db),
-    publishSyncJob: deps?.rabbitmq?.publishSyncJob ?? (async () => undefined),
   });
 
   // GET /forms
@@ -861,14 +858,3 @@ export async function formsRoutes(
     });
   });
 }
-
-
-
-
-
-
-
-
-
-
-

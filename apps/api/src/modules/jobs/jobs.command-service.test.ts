@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SyncJobMessage } from '@survey-service/messaging';
 import { NotFoundError, ValidationError } from '../../server/errors';
 import { createJobsCommandService } from './jobs.command-service';
 import type { JobsRepository, SyncJobRecord } from './jobs.repository';
@@ -41,7 +40,6 @@ describe('createJobsCommandService', () => {
   it('enqueues with connection ownership validation when formId is not provided', async () => {
     const repository = makeRepo();
     const syncTargetQuery = makeSyncTargetQuery();
-    const publishSyncJob = vi.fn(async (_message: SyncJobMessage) => {});
 
     vi.mocked(syncTargetQuery.resolveOwnedConnectionForSync).mockResolvedValue({
       id: '11111111-1111-1111-1111-111111111111',
@@ -54,7 +52,6 @@ describe('createJobsCommandService', () => {
     const service = createJobsCommandService({
       repository,
       syncTargetQuery,
-      publishSyncJob,
     });
 
     const result = await service.enqueueSyncJob({
@@ -69,14 +66,23 @@ describe('createJobsCommandService', () => {
       'test-user',
     );
     expect(repository.createSyncJob).toHaveBeenCalledTimes(1);
-    expect(publishSyncJob).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(repository.createSyncJob).mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        connectionId: '11111111-1111-1111-1111-111111111111',
+        formId: null,
+        outboxMessage: expect.objectContaining({
+          connectionId: '11111111-1111-1111-1111-111111111111',
+          requestedBy: 'test-user',
+          forceFullSync: false,
+        }),
+      }),
+    );
     expect(result.id).toBe(created.id);
   });
 
   it('derives connection from owned form when formId is provided', async () => {
     const repository = makeRepo();
     const syncTargetQuery = makeSyncTargetQuery();
-    const publishSyncJob = vi.fn(async (_message: SyncJobMessage) => {});
 
     vi.mocked(syncTargetQuery.resolveOwnedFormForSync).mockResolvedValue({
       id: '22222222-2222-2222-2222-222222222222',
@@ -93,7 +99,6 @@ describe('createJobsCommandService', () => {
     const service = createJobsCommandService({
       repository,
       syncTargetQuery,
-      publishSyncJob,
     });
 
     await service.enqueueSyncJob({
@@ -125,7 +130,6 @@ describe('createJobsCommandService', () => {
     const service = createJobsCommandService({
       repository,
       syncTargetQuery,
-      publishSyncJob: vi.fn(async (_message: SyncJobMessage) => {}),
     });
 
     await expect(
@@ -151,7 +155,6 @@ describe('createJobsCommandService', () => {
     const service = createJobsCommandService({
       repository,
       syncTargetQuery,
-      publishSyncJob: vi.fn(async (_message: SyncJobMessage) => {}),
     });
 
     await expect(
