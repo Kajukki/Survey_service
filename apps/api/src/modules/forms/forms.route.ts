@@ -4,6 +4,8 @@ import type { Database } from '@survey-service/db';
 import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { mockForms } from './forms.mock.js';
 import { getPrincipal } from '../../server/principal';
+import { createJobsRepository } from '../jobs/jobs.repository';
+import { createJobsService } from '../jobs/jobs.service';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
@@ -15,6 +17,12 @@ export async function formsRoutes(
   },
 ) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
+  const jobsService = deps?.db
+    ? createJobsService({
+        repository: createJobsRepository(deps.db),
+        publishSyncJob: deps.rabbitmq.publishSyncJob,
+      })
+    : null;
 
   // GET /forms
   zApp.get('/forms', async (request, reply) => {
@@ -114,7 +122,21 @@ export async function formsRoutes(
   zApp.post('/forms/:id/sync', async (request, reply) => {
     const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const form = mockForms.find((item) => item.id === id && item.ownerId === principal.userId);
+    const mockForm = mockForms.find((item) => item.id === id && item.ownerId === principal.userId);
+    const form = deps?.db
+      ? await deps.db
+          .selectFrom('forms')
+          .select(['id', 'connection_id', 'owner_id'])
+          .where('id', '=', id)
+          .where('owner_id', '=', principal.userId)
+          .executeTakeFirst()
+      : mockForm
+        ? {
+            id,
+            connection_id: mockForm.connectionId,
+            owner_id: principal.userId,
+          }
+        : null;
 
     if (!form) {
       return reply.status(404).send({
@@ -124,12 +146,33 @@ export async function formsRoutes(
       });
     }
 
-    // This is where RabbitMQ enqueueing happens in real app
+    if (!jobsService) {
+      return reply.status(202).send({
+        success: true,
+        data: {
+          job_id: `job-mock-${form.id}`,
+          status: 'queued',
+          type: 'sync_form',
+        },
+        meta: {
+          requestId: request.id,
+        },
+      });
+    }
+
+    const job = await jobsService.enqueueSyncJob({
+      requestedBy: principal.userId,
+      connectionId: form.connection_id,
+      formId: form.id,
+      trigger: 'manual',
+      forceFullSync: false,
+    });
+
     return reply.status(202).send({
       success: true,
       data: {
-        job_id: `job-mock-${form.id}`,
-        status: 'queued',
+        job_id: job.id,
+        status: job.status,
         type: 'sync_form',
       },
       meta: {
