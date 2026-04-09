@@ -43,10 +43,9 @@ It is intentionally split into:
 
 ### Partially Implemented
 
-1. Domain modules with mock-backed behavior
-- Connections routes exist, but are mock-backed.
-- Forms routes exist, but are mock-backed for list/detail and route-level sync placeholder.
-- Sharing routes exist, but are mock-backed.
+1. Export workflow completion
+- Export enqueue/list/detail/download endpoints are implemented.
+- Export producer/worker execution path to produce ready downloads is still pending.
 
 2. Authorization enforcement
 - Policy helpers exist, and protected routes now require a request principal.
@@ -54,7 +53,7 @@ It is intentionally split into:
 - Sharing routes now enforce owner-scoped access checks (404 on inaccessible forms).
 - Connections delete route now enforces owner-scoped access checks.
 - Forms sync route now enforces owner-scoped access checks.
-- Owner/share policy parity is still in progress for mock-backed domain paths.
+- Owner/share policy parity has been implemented for DB-backed connections/forms/sharing/exports/dashboard reads.
 
 3. Google provider auth API surface
 - `POST /api/v1/providers/google/auth/start` and `POST /api/v1/providers/google/auth/callback` are now implemented.
@@ -67,7 +66,7 @@ It is intentionally split into:
 - End-to-end principal mapping from external identity provider.
 
 2. Export and analytics completion
-- Export job workflow completion beyond scaffold.
+- Export job worker completion beyond API scaffolding.
 - Dashboard-oriented analytics endpoints and persistence path.
 
 ## Mandatory Accuracy Gates
@@ -129,7 +128,7 @@ Exit criteria:
 
 Goal: complete functional roadmap beyond sync jobs.
 
-1. Finalize export enqueue/status/download path.
+1. Finalize export worker lifecycle to move jobs into `ready` with durable `download_url`.
 2. Implement analytics read endpoints needed by dashboard.
 3. Add end-to-end tests for one export flow and one analytics query.
 

@@ -54,14 +54,53 @@ async function signAccessToken(config: Config, userId: string = 'user-one'): Pro
 }
 
 function createFakeExportsDb(input: {
-  exportJobs: Array<{ id: string; format: 'csv' | 'json' | 'excel'; status: 'queued' | 'ready' | 'failed'; requested_at: string }>;
+  exportJobs: Array<{
+    id: string;
+    format: 'csv' | 'json' | 'excel';
+    status: 'queued' | 'ready' | 'failed';
+    requested_at: string;
+  }>;
+  exportDetail?: {
+    id: string;
+    format: 'csv' | 'json' | 'excel';
+    status: 'queued' | 'ready' | 'failed';
+    requested_at: string;
+    download_url: string | null;
+    error: string | null;
+    completed_at: string | null;
+  } | null;
+  exportDownload?: {
+    id: string;
+    status: 'queued' | 'ready' | 'failed';
+    download_url: string | null;
+  } | null;
   ownedFormId: string | null;
   insertedExportJob?: { id: string; format: 'csv' | 'json' | 'excel'; status: 'queued'; requested_at: string };
 }) {
   const exportJobsExecute = vi.fn(async () => input.exportJobs);
   const exportJobsOrderBy = vi.fn(() => ({ execute: exportJobsExecute }));
   const exportJobsWhere = vi.fn(() => ({ orderBy: exportJobsOrderBy }));
-  const exportJobsSelect = vi.fn(() => ({ where: exportJobsWhere }));
+  const exportDetailExecuteTakeFirst = vi.fn(async () => input.exportDetail ?? undefined);
+  const exportDetailWhereOwner = vi.fn(() => ({ executeTakeFirst: exportDetailExecuteTakeFirst }));
+  const exportDetailWhereId = vi.fn(() => ({ where: exportDetailWhereOwner }));
+
+  const exportDownloadExecuteTakeFirst = vi.fn(async () => input.exportDownload ?? undefined);
+  const exportDownloadWhereOwner = vi.fn(() => ({ executeTakeFirst: exportDownloadExecuteTakeFirst }));
+  const exportDownloadWhereId = vi.fn(() => ({ where: exportDownloadWhereOwner }));
+
+  const exportJobsSelect = vi.fn((columns: unknown) => {
+    const selected = Array.isArray(columns) ? columns : [columns];
+
+    if (selected.includes('download_url') && selected.includes('error')) {
+      return { where: exportDetailWhereId };
+    }
+
+    if (selected.includes('download_url') && !selected.includes('error')) {
+      return { where: exportDownloadWhereId };
+    }
+
+    return { where: exportJobsWhere };
+  });
 
   const formExecuteTakeFirst = vi.fn(async () =>
     input.ownedFormId ? { id: input.ownedFormId } : undefined,
@@ -103,6 +142,10 @@ function createFakeExportsDb(input: {
       selectFrom,
       exportInsertInto,
       exportInsertValues,
+      exportDetailWhereId,
+      exportDetailWhereOwner,
+      exportDownloadWhereId,
+      exportDownloadWhereOwner,
     },
   };
 }
@@ -229,5 +272,137 @@ describe('exports routes', () => {
     expect(payload.success).toBe(true);
     expect(payload.data.id).toBe('exp-new-9');
     expect(payload.data.status).toBe('queued');
+  });
+
+  it('gets DB-backed export detail for owner', async () => {
+    const exportId = '11111111-1111-4111-8111-111111111111';
+    const fakeDb = createFakeExportsDb({
+      exportJobs: [],
+      ownedFormId: null,
+      exportDetail: {
+        id: exportId,
+        format: 'csv',
+        status: 'ready',
+        requested_at: '2026-04-09T12:34:56.000Z',
+        download_url: 'https://example.com/export.csv',
+        error: null,
+        completed_at: '2026-04-09T12:35:56.000Z',
+      },
+    });
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config, 'user-one');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/exports/${exportId}`,
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fakeDb.spies.exportDetailWhereId).toHaveBeenCalledWith('id', '=', exportId);
+    expect(fakeDb.spies.exportDetailWhereOwner).toHaveBeenCalledWith('requested_by', '=', 'user-one');
+    const payload = response.json();
+    expect(payload.success).toBe(true);
+    expect(payload.data.id).toBe(exportId);
+    expect(payload.data.download_url).toBe('https://example.com/export.csv');
+  });
+
+  it('returns 404 for export detail outside owner scope', async () => {
+    const exportId = '11111111-1111-4111-8111-111111111111';
+    const fakeDb = createFakeExportsDb({
+      exportJobs: [],
+      ownedFormId: null,
+      exportDetail: null,
+    });
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config, 'user-one');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/exports/${exportId}`,
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(404);
+  });
+
+  it('returns ready download URL for owner when export is ready', async () => {
+    const exportId = '11111111-1111-4111-8111-111111111111';
+    const fakeDb = createFakeExportsDb({
+      exportJobs: [],
+      ownedFormId: null,
+      exportDownload: {
+        id: exportId,
+        status: 'ready',
+        download_url: 'https://example.com/export.csv',
+      },
+    });
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config, 'user-one');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/exports/${exportId}/download`,
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(fakeDb.spies.exportDownloadWhereId).toHaveBeenCalledWith('id', '=', exportId);
+    expect(fakeDb.spies.exportDownloadWhereOwner).toHaveBeenCalledWith('requested_by', '=', 'user-one');
+    const payload = response.json();
+    expect(payload.success).toBe(true);
+    expect(payload.data.download_url).toBe('https://example.com/export.csv');
+  });
+
+  it('returns 409 when export download is requested before ready state', async () => {
+    const exportId = '11111111-1111-4111-8111-111111111111';
+    const fakeDb = createFakeExportsDb({
+      exportJobs: [],
+      ownedFormId: null,
+      exportDownload: {
+        id: exportId,
+        status: 'queued',
+        download_url: null,
+      },
+    });
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config, 'user-one');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/exports/${exportId}/download`,
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(409);
+  });
+
+  it('returns 404 when export download is outside owner scope', async () => {
+    const exportId = '11111111-1111-4111-8111-111111111111';
+    const fakeDb = createFakeExportsDb({
+      exportJobs: [],
+      ownedFormId: null,
+      exportDownload: null,
+    });
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config, 'user-one');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/exports/${exportId}/download`,
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(404);
   });
 });

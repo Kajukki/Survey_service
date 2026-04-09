@@ -254,6 +254,19 @@ Trigger an async export generation for form responses.
 - **Body:** `{ "formId": "form-uuid", "format": "csv|json|excel" }`
 - **202 Accepted**: Returns queued export job metadata.
 
+### `GET /api/v1/exports/:id`
+Get export job status and metadata for the authenticated requester.
+- **Status:** `Implemented`
+- **200 OK**: Returns export detail payload including `status`, `requested_at`, `completed_at`, `download_url`, and `error`.
+- **404 Not Found**: Export not found or not accessible to requester.
+
+### `GET /api/v1/exports/:id/download`
+Resolve a ready export download URL for the authenticated requester.
+- **Status:** `Implemented`
+- **200 OK**: Returns `{ id, download_url }` when export is ready.
+- **404 Not Found**: Export not found or not accessible to requester.
+- **409 Conflict**: Export exists but is not ready for download.
+
 ---
 
 ## 8. Dashboard Analytics

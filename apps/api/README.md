@@ -131,7 +131,7 @@ Additional endpoints are implemented in feature modules under `modules/`.
 | `/connections/*` | DB-backed list/create/delete with owner scoping |
 | `/forms/*` | DB-backed list/detail and form-level sync enqueue |
 | `/forms/:id/shares/*` | DB-backed list/create/delete with owner-scoped form checks |
-| `/exports/*` | DB-backed list/create with owner-scoped form checks |
+| `/exports/*` | DB-backed list/create/detail/download with owner-scoped access checks |
 | `/dashboard` | Implemented analytics read endpoint returning `{ kpis, series, questions }` |
 
 See [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) for full endpoint specification and design decisions.
