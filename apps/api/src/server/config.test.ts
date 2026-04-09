@@ -15,6 +15,7 @@ describe('Configuration', () => {
     process.env.CREDENTIAL_ENCRYPTION_KEY_VERSION = 'v1';
     process.env.GOOGLE_OAUTH_CLIENT_ID = 'google-client-id';
     process.env.GOOGLE_OAUTH_CLIENT_SECRET = 'google-client-secret';
+    process.env.AUTH_MODE = 'local';
   });
 
   afterEach(() => {
@@ -99,6 +100,28 @@ describe('Configuration', () => {
     const config = loadConfig();
 
     expect(config.NODE_ENV).toBe('production');
+  });
+
+  it('should require OIDC_JWKS_URI when AUTH_MODE is oidc', () => {
+    process.env.DATABASE_URL = 'postgresql://localhost/test';
+    process.env.RABBITMQ_URL = 'amqp://localhost';
+    process.env.OIDC_ISSUER = 'https://idp.example.com';
+    process.env.OIDC_AUDIENCE = 'api.example.com';
+    process.env.AUTH_MODE = 'oidc';
+    delete process.env.OIDC_JWKS_URI;
+
+    expect(() => loadConfig()).toThrow();
+  });
+
+  it('should require AUTH_JWT_SECRET when AUTH_MODE is local', () => {
+    process.env.DATABASE_URL = 'postgresql://localhost/test';
+    process.env.RABBITMQ_URL = 'amqp://localhost';
+    process.env.OIDC_ISSUER = 'https://idp.example.com';
+    process.env.OIDC_AUDIENCE = 'api.example.com';
+    process.env.AUTH_MODE = 'local';
+    delete process.env.AUTH_JWT_SECRET;
+
+    expect(() => loadConfig()).toThrow();
   });
 
   it('should throw on invalid NODE_ENV', () => {

@@ -67,6 +67,10 @@ function toSessionUser(user: AuthUserRecord): AuthSessionUser {
 }
 
 async function signAccessToken(user: AuthUserRecord, config: Config): Promise<string> {
+  if (!config.AUTH_JWT_SECRET) {
+    throw new UnauthorizedError('AUTH_JWT_SECRET is not configured for local token signing');
+  }
+
   const secret = new TextEncoder().encode(config.AUTH_JWT_SECRET);
 
   return new SignJWT({

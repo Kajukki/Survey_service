@@ -22,6 +22,7 @@ function buildConfig(): Config {
     RATE_LIMIT_TTL: 60,
     RATE_LIMIT_MAX: 100,
     AUTH_JWT_SECRET: 'test-secret-test-secret-test-secret',
+    AUTH_MODE: 'local',
     ACCESS_TOKEN_TTL_SECONDS: 900,
     REFRESH_TOKEN_TTL_SECONDS: 604800,
     CREDENTIAL_ENCRYPTION_KEY_B64: 'MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=',
@@ -39,7 +40,7 @@ function buildConfig(): Config {
 }
 
 async function signAccessToken(config: Config, principal: { userId: string; orgId: string }) {
-  const secret = new TextEncoder().encode(config.AUTH_JWT_SECRET);
+  const secret = new TextEncoder().encode(config.AUTH_JWT_SECRET!);
 
   return new SignJWT({ org: principal.orgId })
     .setProtectedHeader({ alg: 'HS256' })

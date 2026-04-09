@@ -6,9 +6,9 @@ HTTP API server: validates requests, enforces ownership and sharing rules, enque
 
 This README separates what is implemented now from target-state architecture.
 
-- Implemented now: local credential auth endpoints, bearer token principal extraction on protected routes, job persistence, RabbitMQ publish with confirms, worker-consumable job lifecycle.
-- Partially implemented: domain routes for connections/forms/sharing are present but still mock-backed in key paths.
-- Planned: full owner/share enforcement parity on all protected domain routes once DB-backed repositories replace mock paths.
+- Implemented now: local credential auth endpoints, explicit auth mode selection (`AUTH_MODE=local|oidc`), bearer token principal extraction on protected routes, job persistence, RabbitMQ publish with confirms, worker-consumable job lifecycle.
+- Partially implemented: export artifact storage and signed URL delivery hardening.
+- Planned: enterprise IdP rollout hardening and final environment policy adoption.
 
 ## Architecture
 
@@ -16,8 +16,8 @@ This README separates what is implemented now from target-state architecture.
 - **Database:** Kysely (type-safe query builder) + pg driver with connection pooling
 - **Messaging:** amqplib for RabbitMQ publish/consume
 - **Validation:** Zod schemas in [packages/contracts](../../packages/contracts)
-- **Auth (current):** local credential login/register/refresh with signed access tokens
-- **Auth (target):** JWT verification via OIDC JWKS endpoint
+- **Auth (current):** local credential login/register/refresh with signed access tokens (`AUTH_MODE=local`)
+- **Auth (target):** external IdP JWT verification via OIDC JWKS endpoint (`AUTH_MODE=oidc`)
 - **Logging:** Pino structured JSON logging
 - **Metrics:** Prometheus via prom-client
 
@@ -69,6 +69,7 @@ RABBITMQ_URL=amqp://user:pass@host/
 RABBITMQ_PREFETCH=10
 
 # Authentication
+AUTH_MODE=local|oidc
 OIDC_ISSUER=https://your-idp.example.com
 OIDC_AUDIENCE=api.example.com
 OIDC_JWKS_URI=https://your-idp.example.com/.well-known/jwks.json
@@ -133,6 +134,13 @@ Additional endpoints are implemented in feature modules under `modules/`.
 | `/forms/:id/shares/*` | DB-backed list/create/delete with owner-scoped form checks |
 | `/exports/*` | DB-backed list/create/detail/download with owner-scoped access checks |
 | `/dashboard` | Implemented analytics read endpoint returning `{ kpis, series, questions }` |
+
+### Auth Mode Matrix
+
+| Mode | Verification strategy | Required variables |
+|---|---|---|
+| `local` | HS256 shared secret token verification | `AUTH_MODE`, `AUTH_JWT_SECRET`, `OIDC_ISSUER`, `OIDC_AUDIENCE` |
+| `oidc` | Remote JWKS token verification | `AUTH_MODE`, `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URI` |
 
 See [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) for full endpoint specification and design decisions.
 

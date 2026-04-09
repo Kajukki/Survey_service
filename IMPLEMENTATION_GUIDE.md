@@ -42,6 +42,11 @@ It is intentionally split into:
 - Bearer access token verification is wired into API request handling.
 - Protected jobs/connections/forms/sharing routes now read principal from request context.
 
+6. Auth mode selection baseline
+- API runtime supports `AUTH_MODE=local|oidc`.
+- `local` mode verifies HS256 tokens using `AUTH_JWT_SECRET`.
+- `oidc` mode verifies tokens against remote JWKS via `OIDC_JWKS_URI`.
+
 ### Partially Implemented
 
 1. Export workflow hardening

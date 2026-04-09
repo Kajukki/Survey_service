@@ -28,11 +28,12 @@ Design objective:
 
 ### Current Runtime (Partial)
 
-1. Domain route maturity
-- Connections/forms/sharing route surfaces exist, but key paths are mock-backed.
+1. Export workflow hardening
+- API and worker lifecycle are implemented, but durable artifact storage and signed URLs are still pending.
 
-2. Authorization enforcement
-- Policy utilities exist, but full principal-based enforcement is not universal yet.
+2. Auth strategy consolidation
+- Runtime supports both `AUTH_MODE=local` and `AUTH_MODE=oidc` token verification.
+- Environment policy and rollout hardening remain in progress.
 
 ### Target Architecture
 
