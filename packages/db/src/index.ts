@@ -105,6 +105,19 @@ export interface ExportJobsTable {
   completed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
 }
 
+export interface FormResponsesTable {
+  id: ColumnType<string, string | undefined, string>;
+  owner_id: string;
+  form_id: string;
+  external_response_id: string;
+  submitted_at: OptionalTimestampColumn;
+  completion: 'completed' | 'partial';
+  answers_json: ColumnType<unknown, unknown, unknown>;
+  answer_preview_json: ColumnType<unknown, unknown, unknown>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface DatabaseSchema {
   jobs: JobsTable;
   users: UsersTable;
@@ -113,6 +126,7 @@ export interface DatabaseSchema {
   provider_connections: ProviderConnectionsTable;
   forms: FormsTable;
   form_shares: FormSharesTable;
+  form_responses: FormResponsesTable;
   export_jobs: ExportJobsTable;
 }
 
