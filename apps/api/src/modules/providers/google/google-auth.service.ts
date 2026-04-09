@@ -6,6 +6,7 @@ import type { Database } from '@survey-service/db';
 import type { Config } from '../../../server/config';
 import { AppError, ErrorCode, ForbiddenError } from '../../../server/errors';
 import { createGoogleAuthRepository } from './google-auth.repository';
+import { createProviderCredentialCrypto } from './credential-crypto';
 
 export interface GoogleAuthPrincipal {
   userId: string;
@@ -398,7 +399,11 @@ export function createDefaultGoogleAuthService(
   );
 
   if (db) {
-    const repository = createGoogleAuthRepository(db);
+    const credentialCrypto = createProviderCredentialCrypto({
+      base64Key: config.CREDENTIAL_ENCRYPTION_KEY_B64,
+      keyVersion: config.CREDENTIAL_ENCRYPTION_KEY_VERSION,
+    });
+    const repository = createGoogleAuthRepository(db, credentialCrypto);
     return createGoogleAuthService({
       connector,
       stateStore: repository.stateStore,
