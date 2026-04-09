@@ -21,6 +21,7 @@ import {
   SyncJobMessageSchema,
   type SyncJobMessage,
 } from '@survey-service/messaging';
+import { listAllProviderForms } from './sync-utils.js';
 
 const configSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
@@ -838,12 +839,10 @@ async function processSyncJob(
     }
 
     stage = 'list-forms';
-    const formsPage = await connector.listForms({
-      accessToken: tokenSet.accessToken,
-    });
+    const formsResult = await listAllProviderForms(connector, tokenSet.accessToken);
 
     stage = 'persist-forms';
-    for (const form of formsPage.items) {
+    for (const form of formsResult.items) {
       stage = 'fetch-form-definition';
       const formDefinition = await connector.getFormDefinition({
         accessToken: tokenSet.accessToken,
@@ -965,8 +964,8 @@ async function processSyncJob(
         jobId: payload.jobId,
         connectionId: payload.connectionId,
         effectiveConnectionId,
-        fetchedForms: formsPage.items.length,
-        hasNextPage: Boolean(formsPage.nextPageToken),
+        fetchedForms: formsResult.items.length,
+        hasMoreFormPages: formsResult.hasMorePages,
         forcedFullSync: payload.forceFullSync,
       },
       'Processed Google sync job using provider API',
