@@ -2,8 +2,10 @@ import { FastifyInstance } from 'fastify';
 import { CreateConnectionSchema } from '@survey-service/contracts';
 import { mockConnections } from './connections.mock.js';
 import { getPrincipal } from '../../server/principal';
+import type { Config } from '../../server/config';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
+import { createProviderCredentialCrypto } from '../providers/google/credential-crypto';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
@@ -30,7 +32,19 @@ function mapDbConnection(row: DbConnectionRow) {
   };
 }
 
-export async function connectionsRoutes(app: FastifyInstance, deps?: { db?: Kysely<Database> }) {
+function createTokenSetFromCredentialToken(input: { provider: 'google' | 'microsoft'; credentialToken: string }) {
+  return {
+    provider: input.provider,
+    accessToken: input.credentialToken,
+    expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+    tokenType: 'Bearer',
+  } as const;
+}
+
+export async function connectionsRoutes(
+  app: FastifyInstance,
+  deps?: { db?: Kysely<Database>; config?: Config },
+) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
 
   // GET /connections
@@ -75,8 +89,97 @@ export async function connectionsRoutes(app: FastifyInstance, deps?: { db?: Kyse
     },
     async (request, reply) => {
       const principal = getPrincipal(request);
-      // Fake create from validated payload
-      const payload = request.body as Record<string, unknown>;
+      const payload = request.body as {
+        type: 'google' | 'microsoft';
+        name: string;
+        externalId: string;
+        credentialToken: string;
+      };
+
+      if (deps?.db) {
+        if (!deps.config) {
+          return reply.status(500).send({
+            success: false,
+            error: {
+              code: 'internal_error',
+              message: 'Connection creation requires API config when DB mode is enabled',
+            },
+            meta: {
+              requestId: request.id,
+            },
+          });
+        }
+
+        const credentialCrypto = createProviderCredentialCrypto({
+          base64Key: deps.config.CREDENTIAL_ENCRYPTION_KEY_B64,
+          keyVersion: deps.config.CREDENTIAL_ENCRYPTION_KEY_VERSION,
+        });
+
+        const tokenSet = createTokenSetFromCredentialToken({
+          provider: payload.type,
+          credentialToken: payload.credentialToken,
+        });
+
+        const encrypted = credentialCrypto.encrypt({
+          tokenSet,
+          idToken: '',
+        });
+
+        const created = await deps.db
+          .insertInto('provider_connections')
+          .values({
+            owner_id: principal.userId,
+            org_id: principal.orgId,
+            provider: payload.type,
+            external_account_id: payload.externalId,
+            name: payload.name,
+            encrypted_token_payload: encrypted.encryptedTokenPayload,
+            encrypted_token_iv: encrypted.encryptedTokenIv,
+            encrypted_token_tag: encrypted.encryptedTokenTag,
+            encrypted_token_key_version: encrypted.encryptedTokenKeyVersion,
+            access_token: null,
+            refresh_token: null,
+            id_token: null,
+            expires_at: new Date(tokenSet.expiresAt),
+            scope: null,
+            token_type: tokenSet.tokenType,
+          })
+          .onConflict((oc) =>
+            oc.columns(['provider', 'owner_id', 'external_account_id']).doUpdateSet({
+              name: payload.name,
+              encrypted_token_payload: encrypted.encryptedTokenPayload,
+              encrypted_token_iv: encrypted.encryptedTokenIv,
+              encrypted_token_tag: encrypted.encryptedTokenTag,
+              encrypted_token_key_version: encrypted.encryptedTokenKeyVersion,
+              access_token: null,
+              refresh_token: null,
+              id_token: null,
+              expires_at: new Date(tokenSet.expiresAt),
+              scope: null,
+              token_type: tokenSet.tokenType,
+              updated_at: new Date(),
+            }),
+          )
+          .returning([
+            'id',
+            'owner_id',
+            'provider',
+            'external_account_id',
+            'name',
+            'created_at',
+            'updated_at',
+          ])
+          .executeTakeFirstOrThrow();
+
+        return reply.status(201).send({
+          success: true,
+          data: mapDbConnection(created as DbConnectionRow),
+          meta: {
+            requestId: request.id,
+          },
+        });
+      }
+
       return reply.status(201).send({
         success: true,
         data: {
