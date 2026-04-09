@@ -117,11 +117,36 @@ class SyncJobProcessingError extends Error {
   }
 }
 
+function extractErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as Record<string, unknown>;
+    if (typeof candidate.message === 'string' && candidate.message.length > 0) {
+      return candidate.message;
+    }
+  }
+
+  return 'unknown worker error';
+}
+
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH_BYTES = 12;
 const PLACEHOLDER_CONNECTION_ID = '00000000-0000-0000-0000-000000000000';
 
 function serializeError(error: unknown): Record<string, unknown> {
+  if (error instanceof SyncJobProcessingError) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      context: error.context,
+      cause: serializeError(error.causeError),
+    };
+  }
+
   if (error instanceof Error) {
     const details: Record<string, unknown> = {
       name: error.name,
@@ -174,8 +199,13 @@ function serializeError(error: unknown): Record<string, unknown> {
   }
 
   if (typeof error === 'object' && error !== null) {
+    const candidate = error as Record<string, unknown>;
     return {
-      ...(error as Record<string, unknown>),
+      ...candidate,
+      message:
+        typeof candidate.message === 'string' && candidate.message.length > 0
+          ? candidate.message
+          : 'unknown worker error',
     };
   }
 
@@ -576,7 +606,7 @@ async function processSyncJob(
       'Processed Google sync job using provider API',
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'unknown worker error';
+    const message = extractErrorMessage(error);
     throw new SyncJobProcessingError(
       message,
       {
@@ -620,7 +650,7 @@ async function handleMessage(
     await markJobSucceeded(pool, parsedMessage.jobId);
     channel.ack(message);
   } catch (error) {
-    const reason = error instanceof Error ? error.message : 'unknown worker error';
+    const reason = extractErrorMessage(error);
     await markJobFailed(pool, parsedMessage.jobId, reason);
 
     const processingError = error instanceof SyncJobProcessingError ? error : null;
