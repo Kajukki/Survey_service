@@ -178,6 +178,20 @@ List response summaries for a form with server-side filtering and pagination.
 - **200 OK**: Returns `{ responses, appliedFilters }` with pagination metadata.
 - **404 Not Found**: Form not found or not accessible to requester.
 
+### `GET /api/v1/forms/:id/analytics/overview`
+Get response-centered KPI and time-series analytics for a form.
+- **Status:** `Implemented`
+- **Query Params:** `from`, `to`, `granularity`, `questionId`
+- **200 OK**: Returns `{ kpis, series, appliedFilters, dataFreshness }`.
+- **404 Not Found**: Form not found or not accessible to requester.
+
+### `GET /api/v1/forms/:id/analytics/questions`
+Get per-question breakdown analytics for a form.
+- **Status:** `Implemented`
+- **Query Params:** `from`, `to`, `granularity`, `questionId`
+- **200 OK**: Returns `{ questions, appliedFilters, dataFreshness }`.
+- **404 Not Found**: Form not found or not accessible to requester.
+
 ### `POST /api/v1/forms/:id/sync`
 Trigger a manual synchronization job for the specified form.
 - **Status:** `Implemented`

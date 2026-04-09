@@ -7,12 +7,18 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { API_BASE_URL } from '../../core/api/api-config.token';
 import { ApiSuccessEnvelope } from '../../core/api/api-envelope';
 import {
+  FormAnalyticsOverviewDto,
+  FormAnalyticsQuestionsDto,
   FormResponsesListDto,
   FormStructureDto,
+  mapFormAnalyticsOverview,
+  mapFormAnalyticsQuestions,
   mapFormResponses,
   mapFormStructure,
 } from '../../core/api/survey-api.adapters';
 import {
+  FormAnalyticsOverviewRecord,
+  FormAnalyticsQuestionsRecord,
   FormResponseSummaryRecord,
   FormSectionRecord,
   FormStructureRecord,
@@ -55,6 +61,14 @@ export class FormWorkspacePageComponent {
     () => this.buildResponsesEndpoint(),
   );
 
+  protected readonly analyticsOverviewResource = httpResource<ApiSuccessEnvelope<FormAnalyticsOverviewDto>>(
+    () => this.buildAnalyticsOverviewEndpoint(),
+  );
+
+  protected readonly analyticsQuestionsResource = httpResource<ApiSuccessEnvelope<FormAnalyticsQuestionsDto>>(
+    () => this.buildAnalyticsQuestionsEndpoint(),
+  );
+
   protected readonly structure = computed<FormStructureRecord | null>(() => {
     const dto = this.structureResource.value()?.data;
     return dto ? mapFormStructure(dto) : null;
@@ -91,6 +105,16 @@ export class FormWorkspacePageComponent {
   protected readonly responses = computed<FormResponseSummaryRecord[]>(() => {
     const dto = this.responsesResource.value()?.data;
     return dto ? mapFormResponses(dto) : [];
+  });
+
+  protected readonly analyticsOverview = computed<FormAnalyticsOverviewRecord | null>(() => {
+    const dto = this.analyticsOverviewResource.value()?.data;
+    return dto ? mapFormAnalyticsOverview(dto) : null;
+  });
+
+  protected readonly analyticsQuestions = computed<FormAnalyticsQuestionsRecord | null>(() => {
+    const dto = this.analyticsQuestionsResource.value()?.data;
+    return dto ? mapFormAnalyticsQuestions(dto) : null;
   });
 
   protected readonly responsePage = computed(() => this.workspaceState().responsesPage);
@@ -165,9 +189,35 @@ export class FormWorkspacePageComponent {
     this.updateWorkspaceState({ responsesPage: this.responsePage() + 1 });
   }
 
+  protected updateAnalyticsFrom(value: string): void {
+    if (!value) {
+      return;
+    }
+
+    this.updateWorkspaceState({ analyticsFrom: value });
+  }
+
+  protected updateAnalyticsTo(value: string): void {
+    if (!value) {
+      return;
+    }
+
+    this.updateWorkspaceState({ analyticsTo: value });
+  }
+
+  protected updateAnalyticsGranularity(value: string): void {
+    if (value !== 'day' && value !== 'week' && value !== 'month') {
+      return;
+    }
+
+    this.updateWorkspaceState({ analyticsGranularity: value });
+  }
+
   protected refresh(): void {
     this.structureResource.reload();
     this.responsesResource.reload();
+    this.analyticsOverviewResource.reload();
+    this.analyticsQuestionsResource.reload();
   }
 
   private buildStructureEndpoint(): string | undefined {
@@ -204,6 +254,46 @@ export class FormWorkspacePageComponent {
     }
 
     return `${this.apiBaseUrl}/forms/${formId}/responses?${searchParams.toString()}`;
+  }
+
+  private buildAnalyticsOverviewEndpoint(): string | undefined {
+    const formId = this.routeParams()['id'];
+    if (!formId || typeof formId !== 'string') {
+      return undefined;
+    }
+
+    const state = this.workspaceState();
+    const searchParams = new URLSearchParams({
+      from: state.analyticsFrom,
+      to: state.analyticsTo,
+      granularity: state.analyticsGranularity,
+    });
+
+    if (state.questionId) {
+      searchParams.set('questionId', state.questionId);
+    }
+
+    return `${this.apiBaseUrl}/forms/${formId}/analytics/overview?${searchParams.toString()}`;
+  }
+
+  private buildAnalyticsQuestionsEndpoint(): string | undefined {
+    const formId = this.routeParams()['id'];
+    if (!formId || typeof formId !== 'string') {
+      return undefined;
+    }
+
+    const state = this.workspaceState();
+    const searchParams = new URLSearchParams({
+      from: state.analyticsFrom,
+      to: state.analyticsTo,
+      granularity: state.analyticsGranularity,
+    });
+
+    if (state.questionId) {
+      searchParams.set('questionId', state.questionId);
+    }
+
+    return `${this.apiBaseUrl}/forms/${formId}/analytics/questions?${searchParams.toString()}`;
   }
 
   private updateWorkspaceState(partial: Partial<ReturnType<typeof parseFormsWorkspaceState>>): void {

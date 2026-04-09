@@ -1,6 +1,8 @@
 import {
   Connection,
   ExportRecord,
+  FormAnalyticsOverviewRecord,
+  FormAnalyticsQuestionsRecord,
   FormResponseSummaryRecord,
   FormRecord,
   FormSectionRecord,
@@ -76,6 +78,56 @@ export interface FormResponsesListDto {
     questionId?: string;
     answerContains?: string;
     completion?: 'completed' | 'partial';
+  };
+}
+
+export interface FormAnalyticsKpiDto {
+  label: string;
+  value: string;
+  delta?: string;
+}
+
+export interface FormAnalyticsSeriesPointDto {
+  date: string;
+  count: number;
+}
+
+export interface FormAnalyticsOverviewDto {
+  kpis: FormAnalyticsKpiDto[];
+  series: FormAnalyticsSeriesPointDto[];
+  appliedFilters: {
+    from: string;
+    to: string;
+    granularity: 'day' | 'week' | 'month';
+    questionId?: string;
+  };
+  dataFreshness: {
+    generatedAt: string;
+    lastSuccessfulSyncAt?: string;
+    lastAttemptedSyncAt?: string;
+  };
+}
+
+export interface FormAnalyticsQuestionDto {
+  questionId: string;
+  questionLabel: string;
+  questionType: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  responses: number;
+  distribution?: Array<{ label: string; value: number }>;
+}
+
+export interface FormAnalyticsQuestionsDto {
+  questions: FormAnalyticsQuestionDto[];
+  appliedFilters: {
+    from: string;
+    to: string;
+    granularity: 'day' | 'week' | 'month';
+    questionId?: string;
+  };
+  dataFreshness: {
+    generatedAt: string;
+    lastSuccessfulSyncAt?: string;
+    lastAttemptedSyncAt?: string;
   };
 }
 
@@ -168,6 +220,29 @@ export function mapFormResponses(input: FormResponsesListDto): FormResponseSumma
       valuePreview: preview.valuePreview,
     })),
   }));
+}
+
+export function mapFormAnalyticsOverview(input: FormAnalyticsOverviewDto): FormAnalyticsOverviewRecord {
+  return {
+    kpis: input.kpis,
+    series: input.series,
+    appliedFilters: input.appliedFilters,
+    dataFreshness: input.dataFreshness,
+  };
+}
+
+export function mapFormAnalyticsQuestions(input: FormAnalyticsQuestionsDto): FormAnalyticsQuestionsRecord {
+  return {
+    questions: input.questions.map((question) => ({
+      questionId: question.questionId,
+      questionLabel: question.questionLabel,
+      questionType: question.questionType,
+      responses: question.responses,
+      distribution: question.distribution,
+    })),
+    appliedFilters: input.appliedFilters,
+    dataFreshness: input.dataFreshness,
+  };
 }
 
 export function mapJobs(items: JobDto[]): SyncJob[] {

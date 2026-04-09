@@ -234,10 +234,106 @@
     }
 
     @if (activeTab() === 'analytics') {
-      <section class="card empty-state">
-        <h3>Analytics tab is coming next</h3>
-        <p>Response-centered analytics widgets will be introduced after response browsing.</p>
+      <section class="card analytics-filters">
+        <label>
+          From
+          <input
+            type="date"
+            [value]="workspaceState().analyticsFrom"
+            (change)="updateAnalyticsFrom($any($event.target).value)"
+          />
+        </label>
+
+        <label>
+          To
+          <input
+            type="date"
+            [value]="workspaceState().analyticsTo"
+            (change)="updateAnalyticsTo($any($event.target).value)"
+          />
+        </label>
+
+        <label>
+          Granularity
+          <select
+            [value]="workspaceState().analyticsGranularity"
+            (change)="updateAnalyticsGranularity($any($event.target).value)"
+          >
+            <option value="day">Day</option>
+            <option value="week">Week</option>
+            <option value="month">Month</option>
+          </select>
+        </label>
       </section>
+
+      @if (analyticsOverviewResource.isLoading() || analyticsQuestionsResource.isLoading()) {
+        <section class="card empty-state">
+          <h3>Loading analytics...</h3>
+        </section>
+      } @else if (analyticsOverviewResource.error() || analyticsQuestionsResource.error()) {
+        <section class="card empty-state">
+          <h3>Unable to load analytics</h3>
+          <p>Try refreshing or broadening the selected date range.</p>
+          <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
+        </section>
+      } @else {
+        <section class="analytics-kpis">
+          @for (kpi of analyticsOverview()?.kpis ?? []; track kpi.label) {
+            <article class="card metric">
+              <h3>{{ kpi.label }}</h3>
+              <p class="metric-value">{{ kpi.value }}</p>
+              @if (kpi.delta) {
+                <p class="metric-delta">{{ kpi.delta }}</p>
+              }
+            </article>
+          }
+        </section>
+
+        <section class="card analytics-series">
+          <header>
+            <h3>Trend</h3>
+            <p>
+              Generated {{ analyticsOverview()?.dataFreshness?.generatedAt | date: 'medium' }}
+            </p>
+          </header>
+
+          <ul>
+            @for (point of analyticsOverview()?.series ?? []; track point.date) {
+              <li>
+                <span>{{ point.date }}</span>
+                <strong>{{ point.count }}</strong>
+              </li>
+            }
+          </ul>
+        </section>
+
+        <section class="card analytics-questions">
+          <h3>Question Breakdown</h3>
+
+          @for (question of analyticsQuestions()?.questions ?? []; track question.questionId) {
+            <article>
+              <header>
+                <h4>{{ question.questionLabel }}</h4>
+                <span class="badge">{{ question.questionType }}</span>
+              </header>
+              <p>{{ question.responses }} responses in selected range</p>
+
+              @if (question.distribution?.length) {
+                <ul>
+                  @for (item of question.distribution ?? []; track item.label) {
+                    <li>
+                      <span>{{ item.label }}</span>
+                      <strong>{{ item.value }}</strong>
+                    </li>
+                  }
+                </ul>
+              }
+            </article>
+          } @empty {
+            <p class="empty-inline">No analytics question data is available for this filter range.</p>
+          }
+        </section>
+      }
     }
   }
 </section>
