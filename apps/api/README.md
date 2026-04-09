@@ -74,6 +74,8 @@ OIDC_JWKS_URI=https://your-idp.example.com/.well-known/jwks.json
 AUTH_JWT_SECRET=replace-with-a-long-random-secret
 ACCESS_TOKEN_TTL_SECONDS=900
 REFRESH_TOKEN_TTL_SECONDS=604800
+CREDENTIAL_ENCRYPTION_KEY_B64=base64-encoded-32-byte-key
+CREDENTIAL_ENCRYPTION_KEY_VERSION=v1
 
 # Google OAuth provider initialization
 GOOGLE_OAUTH_CLIENT_ID=your-google-client-id
