@@ -95,6 +95,7 @@ interface ProviderConnectionRow {
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH_BYTES = 12;
+const PLACEHOLDER_CONNECTION_ID = '00000000-0000-0000-0000-000000000000';
 
 function serializeError(error: unknown): Record<string, unknown> {
   if (error instanceof Error) {
@@ -368,29 +369,69 @@ async function processSyncJob(
   config: WorkerConfig,
   logger: Logger,
 ): Promise<void> {
-  const connectionResult = await pool.query<ProviderConnectionRow>(
-    `
-      SELECT
-        id,
-        owner_id,
-        provider,
-        encrypted_token_payload,
-        encrypted_token_iv,
-        encrypted_token_tag,
-        encrypted_token_key_version,
-        expires_at,
-        scope,
-        token_type
-      FROM provider_connections
-      WHERE id = $1 AND owner_id = $2
-      LIMIT 1
-    `,
-    [payload.connectionId, payload.requestedBy],
-  );
+  const hasPlaceholderConnectionId = payload.connectionId === PLACEHOLDER_CONNECTION_ID;
+
+  const connectionResult = hasPlaceholderConnectionId
+    ? await pool.query<ProviderConnectionRow>(
+        `
+          SELECT
+            id,
+            owner_id,
+            provider,
+            encrypted_token_payload,
+            encrypted_token_iv,
+            encrypted_token_tag,
+            encrypted_token_key_version,
+            expires_at,
+            scope,
+            token_type
+          FROM provider_connections
+          WHERE owner_id = $1 AND provider = 'google'
+          ORDER BY updated_at DESC
+          LIMIT 1
+        `,
+        [payload.requestedBy],
+      )
+    : await pool.query<ProviderConnectionRow>(
+        `
+          SELECT
+            id,
+            owner_id,
+            provider,
+            encrypted_token_payload,
+            encrypted_token_iv,
+            encrypted_token_tag,
+            encrypted_token_key_version,
+            expires_at,
+            scope,
+            token_type
+          FROM provider_connections
+          WHERE id = $1 AND owner_id = $2
+          LIMIT 1
+        `,
+        [payload.connectionId, payload.requestedBy],
+      );
 
   const connection = connectionResult.rows[0];
   if (!connection) {
+    if (hasPlaceholderConnectionId) {
+      throw new Error(
+        'Sync request did not include a connectionId and no Google connection exists for this user',
+      );
+    }
+
     throw new Error('Provider connection not found for sync job and requester');
+  }
+
+  if (hasPlaceholderConnectionId) {
+    logger.warn(
+      {
+        jobId: payload.jobId,
+        requestedBy: payload.requestedBy,
+        resolvedConnectionId: connection.id,
+      },
+      'Resolved placeholder connectionId to most recent Google connection for requester',
+    );
   }
 
   if (connection.provider !== 'google') {
