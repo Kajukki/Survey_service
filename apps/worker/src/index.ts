@@ -96,6 +96,69 @@ interface ProviderConnectionRow {
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH_BYTES = 12;
 
+function serializeError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    const details: Record<string, unknown> = {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+    };
+
+    const withKnownFields = error as Error & {
+      code?: string;
+      status?: number;
+      statusCode?: number;
+      response?: {
+        status?: number;
+        data?: unknown;
+      };
+      cause?: unknown;
+    };
+
+    if (withKnownFields.code) {
+      details.code = withKnownFields.code;
+    }
+
+    if (withKnownFields.status !== undefined) {
+      details.status = withKnownFields.status;
+    }
+
+    if (withKnownFields.statusCode !== undefined) {
+      details.statusCode = withKnownFields.statusCode;
+    }
+
+    if (withKnownFields.response?.status !== undefined) {
+      details.responseStatus = withKnownFields.response.status;
+    }
+
+    if (withKnownFields.response?.data !== undefined) {
+      details.responseData = withKnownFields.response.data;
+    }
+
+    if (withKnownFields.cause !== undefined) {
+      details.cause =
+        withKnownFields.cause instanceof Error
+          ? {
+              name: withKnownFields.cause.name,
+              message: withKnownFields.cause.message,
+            }
+          : withKnownFields.cause;
+    }
+
+    return details;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    return {
+      ...(error as Record<string, unknown>),
+    };
+  }
+
+  return {
+    value: String(error),
+  };
+}
+
 function loadEnvironmentFiles(): void {
   const currentFilePath = fileURLToPath(import.meta.url);
   const currentDir = dirname(currentFilePath);
@@ -426,7 +489,13 @@ async function handleMessage(
     const decoded = JSON.parse(message.content.toString('utf-8')) as unknown;
     parsedMessage = SyncJobMessageSchema.parse(decoded);
   } catch (error) {
-    logger.error({ error }, 'Invalid sync message payload, dead-lettering');
+    logger.error(
+      {
+        error: serializeError(error),
+        rawMessage: message.content.toString('utf-8'),
+      },
+      'Invalid sync message payload, dead-lettering',
+    );
     channel.nack(message, false, false);
     return;
   }
@@ -439,7 +508,18 @@ async function handleMessage(
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'unknown worker error';
     await markJobFailed(pool, parsedMessage.jobId, reason);
-    logger.error({ error, jobId: parsedMessage.jobId }, 'Sync job failed');
+    logger.error(
+      {
+        error: serializeError(error),
+        jobId: parsedMessage.jobId,
+        connectionId: parsedMessage.connectionId,
+        requestedBy: parsedMessage.requestedBy,
+        trigger: parsedMessage.trigger,
+        formId: parsedMessage.formId ?? null,
+        forceFullSync: parsedMessage.forceFullSync,
+      },
+      'Sync job failed',
+    );
     channel.nack(message, false, false);
   }
 }
@@ -500,7 +580,7 @@ async function main(): Promise<void> {
       await pool.end();
       process.exit(0);
     } catch (error) {
-      logger.error({ error }, 'Worker shutdown failed');
+        logger.error({ error: serializeError(error) }, 'Worker shutdown failed');
       process.exit(1);
     }
   };
@@ -510,6 +590,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error) => {
-  console.error('Worker failed to start', error);
+  console.error('Worker failed to start', serializeError(error));
   process.exit(1);
 });
