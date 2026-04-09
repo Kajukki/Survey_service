@@ -7,7 +7,11 @@ import { config as loadDotenv } from 'dotenv';
 import { pino, type Logger } from 'pino';
 import { Pool } from 'pg';
 import { z } from 'zod';
-import { GoogleFormsConnector, type ConnectorHttpClient } from '@survey-service/connectors';
+import {
+  GoogleFormsConnector,
+  type ConnectorHttpClient,
+  type ProviderFormDefinition,
+} from '@survey-service/connectors';
 import {
   BINDINGS,
   CONSUMER_PREFETCH,
@@ -102,6 +106,7 @@ interface SyncJobProcessingContext {
     | 'refresh-token'
     | 'persist-refreshed-token'
     | 'list-forms'
+    | 'fetch-form-definition'
     | 'persist-forms'
     | 'list-responses'
     | 'persist-responses';
@@ -597,13 +602,121 @@ function toPreviewString(value: unknown): string {
   return String(value);
 }
 
-function buildAnswerPreview(answers: Record<string, unknown>) {
+type PersistedFormSchema = {
+  source: 'google_forms_api';
+  sections: Array<{
+    id: string;
+    title: string;
+    description?: string;
+    order: number;
+    questions: Array<{
+      id: string;
+      externalQuestionId: string;
+      sectionId: string;
+      label: string;
+      description?: string;
+      required: boolean;
+      type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+      order: number;
+      options?: Array<{ value: string; label: string }>;
+    }>;
+  }>;
+  questionCount: number;
+};
+
+type QuestionLookup = Map<
+  string,
+  {
+    label: string;
+    type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  }
+>;
+
+function buildPersistedFormSchema(definition: ProviderFormDefinition): PersistedFormSchema {
+  const sectionMap = new Map<string, PersistedFormSchema['sections'][number]>();
+
+  for (const section of definition.sections) {
+    sectionMap.set(section.id, {
+      id: section.id,
+      title: section.title,
+      description: section.description,
+      order: section.order,
+      questions: [],
+    });
+  }
+
+  if (!sectionMap.has('section-0')) {
+    sectionMap.set('section-0', {
+      id: 'section-0',
+      title: 'General',
+      order: 0,
+      questions: [],
+    });
+  }
+
+  for (const question of definition.questions) {
+    const sectionId = question.sectionId ?? 'section-0';
+    const section = sectionMap.get(sectionId);
+    if (!section) {
+      sectionMap.set(sectionId, {
+        id: sectionId,
+        title: 'General',
+        order: sectionMap.size,
+        questions: [],
+      });
+    }
+
+    const resolvedSection = sectionMap.get(sectionId)!;
+    resolvedSection.questions.push({
+      id: question.id,
+      externalQuestionId: question.id,
+      sectionId,
+      label: question.label,
+      description: question.description,
+      required: question.required,
+      type: question.type,
+      order: question.order,
+      options: question.options,
+    });
+  }
+
+  const sections = [...sectionMap.values()]
+    .sort((left, right) => left.order - right.order)
+    .map((section) => ({
+      ...section,
+      questions: section.questions.sort((left, right) => left.order - right.order),
+    }));
+
+  return {
+    source: 'google_forms_api',
+    sections,
+    questionCount: sections.reduce((total, section) => total + section.questions.length, 0),
+  };
+}
+
+function buildQuestionLookup(schema: PersistedFormSchema): QuestionLookup {
+  const map: QuestionLookup = new Map();
+  for (const section of schema.sections) {
+    for (const question of section.questions) {
+      map.set(question.id, {
+        label: question.label,
+        type: question.type,
+      });
+    }
+  }
+
+  return map;
+}
+
+function buildAnswerPreview(answers: Record<string, unknown>, questionLookup: QuestionLookup) {
   return Object.entries(answers)
     .map(([questionId, rawValue]) => {
+      const question = questionLookup.get(questionId);
       const preview = toPreviewString(rawValue).trim();
       return {
         questionId,
-        questionLabel: questionId,
+        questionLabel: question?.label ?? questionId,
+        questionType: question?.type ?? 'text',
         valuePreview: preview.length > 0 ? preview.slice(0, 160) : '(no answer)',
       };
     })
@@ -731,6 +844,15 @@ async function processSyncJob(
 
     stage = 'persist-forms';
     for (const form of formsPage.items) {
+      stage = 'fetch-form-definition';
+      const formDefinition = await connector.getFormDefinition({
+        accessToken: tokenSet.accessToken,
+        externalFormId: form.externalFormId,
+      });
+      const persistedSchema = buildPersistedFormSchema(formDefinition);
+      const questionLookup = buildQuestionLookup(persistedSchema);
+
+      stage = 'persist-forms';
       const persistedFormResult = await pool.query<{ id: string }>(
         `
           INSERT INTO forms (
@@ -739,14 +861,16 @@ async function processSyncJob(
             external_form_id,
             title,
             description,
+            form_schema_json,
             response_count,
             updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, NOW())
           ON CONFLICT (owner_id, connection_id, external_form_id)
           DO UPDATE SET
             title = EXCLUDED.title,
             description = EXCLUDED.description,
+            form_schema_json = EXCLUDED.form_schema_json,
             response_count = EXCLUDED.response_count,
             updated_at = NOW()
           RETURNING id
@@ -755,8 +879,9 @@ async function processSyncJob(
           connection.owner_id,
           connection.id,
           form.externalFormId,
-          form.title,
-          form.description ?? null,
+          formDefinition.title,
+          formDefinition.description ?? null,
+          JSON.stringify(persistedSchema),
           form.responseCount,
         ],
       );
@@ -780,7 +905,7 @@ async function processSyncJob(
         stage = 'persist-responses';
         for (const response of responsePage.responses) {
           const answers = response.answers ?? {};
-          const answerPreview = buildAnswerPreview(answers);
+          const answerPreview = buildAnswerPreview(answers, questionLookup);
 
           await pool.query(
             `

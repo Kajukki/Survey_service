@@ -80,6 +80,7 @@ export interface FormsTable {
   external_form_id: string;
   title: string;
   description: string | null;
+  form_schema_json: ColumnType<unknown | null, unknown | null | undefined, unknown | null>;
   response_count: number;
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;

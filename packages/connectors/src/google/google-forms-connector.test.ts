@@ -206,6 +206,73 @@ describe('GoogleFormsConnector', () => {
     expect(result.nextPageToken).toBe('next');
   });
 
+  it('maps form definition payload into provider-neutral structure', async () => {
+    const httpClient = makeHttpClient();
+    vi.mocked(httpClient.request).mockResolvedValueOnce({
+      formId: 'form-ext-1',
+      info: {
+        title: 'Customer Survey',
+        description: 'Quarterly pulse',
+      },
+      items: [
+        {
+          itemId: 'item-1',
+          title: 'Overall satisfaction',
+          questionItem: {
+            question: {
+              questionId: 'q-overall',
+              required: true,
+              scaleQuestion: {
+                low: 1,
+                high: 5,
+              },
+            },
+          },
+        },
+        {
+          itemId: 'section-1',
+          title: 'Feedback',
+          pageBreakItem: {},
+        },
+        {
+          itemId: 'item-2',
+          title: 'Acquisition channel',
+          questionItem: {
+            question: {
+              questionId: 'q-channel',
+              choiceQuestion: {
+                type: 'DROP_DOWN',
+                options: [{ value: 'Organic' }, { value: 'Referral' }],
+              },
+            },
+          },
+        },
+      ],
+    });
+
+    const connector = new GoogleFormsConnector(config, httpClient);
+    const result = await connector.getFormDefinition({
+      accessToken: 'token',
+      externalFormId: 'form-ext-1',
+    });
+
+    expect(result.externalFormId).toBe('form-ext-1');
+    expect(result.title).toBe('Customer Survey');
+    expect(result.sections.map((section) => section.id)).toEqual(['section-0', 'section-1']);
+    expect(result.questions).toHaveLength(2);
+    expect(result.questions[0]).toMatchObject({
+      id: 'q-overall',
+      type: 'rating',
+      sectionId: 'section-0',
+      required: true,
+    });
+    expect(result.questions[1]).toMatchObject({
+      id: 'q-channel',
+      type: 'single_choice',
+      sectionId: 'section-1',
+    });
+  });
+
   it('throws mapped provider error when OAuth token exchange fails', async () => {
     const httpClient = makeHttpClient();
     const oauthClient = makeOAuthClient();

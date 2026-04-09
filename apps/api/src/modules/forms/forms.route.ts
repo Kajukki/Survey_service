@@ -156,6 +156,27 @@ export async function formsRoutes(
     answerPreview: Array<{ questionId: string; questionLabel: string; valuePreview: string }>;
   };
 
+  type PersistedFormStructureRecord = {
+    sections: Array<{
+      id: string;
+      title: string;
+      description?: string;
+      order: number;
+      questions: Array<{
+        id: string;
+        externalQuestionId?: string;
+        sectionId?: string;
+        label: string;
+        description?: string;
+        required?: boolean;
+        type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+        options?: Array<{ value: string; label: string }>;
+        order: number;
+      }>;
+    }>;
+    questionCount: number;
+  };
+
   function normalizeAnswerPreviewJson(value: unknown): FormResponseRecord['answerPreview'] {
     if (!Array.isArray(value)) {
       return [];
@@ -212,61 +233,146 @@ export async function formsRoutes(
     }));
   }
 
-  function inferStructureFromResponses(responses: FormResponseRecord[]) {
-    const byQuestionId = new Map<string, { label: string; order: number }>();
-    let nextOrder = 0;
-
-    for (const response of responses) {
-      for (const preview of response.answerPreview) {
-        if (byQuestionId.has(preview.questionId)) {
-          continue;
-        }
-
-        byQuestionId.set(preview.questionId, {
-          label: preview.questionLabel,
-          order: nextOrder,
-        });
-        nextOrder += 1;
-      }
+  function normalizePersistedFormStructureJson(value: unknown): PersistedFormStructureRecord | null {
+    if (!value || typeof value !== 'object') {
+      return null;
     }
 
-    const questions = [...byQuestionId.entries()]
-      .sort((left, right) => left[1].order - right[1].order)
-      .map(([questionId, question]) => ({
-        id: questionId,
-        label: question.label,
-        type: 'text' as const,
-        order: question.order,
-      }));
+    const candidate = value as Record<string, unknown>;
+    if (!Array.isArray(candidate.sections)) {
+      return null;
+    }
 
-    if (questions.length === 0) {
+    const sections = candidate.sections
+      .map((section): PersistedFormStructureRecord['sections'][number] | null => {
+        if (!section || typeof section !== 'object') {
+          return null;
+        }
+
+        const sectionCandidate = section as Record<string, unknown>;
+        if (
+          typeof sectionCandidate.id !== 'string' ||
+          typeof sectionCandidate.title !== 'string' ||
+          typeof sectionCandidate.order !== 'number' ||
+          !Array.isArray(sectionCandidate.questions)
+        ) {
+          return null;
+        }
+
+        const questions = sectionCandidate.questions
+          .map((question): PersistedFormStructureRecord['sections'][number]['questions'][number] | null => {
+            if (!question || typeof question !== 'object') {
+              return null;
+            }
+
+            const questionCandidate = question as Record<string, unknown>;
+            if (
+              typeof questionCandidate.id !== 'string' ||
+              typeof questionCandidate.label !== 'string' ||
+              typeof questionCandidate.order !== 'number' ||
+              !['single_choice', 'multi_choice', 'text', 'rating', 'date', 'number'].includes(
+                String(questionCandidate.type),
+              )
+            ) {
+              return null;
+            }
+
+            const options = Array.isArray(questionCandidate.options)
+              ? questionCandidate.options
+                  .map((option) => {
+                    if (!option || typeof option !== 'object') {
+                      return null;
+                    }
+
+                    const optionCandidate = option as Record<string, unknown>;
+                    if (
+                      typeof optionCandidate.value !== 'string' ||
+                      typeof optionCandidate.label !== 'string'
+                    ) {
+                      return null;
+                    }
+
+                    return {
+                      value: optionCandidate.value,
+                      label: optionCandidate.label,
+                    };
+                  })
+                  .filter((option): option is { value: string; label: string } => Boolean(option))
+              : undefined;
+
+            return {
+              id: questionCandidate.id,
+              externalQuestionId:
+                typeof questionCandidate.externalQuestionId === 'string'
+                  ? questionCandidate.externalQuestionId
+                  : undefined,
+              sectionId:
+                typeof questionCandidate.sectionId === 'string' ? questionCandidate.sectionId : undefined,
+              label: questionCandidate.label,
+              description:
+                typeof questionCandidate.description === 'string' ? questionCandidate.description : undefined,
+              required: typeof questionCandidate.required === 'boolean' ? questionCandidate.required : false,
+              type: questionCandidate.type as PersistedFormStructureRecord['sections'][number]['questions'][number]['type'],
+              ...(options && options.length > 0 ? { options } : {}),
+              order: questionCandidate.order,
+            };
+          })
+          .filter(
+            (
+              question,
+            ): question is PersistedFormStructureRecord['sections'][number]['questions'][number] =>
+              Boolean(question),
+          )
+          .sort((left, right) => left.order - right.order);
+
+        return {
+          id: sectionCandidate.id,
+          title: sectionCandidate.title,
+          description:
+            typeof sectionCandidate.description === 'string' ? sectionCandidate.description : undefined,
+          order: sectionCandidate.order,
+          questions,
+        };
+      })
+      .filter((section): section is PersistedFormStructureRecord['sections'][number] => Boolean(section))
+      .sort((left, right) => left.order - right.order);
+
+    const questionCountFromSections = sections.reduce(
+      (total, section) => total + section.questions.length,
+      0,
+    );
+    const questionCount =
+      typeof candidate.questionCount === 'number' ? candidate.questionCount : questionCountFromSections;
+
+    return {
+      sections,
+      questionCount,
+    };
+  }
+
+  async function loadFormStructure(formId: string): Promise<PersistedFormStructureRecord> {
+    if (!db) {
       return {
-        sections: [] as Array<{
-          id: string;
-          title: string;
-          order: number;
-          questions: Array<{
-            id: string;
-            label: string;
-            type: 'text';
-            order: number;
-          }>;
-        }>,
+        sections: [],
         questionCount: 0,
       };
     }
 
-    return {
-      sections: [
-        {
-          id: 'inferred-section',
-          title: 'Inferred from responses',
-          order: 0,
-          questions,
-        },
-      ],
-      questionCount: questions.length,
-    };
+    const row = await db
+      .selectFrom('forms')
+      .select(['form_schema_json'])
+      .where('id', '=', formId)
+      .executeTakeFirst();
+
+    const normalized = normalizePersistedFormStructureJson(row?.form_schema_json);
+    if (!normalized) {
+      return {
+        sections: [],
+        questionCount: 0,
+      };
+    }
+
+    return normalized;
   }
 
   type AnalyticsGranularity = 'day' | 'week' | 'month';
@@ -577,8 +683,7 @@ export async function formsRoutes(
       });
     }
 
-    const responses = await loadFormResponses(id, resolvedForm.responseCount);
-    const inferredStructure = inferStructureFromResponses(responses);
+    const formStructure = await loadFormStructure(id);
 
     return reply.send({
       success: true,
@@ -591,8 +696,8 @@ export async function formsRoutes(
           responseCount: resolvedForm.responseCount,
           updatedAt: resolvedForm.updatedAt.toISOString(),
         },
-        sections: inferredStructure.sections,
-        questionCount: inferredStructure.questionCount,
+        sections: formStructure.sections,
+        questionCount: formStructure.questionCount,
       },
       meta: {
         requestId: request.id,
