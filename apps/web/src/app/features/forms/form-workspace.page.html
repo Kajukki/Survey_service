@@ -77,7 +77,7 @@
           Search
           <input
             type="search"
-            [value]="workspaceState().search ?? ''"
+            [value]="workspaceState().questionSearch ?? ''"
             placeholder="Search questions"
             (input)="updateSearch($any($event.target).value)"
           />
@@ -134,20 +134,23 @@
           Answer contains
           <input
             type="search"
-            [value]="workspaceState().search ?? ''"
+            [value]="workspaceState().responseSearch ?? ''"
             placeholder="Search preview text"
             (input)="updateResponsesSearch($any($event.target).value)"
           />
         </label>
 
         <label>
-          Question ID
-          <input
-            type="text"
-            [value]="workspaceState().questionId ?? ''"
-            placeholder="q-overall"
-            (input)="updateResponsesQuestionId($any($event.target).value)"
-          />
+          Question
+          <select
+            [value]="workspaceState().responseQuestionId ?? ''"
+            (change)="updateResponsesQuestionId($any($event.target).value)"
+          >
+            <option value="">All questions</option>
+            @for (option of questionOptions(); track option.id) {
+              <option [value]="option.id">{{ option.label }}</option>
+            }
+          </select>
         </label>
 
         <label>
@@ -251,6 +254,19 @@
             [value]="workspaceState().analyticsTo"
             (change)="updateAnalyticsTo($any($event.target).value)"
           />
+        </label>
+
+        <label>
+          Question
+          <select
+            [value]="workspaceState().analyticsQuestionId ?? ''"
+            (change)="updateAnalyticsQuestionId($any($event.target).value)"
+          >
+            <option value="">All questions</option>
+            @for (option of questionOptions(); track option.id) {
+              <option [value]="option.id">{{ option.label }}</option>
+            }
+          </select>
         </label>
 
         <label>

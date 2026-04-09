@@ -80,7 +80,7 @@ export class FormWorkspacePageComponent {
       return [];
     }
 
-    const search = this.workspaceState().search?.trim().toLowerCase();
+    const search = this.workspaceState().questionSearch?.trim().toLowerCase();
     const typeFilter = this.workspaceState().questionType;
 
     return structure.sections
@@ -100,6 +100,20 @@ export class FormWorkspacePageComponent {
         }),
       }))
       .filter((section) => section.questions.length > 0);
+  });
+
+  protected readonly questionOptions = computed<Array<{ id: string; label: string }>>(() => {
+    const structure = this.structure();
+    if (!structure) {
+      return [];
+    }
+
+    return structure.sections.flatMap((section) =>
+      section.questions.map((question) => ({
+        id: question.id,
+        label: question.label,
+      })),
+    );
   });
 
   protected readonly responses = computed<FormResponseSummaryRecord[]>(() => {
@@ -133,7 +147,7 @@ export class FormWorkspacePageComponent {
   }
 
   protected updateSearch(value: string): void {
-    this.updateWorkspaceState({ search: value || undefined });
+    this.updateWorkspaceState({ questionSearch: value || undefined });
   }
 
   protected updateQuestionType(value: string): void {
@@ -142,14 +156,14 @@ export class FormWorkspacePageComponent {
 
   protected updateResponsesSearch(value: string): void {
     this.updateWorkspaceState({
-      search: value || undefined,
+      responseSearch: value || undefined,
       responsesPage: 1,
     });
   }
 
   protected updateResponsesQuestionId(value: string): void {
     this.updateWorkspaceState({
-      questionId: value || undefined,
+      responseQuestionId: value || undefined,
       responsesPage: 1,
     });
   }
@@ -213,6 +227,10 @@ export class FormWorkspacePageComponent {
     this.updateWorkspaceState({ analyticsGranularity: value });
   }
 
+  protected updateAnalyticsQuestionId(value: string): void {
+    this.updateWorkspaceState({ analyticsQuestionId: value || undefined });
+  }
+
   protected refresh(): void {
     this.structureResource.reload();
     this.responsesResource.reload();
@@ -241,12 +259,12 @@ export class FormWorkspacePageComponent {
       perPage: String(state.responsesPerPage),
     });
 
-    if (state.questionId) {
-      searchParams.set('questionId', state.questionId);
+    if (state.responseQuestionId) {
+      searchParams.set('questionId', state.responseQuestionId);
     }
 
-    if (state.search) {
-      searchParams.set('answerContains', state.search);
+    if (state.responseSearch) {
+      searchParams.set('answerContains', state.responseSearch);
     }
 
     if (state.completion) {
@@ -269,8 +287,8 @@ export class FormWorkspacePageComponent {
       granularity: state.analyticsGranularity,
     });
 
-    if (state.questionId) {
-      searchParams.set('questionId', state.questionId);
+    if (state.analyticsQuestionId) {
+      searchParams.set('questionId', state.analyticsQuestionId);
     }
 
     return `${this.apiBaseUrl}/forms/${formId}/analytics/overview?${searchParams.toString()}`;
@@ -289,8 +307,8 @@ export class FormWorkspacePageComponent {
       granularity: state.analyticsGranularity,
     });
 
-    if (state.questionId) {
-      searchParams.set('questionId', state.questionId);
+    if (state.analyticsQuestionId) {
+      searchParams.set('questionId', state.analyticsQuestionId);
     }
 
     return `${this.apiBaseUrl}/forms/${formId}/analytics/questions?${searchParams.toString()}`;
