@@ -11,7 +11,7 @@ export type { JobsRepository, SyncJobRecord };
 
 export interface EnqueueSyncJobInput {
   requestedBy: string;
-  connectionId?: string;
+  connectionId: string;
   formId?: string;
   trigger: JobTrigger;
   forceFullSync: boolean;
@@ -34,19 +34,18 @@ export function createJobsService(deps: {
   return {
     async enqueueSyncJob(input: EnqueueSyncJobInput): Promise<SyncJobRecord> {
       const jobId = randomUUID();
-      const connectionId = input.connectionId ?? '00000000-0000-0000-0000-000000000000';
 
       const job = await deps.repository.createSyncJob({
         id: jobId,
         requestedBy: input.requestedBy,
-        connectionId: input.connectionId ?? null,
+        connectionId: input.connectionId,
         formId: input.formId ?? null,
         trigger: input.trigger,
       });
 
       await deps.publishSyncJob({
         jobId: job.id,
-        connectionId,
+        connectionId: input.connectionId,
         formId: input.formId,
         requestedBy: input.requestedBy,
         trigger: input.trigger,

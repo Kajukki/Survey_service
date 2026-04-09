@@ -14,11 +14,10 @@ const JobsQuerySchema = z.object({
 
 const CreateSyncJobBodySchema = z
   .object({
-    connectionId: z.string().uuid().optional(),
+    connectionId: z.string().uuid(),
     formId: z.string().uuid().optional(),
     forceFullSync: z.boolean().optional(),
-  })
-  .default({});
+  });
 
 export async function jobsRoutes(
   app: FastifyInstance,

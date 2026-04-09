@@ -4,7 +4,7 @@ import { DatePipe } from '@angular/common';
 
 import { ApiSuccessEnvelope, emptyEnvelope } from '../../core/api/api-envelope';
 import { API_BASE_URL } from '../../core/api/api-config.token';
-import { JobDto, mapJobs } from '../../core/api/survey-api.adapters';
+import { ConnectionDto, JobDto, mapJobs } from '../../core/api/survey-api.adapters';
 import { SyncJob } from '../../shared/models/domain.models';
 
 @Component({
@@ -17,8 +17,18 @@ import { SyncJob } from '../../shared/models/domain.models';
         <div>
           <h2>Sync jobs</h2>
           <p>Track and trigger ingestion jobs.</p>
+          @if (!selectedConnectionId()) {
+            <p class="empty-state">Connect a Google account to run sync jobs.</p>
+          }
         </div>
-        <button type="button" class="btn-primary" (click)="triggerManualSync()">Run sync</button>
+        <button
+          type="button"
+          class="btn-primary"
+          [disabled]="!selectedConnectionId()"
+          (click)="triggerManualSync()"
+        >
+          Run sync
+        </button>
       </header>
 
       @if (jobs.isLoading()) {
@@ -57,10 +67,29 @@ export class SyncJobsPageComponent {
     },
   );
 
+  protected readonly connections = httpResource<ApiSuccessEnvelope<ConnectionDto[]>>(
+    () => `${this.apiBaseUrl}/connections?perPage=20`,
+    {
+      defaultValue: emptyEnvelope<ConnectionDto[]>([]),
+    },
+  );
+
   protected readonly jobItems = computed<SyncJob[]>(() => mapJobs(this.jobs.value()?.data ?? []));
+  protected readonly selectedConnectionId = computed<string | null>(() => {
+    const googleConnection = (this.connections.value()?.data ?? []).find(
+      (connection) => connection.type === 'google',
+    );
+
+    return googleConnection?.id ?? null;
+  });
 
   protected triggerManualSync(): void {
-    this.http.post(`${this.apiBaseUrl}/jobs/sync`, {}).subscribe({
+    const connectionId = this.selectedConnectionId();
+    if (!connectionId) {
+      return;
+    }
+
+    this.http.post(`${this.apiBaseUrl}/jobs/sync`, { connectionId }).subscribe({
       next: () => this.jobs.reload(),
       error: () => {
         // no-op, error handling is centralized in interceptor
