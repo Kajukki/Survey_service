@@ -117,7 +117,9 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
         db: context.db,
         rabbitmq: context.rabbitmq,
       });
-      await exportsRoutes(_api);
+      await exportsRoutes(_api, {
+        db: context.db,
+      });
     },
     { prefix: '/api/v1' },
   );
