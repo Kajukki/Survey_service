@@ -1,90 +1,28 @@
 import amqplib, { type Channel, type ConsumeMessage } from 'amqplib';
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import { config as loadDotenv } from 'dotenv';
 import { pino, type Logger } from 'pino';
 import { Pool } from 'pg';
-import { z } from 'zod';
 import {
   GoogleFormsConnector,
   type ConnectorHttpClient,
   type ProviderFormDefinition,
 } from '@survey-service/connectors';
 import {
-  BINDINGS,
-  CONSUMER_PREFETCH,
-  EXCHANGES,
   QUEUES,
-  QUEUE_CONFIG,
   SyncJobMessageSchema,
   type SyncJobMessage,
 } from '@survey-service/messaging';
+import { loadConfig, loadEnvironmentFiles, type WorkerConfig } from './config.js';
+import {
+  decryptCredentialPayload,
+  encryptCredentialPayload,
+  isTokenExpiringSoon,
+} from './crypto/credentials.js';
+import { assertTopology } from './messaging/topology.js';
+import { getWorkerState, setWorkerState, type WorkerState } from './state.js';
 import { listAllProviderForms } from './sync-utils.js';
 
-const configSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'staging', 'production']).default('development'),
-  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  RABBITMQ_URL: z.string().min(1, 'RABBITMQ_URL is required'),
-  RABBITMQ_PREFETCH: z.coerce.number().int().positive().default(CONSUMER_PREFETCH),
-  CREDENTIAL_ENCRYPTION_KEY_B64: z
-    .string()
-    .min(1, 'CREDENTIAL_ENCRYPTION_KEY_B64 is required')
-    .refine((value) => {
-      try {
-        return Buffer.from(value, 'base64').length === 32;
-      } catch {
-        return false;
-      }
-    }, 'CREDENTIAL_ENCRYPTION_KEY_B64 must be a base64-encoded 32-byte key'),
-  CREDENTIAL_ENCRYPTION_KEY_VERSION: z
-    .string()
-    .min(1, 'CREDENTIAL_ENCRYPTION_KEY_VERSION is required'),
-  GOOGLE_OAUTH_CLIENT_ID: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_ID is required'),
-  GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1, 'GOOGLE_OAUTH_CLIENT_SECRET is required'),
-  GOOGLE_OAUTH_AUTH_BASE_URL: z
-    .string()
-    .url('GOOGLE_OAUTH_AUTH_BASE_URL must be a valid URL')
-    .default('https://accounts.google.com/o/oauth2/v2/auth'),
-  GOOGLE_OAUTH_TOKEN_URL: z
-    .string()
-    .url('GOOGLE_OAUTH_TOKEN_URL must be a valid URL')
-    .default('https://oauth2.googleapis.com/token'),
-  GOOGLE_FORMS_API_BASE_URL: z
-    .string()
-    .url('GOOGLE_FORMS_API_BASE_URL must be a valid URL')
-    .default('https://forms.googleapis.com/v1'),
-  EXPORT_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
-});
-
-type WorkerConfig = z.infer<typeof configSchema>;
-
-export type WorkerState = {
-  service: 'worker';
-  status: 'ready' | 'running';
-};
-
-let currentState: WorkerState = {
-  service: 'worker',
-  status: 'ready',
-};
-
-export const getWorkerState = (): WorkerState => currentState;
-
-interface ProviderTokenSetLike {
-  accessToken: string;
-  refreshToken?: string;
-  expiresAt: string;
-  scope?: string;
-  tokenType?: string;
-}
-
-interface EncryptedCredentialPayload {
-  tokenSet: ProviderTokenSetLike;
-  idToken: string;
-}
+export { getWorkerState };
+export type { WorkerState };
 
 interface ProviderConnectionRow {
   id: string;
@@ -141,9 +79,6 @@ function extractErrorMessage(error: unknown): string {
 
   return 'unknown worker error';
 }
-
-const ALGORITHM = 'aes-256-gcm';
-const IV_LENGTH_BYTES = 12;
 
 function serializeError(error: unknown): Record<string, unknown> {
   if (error instanceof SyncJobProcessingError) {
@@ -244,54 +179,6 @@ function createErrorSummary(error: unknown): string {
   }
 
   return String(error);
-}
-
-function loadEnvironmentFiles(): void {
-  const currentFilePath = fileURLToPath(import.meta.url);
-  const currentDir = dirname(currentFilePath);
-  const candidatePaths = [
-    resolve(process.cwd(), '.env'),
-    resolve(currentDir, '../.env'),
-    resolve(currentDir, '../../../.env'),
-  ];
-
-  const uniquePaths = [...new Set(candidatePaths)];
-  for (const envPath of uniquePaths) {
-    if (existsSync(envPath)) {
-      loadDotenv({ path: envPath });
-    }
-  }
-}
-
-function loadConfig(): WorkerConfig {
-  const parsed = configSchema.safeParse(process.env);
-  if (!parsed.success) {
-    const errorMessage = parsed.error.issues
-      .map((issue) => `${issue.path.join('.')}: ${issue.message}`)
-      .join('\n');
-    throw new Error(
-      `Worker configuration error:\n${errorMessage}\n` +
-        'Set required variables in process env or a .env file at apps/worker/.env or repository root .env',
-    );
-  }
-
-  return parsed.data;
-}
-
-async function assertTopology(channel: Channel): Promise<void> {
-  await channel.assertExchange(EXCHANGES.SYNC, 'topic', { durable: true });
-  await channel.assertExchange(EXCHANGES.ANALYSIS, 'topic', { durable: true });
-  await channel.assertExchange(EXCHANGES.DLX, 'topic', { durable: true });
-
-  for (const [queueName, queueConfig] of Object.entries(QUEUE_CONFIG)) {
-    await channel.assertQueue(queueName, queueConfig);
-  }
-
-  await channel.bindQueue(QUEUES.DLQ, EXCHANGES.DLX, '#');
-
-  for (const binding of BINDINGS) {
-    await channel.bindQueue(binding.queue, binding.exchange, binding.routingKey);
-  }
 }
 
 async function markJobRunning(pool: Pool, jobId: string): Promise<void> {
@@ -492,73 +379,6 @@ function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient 
       }
     },
   };
-}
-
-function decryptCredentialPayload(
-  config: WorkerConfig,
-  connection: ProviderConnectionRow,
-): EncryptedCredentialPayload {
-  if (
-    !connection.encrypted_token_payload ||
-    !connection.encrypted_token_iv ||
-    !connection.encrypted_token_tag
-  ) {
-    throw new Error('Provider connection is missing encrypted credential payload fields');
-  }
-
-  const key = Buffer.from(config.CREDENTIAL_ENCRYPTION_KEY_B64, 'base64');
-  const decipher = createDecipheriv(
-    ALGORITHM,
-    key,
-    Buffer.from(connection.encrypted_token_iv, 'base64'),
-  );
-  decipher.setAuthTag(Buffer.from(connection.encrypted_token_tag, 'base64'));
-
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(connection.encrypted_token_payload, 'base64')),
-    decipher.final(),
-  ]).toString('utf8');
-
-  const parsed = JSON.parse(plaintext) as EncryptedCredentialPayload;
-  if (!parsed?.tokenSet?.accessToken || !parsed?.tokenSet?.expiresAt || !parsed?.idToken) {
-    throw new Error('Decrypted provider credentials payload is invalid');
-  }
-
-  return parsed;
-}
-
-function encryptCredentialPayload(
-  config: WorkerConfig,
-  payload: EncryptedCredentialPayload,
-): {
-  encryptedTokenPayload: string;
-  encryptedTokenIv: string;
-  encryptedTokenTag: string;
-  encryptedTokenKeyVersion: string;
-} {
-  const iv = randomBytes(IV_LENGTH_BYTES);
-  const key = Buffer.from(config.CREDENTIAL_ENCRYPTION_KEY_B64, 'base64');
-  const cipher = createCipheriv(ALGORITHM, key, iv);
-
-  const encoded = JSON.stringify(payload);
-  const ciphertext = Buffer.concat([cipher.update(encoded, 'utf8'), cipher.final()]);
-  const authTag = cipher.getAuthTag();
-
-  return {
-    encryptedTokenPayload: ciphertext.toString('base64'),
-    encryptedTokenIv: iv.toString('base64'),
-    encryptedTokenTag: authTag.toString('base64'),
-    encryptedTokenKeyVersion: config.CREDENTIAL_ENCRYPTION_KEY_VERSION,
-  };
-}
-
-function isTokenExpiringSoon(expiresAt: string, thresholdMs: number = 60_000): boolean {
-  const value = Date.parse(expiresAt);
-  if (!Number.isFinite(value)) {
-    return true;
-  }
-
-  return value <= Date.now() + thresholdMs;
 }
 
 function toPreviewString(value: unknown): string {
@@ -1341,10 +1161,10 @@ async function main(): Promise<void> {
   await assertTopology(channel);
   await channel.prefetch(config.RABBITMQ_PREFETCH);
 
-  currentState = {
+  setWorkerState({
     service: 'worker',
     status: 'running',
-  };
+  });
 
   let exportLifecycleRunning = false;
   const runExportLifecycleTick = async () => {
@@ -1384,10 +1204,10 @@ async function main(): Promise<void> {
   );
 
   const shutdown = async () => {
-    currentState = {
+    setWorkerState({
       service: 'worker',
       status: 'ready',
-    };
+    });
 
     try {
       clearInterval(exportInterval);
