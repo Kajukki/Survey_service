@@ -63,7 +63,7 @@ export interface ProviderConnectionsTable {
   encrypted_token_iv: string | null;
   encrypted_token_tag: string | null;
   encrypted_token_key_version: string | null;
-  access_token: string;
+  access_token: string | null;
   refresh_token: string | null;
   id_token: string | null;
   expires_at: ColumnType<Date, Date | string, Date | string>;

@@ -7,6 +7,7 @@ import type {
   LinkedGoogleConnection,
   PendingAuthState,
 } from './google-auth.service';
+import type { ProviderCredentialCrypto } from './credential-crypto';
 
 interface GoogleAuthRepository {
   stateStore: GoogleAuthStateStore;
@@ -33,7 +34,10 @@ function mapConnectionRow(row: {
   };
 }
 
-export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepository {
+export function createGoogleAuthRepository(
+  db: Kysely<Database>,
+  credentialCrypto: ProviderCredentialCrypto,
+): GoogleAuthRepository {
   const stateStore: GoogleAuthStateStore = {
     async save(state: PendingAuthState): Promise<void> {
       await db
@@ -80,6 +84,11 @@ export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepo
       tokenSet: ProviderTokenSet;
       idToken: string;
     }): Promise<LinkedGoogleConnection> {
+      const encryptedCredentials = credentialCrypto.encrypt({
+        tokenSet: input.tokenSet,
+        idToken: input.idToken,
+      });
+
       const existing = await db
         .selectFrom('provider_connections')
         .selectAll()
@@ -93,12 +102,16 @@ export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepo
           .updateTable('provider_connections')
           .set({
             name: input.name,
-            access_token: input.tokenSet.accessToken,
-            refresh_token: input.tokenSet.refreshToken ?? null,
+            encrypted_token_payload: encryptedCredentials.encryptedTokenPayload,
+            encrypted_token_iv: encryptedCredentials.encryptedTokenIv,
+            encrypted_token_tag: encryptedCredentials.encryptedTokenTag,
+            encrypted_token_key_version: encryptedCredentials.encryptedTokenKeyVersion,
+            access_token: null,
+            refresh_token: null,
             expires_at: input.tokenSet.expiresAt,
             scope: input.tokenSet.scope ?? null,
             token_type: input.tokenSet.tokenType,
-            id_token: input.idToken,
+            id_token: null,
             updated_at: new Date(),
           })
           .where('id', '=', existing.id)
@@ -116,12 +129,16 @@ export function createGoogleAuthRepository(db: Kysely<Database>): GoogleAuthRepo
           provider: 'google',
           external_account_id: input.externalId,
           name: input.name,
-          access_token: input.tokenSet.accessToken,
-          refresh_token: input.tokenSet.refreshToken ?? null,
+          encrypted_token_payload: encryptedCredentials.encryptedTokenPayload,
+          encrypted_token_iv: encryptedCredentials.encryptedTokenIv,
+          encrypted_token_tag: encryptedCredentials.encryptedTokenTag,
+          encrypted_token_key_version: encryptedCredentials.encryptedTokenKeyVersion,
+          access_token: null,
+          refresh_token: null,
           expires_at: input.tokenSet.expiresAt,
           scope: input.tokenSet.scope ?? null,
           token_type: input.tokenSet.tokenType,
-          id_token: input.idToken,
+          id_token: null,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
