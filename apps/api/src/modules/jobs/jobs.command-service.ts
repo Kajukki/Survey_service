@@ -19,7 +19,6 @@ export interface JobsCommandService {
 export function createJobsCommandService(deps: {
   repository: JobsRepository;
   syncTargetQuery: JobsSyncTargetQueryService;
-  publishSyncJob: (message: SyncJobMessage) => Promise<void>;
 }): JobsCommandService {
   return {
     async enqueueSyncJob(input: EnqueueSyncCommandInput): Promise<SyncJobRecord> {
@@ -67,17 +66,8 @@ export function createJobsCommandService(deps: {
 
       const jobId = randomUUID();
       const effectiveFormId = targetForm?.id ?? input.formId;
-
-      const job = await deps.repository.createSyncJob({
-        id: jobId,
-        requestedBy: input.requestedBy,
-        connectionId: effectiveConnectionId,
-        formId: effectiveFormId ?? null,
-        trigger: input.trigger,
-      });
-
-      await deps.publishSyncJob({
-        jobId: job.id,
+      const outboxMessage: SyncJobMessage = {
+        jobId,
         connectionId: effectiveConnectionId,
         formId: effectiveFormId,
         requestedBy: input.requestedBy,
@@ -85,9 +75,16 @@ export function createJobsCommandService(deps: {
         forceFullSync: input.forceFullSync,
         timestamp: Date.now(),
         retryCount: 0,
-      });
+      };
 
-      return job;
+      return deps.repository.createSyncJob({
+        id: jobId,
+        requestedBy: input.requestedBy,
+        connectionId: effectiveConnectionId,
+        formId: effectiveFormId ?? null,
+        trigger: input.trigger,
+        outboxMessage,
+      });
     },
   };
 }

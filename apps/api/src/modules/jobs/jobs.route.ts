@@ -2,7 +2,6 @@ import { z } from 'zod';
 import type { FastifyInstance } from 'fastify';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
-import type { RabbitMQClient } from '../../infra/rabbitmq';
 import { createJobsRepository } from './jobs.repository';
 import { createJobsCommandService } from './jobs.command-service';
 import { createJobsSyncTargetQueryService } from './jobs-sync-target.query-service';
@@ -29,18 +28,15 @@ export async function jobsRoutes(
   app: FastifyInstance,
   deps: {
     db: Kysely<Database>;
-    rabbitmq: RabbitMQClient;
   },
 ) {
   const repository = createJobsRepository(deps.db);
   const commandService = createJobsCommandService({
     repository,
     syncTargetQuery: createJobsSyncTargetQueryService(deps.db),
-    publishSyncJob: deps.rabbitmq.publishSyncJob,
   });
   const service = createJobsService({
     repository,
-    publishSyncJob: deps.rabbitmq.publishSyncJob,
   });
 
   // GET /jobs
@@ -164,6 +160,3 @@ export async function jobsRoutes(
     });
   });
 }
-
-
-

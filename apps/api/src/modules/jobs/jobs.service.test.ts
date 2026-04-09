@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { SyncJobMessage } from '@survey-service/messaging';
 import { createJobsService, type JobsRepository, type SyncJobRecord } from './jobs.service';
 
 function makeRepo(): JobsRepository {
@@ -11,9 +10,8 @@ function makeRepo(): JobsRepository {
 }
 
 describe('createJobsService', () => {
-  it('creates a queued job and publishes a sync message with the same job id', async () => {
+  it('creates a queued job and persists outbox message payload', async () => {
     const repository = makeRepo();
-    const publishSyncJob = vi.fn(async (_message: SyncJobMessage) => {});
 
     const created: SyncJobRecord = {
       id: '8f0ef42e-84ea-4420-b784-194880c5bb8c',
@@ -34,7 +32,6 @@ describe('createJobsService', () => {
 
     const service = createJobsService({
       repository,
-      publishSyncJob,
     });
 
     const result = await service.enqueueSyncJob({
@@ -46,52 +43,21 @@ describe('createJobsService', () => {
     });
 
     expect(repository.createSyncJob).toHaveBeenCalledTimes(1);
-    expect(publishSyncJob).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(publishSyncJob).mock.calls[0]?.[0].jobId).toBe(created.id);
+    expect(vi.mocked(repository.createSyncJob).mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        connectionId: '11111111-1111-1111-1111-111111111111',
+        outboxMessage: expect.objectContaining({
+          connectionId: '11111111-1111-1111-1111-111111111111',
+          requestedBy: 'test-user',
+        }),
+      }),
+    );
     expect(result.id).toBe(created.id);
     expect(result.status).toBe('queued');
   });
 
-  it('does not swallow publish errors', async () => {
-    const repository = makeRepo();
-    const publishSyncJob = vi.fn(async () => {
-      throw new Error('publish failed');
-    });
-
-    vi.mocked(repository.createSyncJob).mockResolvedValue({
-      id: '8f0ef42e-84ea-4420-b784-194880c5bb8c',
-      type: 'sync',
-      status: 'queued',
-      requestedBy: 'test-user',
-      connectionId: '11111111-1111-1111-1111-111111111111',
-      formId: null,
-      trigger: 'manual',
-      source: 'manual_sync',
-      createdAt: new Date().toISOString(),
-      startedAt: null,
-      completedAt: null,
-      error: null,
-    });
-
-    const service = createJobsService({
-      repository,
-      publishSyncJob,
-    });
-
-    await expect(
-      service.enqueueSyncJob({
-        requestedBy: 'test-user',
-        connectionId: '11111111-1111-1111-1111-111111111111',
-        formId: undefined,
-        trigger: 'manual',
-        forceFullSync: false,
-      }),
-    ).rejects.toThrow('publish failed');
-  });
-
   it('reads a job only within the requester scope', async () => {
     const repository = makeRepo();
-    const publishSyncJob = vi.fn(async (_message: SyncJobMessage) => {});
 
     const scopedJob: SyncJobRecord = {
       id: '8f0ef42e-84ea-4420-b784-194880c5bb8c',
@@ -112,7 +78,6 @@ describe('createJobsService', () => {
 
     const service = createJobsService({
       repository,
-      publishSyncJob,
     });
 
     const result = await service.getJobById('owner-user', scopedJob.id);
@@ -123,13 +88,11 @@ describe('createJobsService', () => {
 
   it('returns null when job is outside requester scope', async () => {
     const repository = makeRepo();
-    const publishSyncJob = vi.fn(async (_message: SyncJobMessage) => {});
 
     vi.mocked(repository.getJobById).mockResolvedValue(null);
 
     const service = createJobsService({
       repository,
-      publishSyncJob,
     });
 
     const result = await service.getJobById('other-user', '8f0ef42e-84ea-4420-b784-194880c5bb8c');

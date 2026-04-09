@@ -8,6 +8,7 @@ import { createLogger } from './server/logging';
 import { createMetrics } from './infra/metrics';
 import { createDb } from './infra/db';
 import { createRabbitMQClient } from './infra/rabbitmq';
+import { createOutboxPublisher } from './infra/outbox-publisher';
 import { createServer, startServer, closeServer } from './server/create-server';
 
 /**
@@ -26,6 +27,15 @@ async function main(): Promise<void> {
     const db = createDb(config, logger);
     const rabbitmq = await createRabbitMQClient(config, logger);
     const metrics = createMetrics();
+    const outboxPublisher = createOutboxPublisher({
+      db,
+      rabbitmq,
+      logger,
+      batchSize: config.OUTBOX_BATCH_SIZE,
+      pollIntervalMs: config.OUTBOX_POLL_INTERVAL_MS,
+      maxAttempts: config.OUTBOX_MAX_ATTEMPTS,
+      retryBaseMs: config.OUTBOX_RETRY_BASE_MS,
+    });
 
     // 4. Create server
     const app = await createServer({
@@ -39,13 +49,17 @@ async function main(): Promise<void> {
     // 5. Start listening
     await startServer(app, config, logger);
 
-    // 6. Graceful shutdown on signals
+    // 6. Start outbox publisher loop
+    outboxPublisher.start();
+
+    // 7. Graceful shutdown on signals
     const signals = ['SIGINT', 'SIGTERM'];
     for (const signal of signals) {
       process.on(signal, async () => {
         logger.info({ signal }, 'Received shutdown signal');
 
         try {
+          outboxPublisher.stop();
           await closeServer(app, logger);
           await rabbitmq.close();
           await db.destroy();
