@@ -15,13 +15,28 @@ export interface FormsWorkspaceState {
   search?: string;
   questionId?: string;
   completion?: 'completed' | 'partial';
+  analyticsFrom: string;
+  analyticsTo: string;
+  analyticsGranularity: 'day' | 'week' | 'month';
   responsesPage: number;
   responsesPerPage: number;
 }
 
+function formatDateOnly(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
 export function defaultFormsWorkspaceState(): FormsWorkspaceState {
+  const today = new Date();
+  const defaultTo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const defaultFrom = new Date(defaultTo);
+  defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 29);
+
   return {
     tab: 'overview',
+    analyticsFrom: formatDateOnly(defaultFrom),
+    analyticsTo: formatDateOnly(defaultTo),
+    analyticsGranularity: 'day',
     responsesPage: 1,
     responsesPerPage: 20,
   };
@@ -56,6 +71,20 @@ export function parseFormsWorkspaceState(params: Params): FormsWorkspaceState {
       params['completion'] === 'completed' || params['completion'] === 'partial'
         ? params['completion']
         : undefined,
+    analyticsFrom:
+      typeof params['analyticsFrom'] === 'string' && params['analyticsFrom'].length > 0
+        ? params['analyticsFrom']
+        : defaults.analyticsFrom,
+    analyticsTo:
+      typeof params['analyticsTo'] === 'string' && params['analyticsTo'].length > 0
+        ? params['analyticsTo']
+        : defaults.analyticsTo,
+    analyticsGranularity:
+      params['analyticsGranularity'] === 'day' ||
+      params['analyticsGranularity'] === 'week' ||
+      params['analyticsGranularity'] === 'month'
+        ? params['analyticsGranularity']
+        : defaults.analyticsGranularity,
     responsesPage: parsePositiveInt(params['responsesPage'], defaults.responsesPage),
     responsesPerPage: Math.min(parsePositiveInt(params['responsesPerPage'], defaults.responsesPerPage), 100),
   };
@@ -83,6 +112,10 @@ export function buildFormsWorkspaceQueryParams(state: FormsWorkspaceState): Para
   if (state.completion) {
     params['completion'] = state.completion;
   }
+
+  params['analyticsFrom'] = state.analyticsFrom;
+  params['analyticsTo'] = state.analyticsTo;
+  params['analyticsGranularity'] = state.analyticsGranularity;
 
   return params;
 }

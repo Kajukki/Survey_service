@@ -149,6 +149,127 @@ export async function formsRoutes(
     });
   }
 
+  type AnalyticsGranularity = 'day' | 'week' | 'month';
+
+  function parseAnalyticsGranularity(value: unknown): AnalyticsGranularity {
+    return value === 'week' || value === 'month' ? value : 'day';
+  }
+
+  function formatDateKey(value: Date): string {
+    return value.toISOString().slice(0, 10);
+  }
+
+  function normalizeUtcDay(value: Date): Date {
+    return new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), value.getUTCDate()));
+  }
+
+  function addGranularityStep(value: Date, granularity: AnalyticsGranularity): Date {
+    const next = new Date(value);
+    if (granularity === 'day') {
+      next.setUTCDate(next.getUTCDate() + 1);
+      return next;
+    }
+
+    if (granularity === 'week') {
+      next.setUTCDate(next.getUTCDate() + 7);
+      return next;
+    }
+
+    next.setUTCMonth(next.getUTCMonth() + 1);
+    return next;
+  }
+
+  function buildAnalyticsSeries(
+    responses: Array<{ submittedAt?: string }>,
+    from: Date,
+    to: Date,
+    granularity: AnalyticsGranularity,
+  ) {
+    const buckets: Array<{ date: string; count: number; start: Date }> = [];
+    let cursor = normalizeUtcDay(from);
+    const end = normalizeUtcDay(to);
+
+    while (cursor <= end) {
+      buckets.push({ date: formatDateKey(cursor), count: 0, start: new Date(cursor) });
+      cursor = addGranularityStep(cursor, granularity);
+    }
+
+    for (const response of responses) {
+      if (!response.submittedAt) {
+        continue;
+      }
+
+      const submittedAt = new Date(response.submittedAt);
+      for (let index = buckets.length - 1; index >= 0; index -= 1) {
+        const bucket = buckets[index]!;
+        const nextStart = addGranularityStep(bucket.start, granularity);
+        if (submittedAt >= bucket.start && submittedAt < nextStart) {
+          bucket.count += 1;
+          break;
+        }
+      }
+    }
+
+    return buckets.map(({ date, count }) => ({ date, count }));
+  }
+
+  function buildQuestionBreakdowns(
+    responses: Array<{
+      answerPreview: Array<{ questionId: string; questionLabel: string; valuePreview: string }>;
+    }>,
+    questionId?: string,
+  ) {
+    const scoreDistribution = new Map<string, number>();
+    const channelDistribution = new Map<string, number>();
+    let commentCount = 0;
+
+    for (const response of responses) {
+      const score = response.answerPreview.find((item) => item.questionId === 'q-overall');
+      if (score) {
+        scoreDistribution.set(score.valuePreview, (scoreDistribution.get(score.valuePreview) ?? 0) + 1);
+      }
+
+      const channel = response.answerPreview.find((item) => item.questionId === 'q-channel');
+      if (channel) {
+        channelDistribution.set(channel.valuePreview, (channelDistribution.get(channel.valuePreview) ?? 0) + 1);
+      }
+
+      const comment = response.answerPreview.find((item) => item.questionId === 'q-comment');
+      if (comment && comment.valuePreview.trim().length > 0) {
+        commentCount += 1;
+      }
+    }
+
+    const breakdowns = [
+      {
+        questionId: 'q-overall',
+        questionLabel: 'Overall satisfaction',
+        questionType: 'rating' as const,
+        responses: responses.length,
+        distribution: [...scoreDistribution.entries()].map(([label, value]) => ({ label, value })),
+      },
+      {
+        questionId: 'q-channel',
+        questionLabel: 'Acquisition channel',
+        questionType: 'single_choice' as const,
+        responses: responses.length,
+        distribution: [...channelDistribution.entries()].map(([label, value]) => ({ label, value })),
+      },
+      {
+        questionId: 'q-comment',
+        questionLabel: 'Additional comments',
+        questionType: 'text' as const,
+        responses: commentCount,
+      },
+    ];
+
+    if (!questionId) {
+      return breakdowns;
+    }
+
+    return breakdowns.filter((item) => item.questionId === questionId);
+  }
+
   const jobsService = deps?.db
     ? createJobsService({
         repository: createJobsRepository(deps.db),
@@ -352,6 +473,151 @@ export async function formsRoutes(
           total,
           totalPages,
         },
+      },
+    });
+  });
+
+  // GET /forms/:id/analytics/overview
+  zApp.get('/forms/:id/analytics/overview', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const { id } = request.params as { id: string };
+    const query = request.query as Record<string, string | undefined>;
+
+    const resolvedForm = await resolveAccessibleForm(id, principal.userId);
+    if (!resolvedForm) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
+    }
+
+    const now = new Date();
+    const defaultTo = normalizeUtcDay(now);
+    const defaultFrom = new Date(defaultTo);
+    defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 29);
+
+    const from = parseDateParam(query.from) ?? defaultFrom;
+    const to = parseDateParam(query.to) ?? defaultTo;
+    const granularity = parseAnalyticsGranularity(query.granularity);
+    const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
+
+    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const filteredResponses = allResponses.filter((response) => {
+      if (!response.submittedAt) {
+        return false;
+      }
+
+      const submittedAt = new Date(response.submittedAt).getTime();
+      return submittedAt >= from.getTime() && submittedAt <= to.getTime();
+    });
+
+    const completedResponses = filteredResponses.filter((response) => response.completion === 'completed').length;
+    const completionRate = filteredResponses.length > 0 ? Math.round((completedResponses / filteredResponses.length) * 100) : 0;
+
+    const scoreValues = filteredResponses
+      .map((response) => response.answerPreview.find((item) => item.questionId === 'q-overall')?.valuePreview)
+      .filter((value): value is string => Boolean(value))
+      .map((value) => Number.parseInt(value.split('/')[0] ?? '', 10))
+      .filter((value) => Number.isFinite(value));
+
+    const averageScore =
+      scoreValues.length > 0
+        ? (scoreValues.reduce((total, value) => total + value, 0) / scoreValues.length).toFixed(1)
+        : '0.0';
+
+    return reply.send({
+      success: true,
+      data: {
+        kpis: [
+          {
+            label: 'Responses in range',
+            value: String(filteredResponses.length),
+            delta: `${resolvedForm.responseCount} total`,
+          },
+          {
+            label: 'Completion rate',
+            value: `${completionRate}%`,
+            delta: `${completedResponses} completed`,
+          },
+          {
+            label: 'Avg satisfaction',
+            value: averageScore,
+            delta: 'Scale: 1 to 5',
+          },
+        ],
+        series: buildAnalyticsSeries(filteredResponses, from, to, granularity),
+        appliedFilters: {
+          from: from.toISOString(),
+          to: to.toISOString(),
+          granularity,
+          ...(questionId ? { questionId } : {}),
+        },
+        dataFreshness: {
+          generatedAt: new Date().toISOString(),
+          lastSuccessfulSyncAt: resolvedForm.updatedAt.toISOString(),
+          lastAttemptedSyncAt: resolvedForm.updatedAt.toISOString(),
+        },
+      },
+      meta: {
+        requestId: request.id,
+      },
+    });
+  });
+
+  // GET /forms/:id/analytics/questions
+  zApp.get('/forms/:id/analytics/questions', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const { id } = request.params as { id: string };
+    const query = request.query as Record<string, string | undefined>;
+
+    const resolvedForm = await resolveAccessibleForm(id, principal.userId);
+    if (!resolvedForm) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
+    }
+
+    const now = new Date();
+    const defaultTo = normalizeUtcDay(now);
+    const defaultFrom = new Date(defaultTo);
+    defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 29);
+
+    const from = parseDateParam(query.from) ?? defaultFrom;
+    const to = parseDateParam(query.to) ?? defaultTo;
+    const granularity = parseAnalyticsGranularity(query.granularity);
+    const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
+
+    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const filteredResponses = allResponses.filter((response) => {
+      if (!response.submittedAt) {
+        return false;
+      }
+
+      const submittedAt = new Date(response.submittedAt).getTime();
+      return submittedAt >= from.getTime() && submittedAt <= to.getTime();
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        questions: buildQuestionBreakdowns(filteredResponses, questionId),
+        appliedFilters: {
+          from: from.toISOString(),
+          to: to.toISOString(),
+          granularity,
+          ...(questionId ? { questionId } : {}),
+        },
+        dataFreshness: {
+          generatedAt: new Date().toISOString(),
+          lastSuccessfulSyncAt: resolvedForm.updatedAt.toISOString(),
+          lastAttemptedSyncAt: resolvedForm.updatedAt.toISOString(),
+        },
+      },
+      meta: {
+        requestId: request.id,
       },
     });
   });

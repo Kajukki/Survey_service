@@ -73,6 +73,12 @@
   font-weight: 700;
 }
 
+.metric-delta {
+  margin-top: 0.3rem;
+  color: var(--text-subtle);
+  font-size: 0.8rem;
+}
+
 .section-list {
   padding: 1rem;
 }
@@ -114,6 +120,13 @@
   padding: 0.85rem;
 }
 
+.analytics-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem;
+}
+
 .question-filters label {
   display: grid;
   gap: 0.35rem;
@@ -123,6 +136,13 @@
 }
 
 .response-filters label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text-subtle);
+  font-size: 0.82rem;
+}
+
+.analytics-filters label {
   display: grid;
   gap: 0.35rem;
   color: var(--text-subtle);
@@ -145,6 +165,94 @@
   background: var(--bg-subtle);
   color: var(--text-body);
   padding: 0.45rem 0.6rem;
+}
+
+.analytics-filters input,
+.analytics-filters select {
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  color: var(--text-body);
+  padding: 0.45rem 0.6rem;
+}
+
+.analytics-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.analytics-series {
+  padding: 1rem;
+}
+
+.analytics-series header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.6rem;
+}
+
+.analytics-series header p {
+  color: var(--text-subtle);
+  font-size: 0.82rem;
+}
+
+.analytics-series ul {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.analytics-series li {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  padding: 0.5rem 0.65rem;
+}
+
+.analytics-questions {
+  padding: 1rem;
+}
+
+.analytics-questions article {
+  border-top: 1px solid var(--line-default);
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+}
+
+.analytics-questions article header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.analytics-questions article p {
+  color: var(--text-subtle);
+  margin: 0.35rem 0 0;
+  font-size: 0.84rem;
+}
+
+.analytics-questions ul {
+  list-style: none;
+  margin: 0.55rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.analytics-questions li {
+  display: flex;
+  justify-content: space-between;
+  border: 1px solid var(--line-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  padding: 0.5rem 0.65rem;
 }
 
 .responses-list {
@@ -293,6 +401,14 @@
   }
 
   .response-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics-kpis {
     grid-template-columns: 1fr;
   }
 

@@ -90,6 +90,63 @@ export interface FormResponseSummaryRecord {
   answerPreview: FormResponseAnswerPreviewRecord[];
 }
 
+export type FormAnalyticsGranularity = 'day' | 'week' | 'month';
+
+export interface FormAnalyticsKpiRecord {
+  label: string;
+  value: string;
+  delta?: string;
+}
+
+export interface FormAnalyticsSeriesPointRecord {
+  date: string;
+  count: number;
+}
+
+export interface FormAnalyticsDistributionRecord {
+  label: string;
+  value: number;
+}
+
+export interface FormAnalyticsQuestionRecord {
+  questionId: string;
+  questionLabel: string;
+  questionType: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  responses: number;
+  distribution?: FormAnalyticsDistributionRecord[];
+}
+
+export interface FormAnalyticsOverviewRecord {
+  kpis: FormAnalyticsKpiRecord[];
+  series: FormAnalyticsSeriesPointRecord[];
+  appliedFilters: {
+    from: string;
+    to: string;
+    granularity: FormAnalyticsGranularity;
+    questionId?: string;
+  };
+  dataFreshness: {
+    generatedAt: string;
+    lastSuccessfulSyncAt?: string;
+    lastAttemptedSyncAt?: string;
+  };
+}
+
+export interface FormAnalyticsQuestionsRecord {
+  questions: FormAnalyticsQuestionRecord[];
+  appliedFilters: {
+    from: string;
+    to: string;
+    granularity: FormAnalyticsGranularity;
+    questionId?: string;
+  };
+  dataFreshness: {
+    generatedAt: string;
+    lastSuccessfulSyncAt?: string;
+    lastAttemptedSyncAt?: string;
+  };
+}
+
 export interface SyncJob {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
