@@ -43,6 +43,53 @@ export async function formsRoutes(
     };
   }
 
+  async function resolveAccessibleForm(id: string, userId: string) {
+    if (!db) {
+      return mockForms.find((form) => form.id === id && form.ownerId === userId) ?? null;
+    }
+
+    const ownedForm = await db
+      .selectFrom('forms')
+      .select([
+        'id',
+        'owner_id',
+        'connection_id',
+        'external_form_id',
+        'title',
+        'description',
+        'response_count',
+        'created_at',
+        'updated_at',
+      ])
+      .where('id', '=', id)
+      .where('owner_id', '=', userId)
+      .executeTakeFirst();
+
+    if (ownedForm) {
+      return mapFormRow(ownedForm);
+    }
+
+    const sharedForm = await db
+      .selectFrom('forms')
+      .innerJoin('form_shares', 'form_shares.form_id', 'forms.id')
+      .select([
+        'forms.id as id',
+        'forms.owner_id as owner_id',
+        'forms.connection_id as connection_id',
+        'forms.external_form_id as external_form_id',
+        'forms.title as title',
+        'forms.description as description',
+        'forms.response_count as response_count',
+        'forms.created_at as created_at',
+        'forms.updated_at as updated_at',
+      ])
+      .where('forms.id', '=', id)
+      .where('form_shares.grantee_user_id', '=', userId)
+      .executeTakeFirst();
+
+    return sharedForm ? mapFormRow(sharedForm) : null;
+  }
+
   const jobsService = deps?.db
     ? createJobsService({
         repository: createJobsRepository(deps.db),
@@ -115,50 +162,7 @@ export async function formsRoutes(
   zApp.get('/forms/:id', async (request, reply) => {
     const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const resolvedForm = db
-      ? await (async () => {
-          const ownedForm = await db
-            .selectFrom('forms')
-            .select([
-              'id',
-              'owner_id',
-              'connection_id',
-              'external_form_id',
-              'title',
-              'description',
-              'response_count',
-              'created_at',
-              'updated_at',
-            ])
-            .where('id', '=', id)
-            .where('owner_id', '=', principal.userId)
-            .executeTakeFirst();
-
-          if (ownedForm) {
-            return mapFormRow(ownedForm);
-          }
-
-          const sharedForm = await db
-            .selectFrom('forms')
-            .innerJoin('form_shares', 'form_shares.form_id', 'forms.id')
-            .select([
-              'forms.id as id',
-              'forms.owner_id as owner_id',
-              'forms.connection_id as connection_id',
-              'forms.external_form_id as external_form_id',
-              'forms.title as title',
-              'forms.description as description',
-              'forms.response_count as response_count',
-              'forms.created_at as created_at',
-              'forms.updated_at as updated_at',
-            ])
-            .where('forms.id', '=', id)
-            .where('form_shares.grantee_user_id', '=', principal.userId)
-            .executeTakeFirst();
-
-          return sharedForm ? mapFormRow(sharedForm) : null;
-        })()
-      : mockForms.find((f) => f.id === id && f.ownerId === principal.userId);
+    const resolvedForm = await resolveAccessibleForm(id, principal.userId);
 
     if (!resolvedForm) {
       return reply.status(404).send({
@@ -169,6 +173,40 @@ export async function formsRoutes(
     }
 
     return reply.send({ success: true, data: resolvedForm, meta: { requestId: request.id } });
+  });
+
+  // GET /forms/:id/structure
+  zApp.get('/forms/:id/structure', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const { id } = request.params as { id: string };
+    const resolvedForm = await resolveAccessibleForm(id, principal.userId);
+
+    if (!resolvedForm) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        form: {
+          id: resolvedForm.id,
+          ownerId: resolvedForm.ownerId,
+          title: resolvedForm.title,
+          description: resolvedForm.description,
+          responseCount: resolvedForm.responseCount,
+          updatedAt: resolvedForm.updatedAt.toISOString(),
+        },
+        sections: [],
+        questionCount: 0,
+      },
+      meta: {
+        requestId: request.id,
+      },
+    });
   });
 
   // POST /forms/:id/sync

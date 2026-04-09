@@ -1,0 +1,145 @@
+<section class="workspace-page">
+  <header class="page-header card">
+    <div>
+      <a routerLink="/forms" class="back-link">Back to forms</a>
+      <h2>{{ structure()?.title ?? 'Form workspace' }}</h2>
+      <p>
+        Explore form structure now, with response and analytics tabs prepared for the next slices.
+      </p>
+    </div>
+    <button type="button" class="btn-primary" (click)="refresh()">Refresh</button>
+  </header>
+
+  @if (structureResource.isLoading()) {
+    <section class="card empty-state">
+      <h3>Loading form structure...</h3>
+    </section>
+  } @else if (structureResource.error()) {
+    <section class="card empty-state">
+      <h3>Unable to load form structure</h3>
+      <p>Try refreshing. If this continues, verify that you have access to this form.</p>
+      <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
+    </section>
+  } @else if (!structure()) {
+    <section class="card empty-state">
+      <h3>Form not available</h3>
+      <p>The requested form could not be resolved.</p>
+    </section>
+  } @else {
+    <section class="tabs card">
+      <button type="button" [class.active]="activeTab() === 'overview'" (click)="selectTab('overview')">
+        Overview
+      </button>
+      <button type="button" [class.active]="activeTab() === 'questions'" (click)="selectTab('questions')">
+        Questions
+      </button>
+      <button type="button" [class.active]="activeTab() === 'responses'" (click)="selectTab('responses')">
+        Responses
+      </button>
+      <button type="button" [class.active]="activeTab() === 'analytics'" (click)="selectTab('analytics')">
+        Analytics
+      </button>
+    </section>
+
+    @if (activeTab() === 'overview') {
+      <section class="overview-grid">
+        <article class="card metric">
+          <h3>Responses</h3>
+          <p class="metric-value">{{ structure()!.responseCount }}</p>
+        </article>
+        <article class="card metric">
+          <h3>Sections</h3>
+          <p class="metric-value">{{ structure()!.sections.length }}</p>
+        </article>
+        <article class="card metric">
+          <h3>Questions</h3>
+          <p class="metric-value">{{ structure()!.questionCount }}</p>
+        </article>
+      </section>
+
+      <section class="card section-list">
+        <h3>Form Sections</h3>
+        @for (section of structure()!.sections; track section.id) {
+          <article>
+            <h4>{{ section.title }}</h4>
+            <p>{{ section.description || 'No section description provided.' }}</p>
+            <span>{{ section.questions.length }} questions</span>
+          </article>
+        } @empty {
+          <p class="empty-inline">No structured sections are available yet.</p>
+        }
+      </section>
+    }
+
+    @if (activeTab() === 'questions') {
+      <section class="card question-filters">
+        <label>
+          Search
+          <input
+            type="search"
+            [value]="workspaceState().search ?? ''"
+            placeholder="Search questions"
+            (input)="updateSearch($any($event.target).value)"
+          />
+        </label>
+
+        <label>
+          Type
+          <select
+            [value]="workspaceState().questionType ?? ''"
+            (change)="updateQuestionType($any($event.target).value)"
+          >
+            <option value="">All types</option>
+            <option value="single_choice">Single choice</option>
+            <option value="multi_choice">Multi choice</option>
+            <option value="text">Text</option>
+            <option value="rating">Rating</option>
+            <option value="date">Date</option>
+            <option value="number">Number</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card section-list">
+        <h3>Questions</h3>
+        @for (section of filteredSections(); track section.id) {
+          <article>
+            <h4>{{ section.title }}</h4>
+            <ul>
+              @for (question of section.questions; track question.id) {
+                <li>
+                  <div>
+                    <strong>{{ question.label }}</strong>
+                    <small>{{ question.description || 'No description' }}</small>
+                  </div>
+                  <div class="question-meta">
+                    <span class="badge">{{ question.type }}</span>
+                    @if (question.required) {
+                      <span class="required">Required</span>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          </article>
+        } @empty {
+          <p class="empty-inline">No questions match the current filters.</p>
+        }
+      </section>
+    }
+
+    @if (activeTab() === 'responses') {
+      <section class="card empty-state">
+        <h3>Responses tab is coming next</h3>
+        <p>Server-side response browsing will be added in the next implementation slice.</p>
+      </section>
+    }
+
+    @if (activeTab() === 'analytics') {
+      <section class="card empty-state">
+        <h3>Analytics tab is coming next</h3>
+        <p>Response-centered analytics widgets will be introduced after response browsing.</p>
+      </section>
+    }
+  }
+</section>
