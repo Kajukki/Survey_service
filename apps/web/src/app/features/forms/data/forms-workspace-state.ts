@@ -12,9 +12,11 @@ const ALLOWED_TABS: ReadonlySet<FormsWorkspaceTab> = new Set([
 export interface FormsWorkspaceState {
   tab: FormsWorkspaceTab;
   questionType?: string;
-  search?: string;
-  questionId?: string;
+  questionSearch?: string;
+  responseSearch?: string;
+  responseQuestionId?: string;
   completion?: 'completed' | 'partial';
+  analyticsQuestionId?: string;
   analyticsFrom: string;
   analyticsTo: string;
   analyticsGranularity: 'day' | 'week' | 'month';
@@ -65,12 +67,34 @@ export function parseFormsWorkspaceState(params: Params): FormsWorkspaceState {
         ? (tabCandidate as FormsWorkspaceTab)
         : defaults.tab,
     questionType: typeof params['questionType'] === 'string' ? params['questionType'] : undefined,
-    search: typeof params['search'] === 'string' ? params['search'] : undefined,
-    questionId: typeof params['questionId'] === 'string' ? params['questionId'] : undefined,
+    questionSearch:
+      typeof params['questionSearch'] === 'string'
+        ? params['questionSearch']
+        : typeof params['search'] === 'string'
+          ? params['search']
+          : undefined,
+    responseSearch:
+      typeof params['responseSearch'] === 'string'
+        ? params['responseSearch']
+        : typeof params['search'] === 'string'
+          ? params['search']
+          : undefined,
+    responseQuestionId:
+      typeof params['responseQuestionId'] === 'string'
+        ? params['responseQuestionId']
+        : typeof params['questionId'] === 'string'
+          ? params['questionId']
+          : undefined,
     completion:
       params['completion'] === 'completed' || params['completion'] === 'partial'
         ? params['completion']
         : undefined,
+    analyticsQuestionId:
+      typeof params['analyticsQuestionId'] === 'string'
+        ? params['analyticsQuestionId']
+        : typeof params['questionId'] === 'string'
+          ? params['questionId']
+          : undefined,
     analyticsFrom:
       typeof params['analyticsFrom'] === 'string' && params['analyticsFrom'].length > 0
         ? params['analyticsFrom']
@@ -101,16 +125,24 @@ export function buildFormsWorkspaceQueryParams(state: FormsWorkspaceState): Para
     params['questionType'] = state.questionType;
   }
 
-  if (state.search) {
-    params['search'] = state.search;
+  if (state.questionSearch) {
+    params['questionSearch'] = state.questionSearch;
   }
 
-  if (state.questionId) {
-    params['questionId'] = state.questionId;
+  if (state.responseSearch) {
+    params['responseSearch'] = state.responseSearch;
+  }
+
+  if (state.responseQuestionId) {
+    params['responseQuestionId'] = state.responseQuestionId;
   }
 
   if (state.completion) {
     params['completion'] = state.completion;
+  }
+
+  if (state.analyticsQuestionId) {
+    params['analyticsQuestionId'] = state.analyticsQuestionId;
   }
 
   params['analyticsFrom'] = state.analyticsFrom;
