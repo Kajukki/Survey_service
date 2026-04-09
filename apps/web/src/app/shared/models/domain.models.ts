@@ -75,6 +75,21 @@ export interface FormStructureRecord {
   questionCount: number;
 }
 
+export type FormResponseCompletion = 'completed' | 'partial';
+
+export interface FormResponseAnswerPreviewRecord {
+  questionId: string;
+  questionLabel: string;
+  valuePreview: string;
+}
+
+export interface FormResponseSummaryRecord {
+  id: string;
+  submittedAt?: string;
+  completion: FormResponseCompletion;
+  answerPreview: FormResponseAnswerPreviewRecord[];
+}
+
 export interface SyncJob {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';

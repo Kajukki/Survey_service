@@ -1,15 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { httpResource } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Params, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 import { API_BASE_URL } from '../../core/api/api-config.token';
 import { ApiSuccessEnvelope } from '../../core/api/api-envelope';
 import {
+  FormResponsesListDto,
   FormStructureDto,
+  mapFormResponses,
   mapFormStructure,
 } from '../../core/api/survey-api.adapters';
-import { FormSectionRecord, FormStructureRecord } from '../../shared/models/domain.models';
+import {
+  FormResponseSummaryRecord,
+  FormSectionRecord,
+  FormStructureRecord,
+} from '../../shared/models/domain.models';
 import {
   FormsWorkspaceTab,
   buildFormsWorkspaceQueryParams,
@@ -19,7 +26,7 @@ import {
 @Component({
   selector: 'app-form-workspace-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, DatePipe],
   templateUrl: './form-workspace.page.html',
   styleUrl: './form-workspace.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -42,6 +49,10 @@ export class FormWorkspacePageComponent {
 
   protected readonly structureResource = httpResource<ApiSuccessEnvelope<FormStructureDto>>(
     () => this.buildStructureEndpoint(),
+  );
+
+  protected readonly responsesResource = httpResource<ApiSuccessEnvelope<FormResponsesListDto>>(
+    () => this.buildResponsesEndpoint(),
   );
 
   protected readonly structure = computed<FormStructureRecord | null>(() => {
@@ -77,6 +88,22 @@ export class FormWorkspacePageComponent {
       .filter((section) => section.questions.length > 0);
   });
 
+  protected readonly responses = computed<FormResponseSummaryRecord[]>(() => {
+    const dto = this.responsesResource.value()?.data;
+    return dto ? mapFormResponses(dto) : [];
+  });
+
+  protected readonly responsePage = computed(() => this.workspaceState().responsesPage);
+  protected readonly responsePerPage = computed(() => this.workspaceState().responsesPerPage);
+  protected readonly responseTotalPages = computed(() => this.responsesResource.value()?.meta?.pagination?.totalPages ?? 0);
+  protected readonly responseTotal = computed(() => this.responsesResource.value()?.meta?.pagination?.total ?? 0);
+
+  protected readonly canPreviousResponsesPage = computed(() => this.responsePage() > 1);
+  protected readonly canNextResponsesPage = computed(() => {
+    const totalPages = this.responseTotalPages();
+    return totalPages > 0 && this.responsePage() < totalPages;
+  });
+
   protected selectTab(tab: FormsWorkspaceTab): void {
     this.updateWorkspaceState({ tab });
   }
@@ -89,8 +116,58 @@ export class FormWorkspacePageComponent {
     this.updateWorkspaceState({ questionType: value || undefined });
   }
 
+  protected updateResponsesSearch(value: string): void {
+    this.updateWorkspaceState({
+      search: value || undefined,
+      responsesPage: 1,
+    });
+  }
+
+  protected updateResponsesQuestionId(value: string): void {
+    this.updateWorkspaceState({
+      questionId: value || undefined,
+      responsesPage: 1,
+    });
+  }
+
+  protected updateResponsesCompletion(value: string): void {
+    this.updateWorkspaceState({
+      completion: value === 'completed' || value === 'partial' ? value : undefined,
+      responsesPage: 1,
+    });
+  }
+
+  protected updateResponsesPerPage(value: string): void {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return;
+    }
+
+    this.updateWorkspaceState({
+      responsesPerPage: Math.min(parsed, 100),
+      responsesPage: 1,
+    });
+  }
+
+  protected previousResponsesPage(): void {
+    if (!this.canPreviousResponsesPage()) {
+      return;
+    }
+
+    this.updateWorkspaceState({ responsesPage: this.responsePage() - 1 });
+  }
+
+  protected nextResponsesPage(): void {
+    if (!this.canNextResponsesPage()) {
+      return;
+    }
+
+    this.updateWorkspaceState({ responsesPage: this.responsePage() + 1 });
+  }
+
   protected refresh(): void {
     this.structureResource.reload();
+    this.responsesResource.reload();
   }
 
   private buildStructureEndpoint(): string | undefined {
@@ -100,6 +177,33 @@ export class FormWorkspacePageComponent {
     }
 
     return `${this.apiBaseUrl}/forms/${formId}/structure`;
+  }
+
+  private buildResponsesEndpoint(): string | undefined {
+    const formId = this.routeParams()['id'];
+    if (!formId || typeof formId !== 'string') {
+      return undefined;
+    }
+
+    const state = this.workspaceState();
+    const searchParams = new URLSearchParams({
+      page: String(state.responsesPage),
+      perPage: String(state.responsesPerPage),
+    });
+
+    if (state.questionId) {
+      searchParams.set('questionId', state.questionId);
+    }
+
+    if (state.search) {
+      searchParams.set('answerContains', state.search);
+    }
+
+    if (state.completion) {
+      searchParams.set('completion', state.completion);
+    }
+
+    return `${this.apiBaseUrl}/forms/${formId}/responses?${searchParams.toString()}`;
   }
 
   private updateWorkspaceState(partial: Partial<ReturnType<typeof parseFormsWorkspaceState>>): void {

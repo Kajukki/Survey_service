@@ -11,6 +11,7 @@ describe('forms workspace state', () => {
       tab: 'questions',
       questionType: 'single_choice',
       search: 'satisfaction',
+      completion: 'completed',
       responsesPage: '3',
       responsesPerPage: '50',
     });
@@ -20,6 +21,7 @@ describe('forms workspace state', () => {
       questionType: 'single_choice',
       search: 'satisfaction',
       questionId: undefined,
+      completion: 'completed',
       responsesPage: 3,
       responsesPerPage: 50,
     });
@@ -44,6 +46,7 @@ describe('forms workspace state', () => {
       questionId: 'q1',
       questionType: 'text',
       search: 'hello',
+      completion: 'partial',
       responsesPage: 2,
       responsesPerPage: 25,
     });
@@ -53,6 +56,7 @@ describe('forms workspace state', () => {
       questionId: 'q1',
       questionType: 'text',
       search: 'hello',
+      completion: 'partial',
       responsesPage: '2',
       responsesPerPage: '25',
     });

@@ -129,10 +129,108 @@
     }
 
     @if (activeTab() === 'responses') {
-      <section class="card empty-state">
-        <h3>Responses tab is coming next</h3>
-        <p>Server-side response browsing will be added in the next implementation slice.</p>
+      <section class="card response-filters">
+        <label>
+          Answer contains
+          <input
+            type="search"
+            [value]="workspaceState().search ?? ''"
+            placeholder="Search preview text"
+            (input)="updateResponsesSearch($any($event.target).value)"
+          />
+        </label>
+
+        <label>
+          Question ID
+          <input
+            type="text"
+            [value]="workspaceState().questionId ?? ''"
+            placeholder="q-overall"
+            (input)="updateResponsesQuestionId($any($event.target).value)"
+          />
+        </label>
+
+        <label>
+          Completion
+          <select
+            [value]="workspaceState().completion ?? ''"
+            (change)="updateResponsesCompletion($any($event.target).value)"
+          >
+            <option value="">All</option>
+            <option value="completed">Completed</option>
+            <option value="partial">Partial</option>
+          </select>
+        </label>
+
+        <label>
+          Per page
+          <select
+            [value]="workspaceState().responsesPerPage"
+            (change)="updateResponsesPerPage($any($event.target).value)"
+          >
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </label>
       </section>
+
+      @if (responsesResource.isLoading()) {
+        <section class="card empty-state">
+          <h3>Loading responses...</h3>
+        </section>
+      } @else if (responsesResource.error()) {
+        <section class="card empty-state">
+          <h3>Unable to load responses</h3>
+          <p>Try refreshing the page or adjusting filters.</p>
+          <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
+        </section>
+      } @else {
+        <section class="card responses-list">
+          <header>
+            <h3>Responses</h3>
+            <p>{{ responseTotal() }} total</p>
+          </header>
+
+          @for (response of responses(); track response.id) {
+            <article class="response-item">
+              <div class="response-meta">
+                <span class="response-id">{{ response.id }}</span>
+                <span class="badge">{{ response.completion }}</span>
+                @if (response.submittedAt) {
+                  <span class="submitted">{{ response.submittedAt | date: 'medium' }}</span>
+                }
+              </div>
+
+              <ul>
+                @for (preview of response.answerPreview; track preview.questionId + preview.valuePreview) {
+                  <li>
+                    <strong>{{ preview.questionLabel }}</strong>
+                    <span>{{ preview.valuePreview }}</span>
+                  </li>
+                }
+              </ul>
+            </article>
+          } @empty {
+            <p class="empty-inline">No responses match the current filters.</p>
+          }
+
+          <footer class="responses-pagination">
+            <button type="button" class="btn-secondary" [disabled]="!canPreviousResponsesPage()" (click)="previousResponsesPage()">
+              Previous
+            </button>
+            <span>
+              Page {{ responsePage() }}
+              @if (responseTotalPages() > 0) {
+                <span>of {{ responseTotalPages() }}</span>
+              }
+            </span>
+            <button type="button" class="btn-secondary" [disabled]="!canNextResponsesPage()" (click)="nextResponsesPage()">
+              Next
+            </button>
+          </footer>
+        </section>
+      }
     }
 
     @if (activeTab() === 'analytics') {

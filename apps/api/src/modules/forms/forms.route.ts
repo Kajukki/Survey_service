@@ -90,6 +90,65 @@ export async function formsRoutes(
     return sharedForm ? mapFormRow(sharedForm) : null;
   }
 
+  function parsePositiveInt(value: unknown, fallback: number): number {
+    if (typeof value !== 'string') {
+      return fallback;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return fallback;
+    }
+
+    return parsed;
+  }
+
+  function parseDateParam(value: unknown): Date | null {
+    if (typeof value !== 'string') {
+      return null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+
+  function buildMockResponses(formId: string, total: number) {
+    const boundedTotal = Math.max(0, Math.min(total, 600));
+    const now = Date.now();
+
+    return Array.from({ length: boundedTotal }, (_, index) => {
+      const ordinal = index + 1;
+      const completion = ordinal % 4 === 0 ? 'partial' : 'completed';
+      const submittedAt = new Date(now - ordinal * 6 * 60 * 60 * 1000).toISOString();
+      const score = ((ordinal % 5) + 1).toString();
+      const channel = ['Organic', 'Referral', 'Paid', 'Social'][ordinal % 4]!;
+      const comment = `Response ${ordinal} for ${formId.slice(0, 8)}`;
+
+      return {
+        id: `${formId}-resp-${ordinal.toString().padStart(4, '0')}`,
+        submittedAt,
+        completion,
+        answerPreview: [
+          {
+            questionId: 'q-overall',
+            questionLabel: 'Overall satisfaction',
+            valuePreview: `${score}/5`,
+          },
+          {
+            questionId: 'q-channel',
+            questionLabel: 'Acquisition channel',
+            valuePreview: channel,
+          },
+          {
+            questionId: 'q-comment',
+            questionLabel: 'Additional comments',
+            valuePreview: comment,
+          },
+        ],
+      };
+    });
+  }
+
   const jobsService = deps?.db
     ? createJobsService({
         repository: createJobsRepository(deps.db),
@@ -205,6 +264,94 @@ export async function formsRoutes(
       },
       meta: {
         requestId: request.id,
+      },
+    });
+  });
+
+  // GET /forms/:id/responses
+  zApp.get('/forms/:id/responses', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const { id } = request.params as { id: string };
+    const query = request.query as Record<string, string | undefined>;
+
+    const resolvedForm = await resolveAccessibleForm(id, principal.userId);
+    if (!resolvedForm) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
+    }
+
+    const page = parsePositiveInt(query.page, 1);
+    const perPage = Math.min(parsePositiveInt(query.perPage, 20), 100);
+    const from = parseDateParam(query.from);
+    const to = parseDateParam(query.to);
+    const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
+    const answerContains =
+      typeof query.answerContains === 'string' && query.answerContains.trim().length > 0
+        ? query.answerContains.trim().toLowerCase()
+        : undefined;
+    const completion =
+      query.completion === 'completed' || query.completion === 'partial' ? query.completion : undefined;
+
+    const allResponses = buildMockResponses(id, resolvedForm.responseCount);
+    const filteredResponses = allResponses.filter((response) => {
+      if (completion && response.completion !== completion) {
+        return false;
+      }
+
+      if (from || to) {
+        const submittedAt = response.submittedAt ? new Date(response.submittedAt).getTime() : null;
+        if (submittedAt !== null) {
+          if (from && submittedAt < from.getTime()) {
+            return false;
+          }
+          if (to && submittedAt > to.getTime()) {
+            return false;
+          }
+        }
+      }
+
+      if (questionId && !response.answerPreview.some((preview) => preview.questionId === questionId)) {
+        return false;
+      }
+
+      if (
+        answerContains &&
+        !response.answerPreview.some((preview) => preview.valuePreview.toLowerCase().includes(answerContains))
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const total = filteredResponses.length;
+    const totalPages = total > 0 ? Math.ceil(total / perPage) : 0;
+    const pageOffset = (page - 1) * perPage;
+    const pagedResponses = filteredResponses.slice(pageOffset, pageOffset + perPage);
+
+    return reply.send({
+      success: true,
+      data: {
+        responses: pagedResponses,
+        appliedFilters: {
+          ...(from ? { from: from.toISOString() } : {}),
+          ...(to ? { to: to.toISOString() } : {}),
+          ...(questionId ? { questionId } : {}),
+          ...(answerContains ? { answerContains: query.answerContains } : {}),
+          ...(completion ? { completion } : {}),
+        },
+      },
+      meta: {
+        requestId: request.id,
+        pagination: {
+          page,
+          perPage,
+          total,
+          totalPages,
+        },
       },
     });
   });
