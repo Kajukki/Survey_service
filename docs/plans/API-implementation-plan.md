@@ -28,11 +28,14 @@ This document is the execution backlog for API delivery, based on the current im
 5. Domain persistence parity for core modules
 - Connections/forms/sharing routes are DB-backed in runtime with owner/share-scoped access checks.
 
+6. Export workflow lifecycle baseline
+- Export enqueue/list/detail/download API surface is implemented with owner-scoped reads.
+- Worker now processes queued export jobs and transitions to `ready` with generated `download_url`.
+
 ### In Progress
 
-1. Export workflow completion
-- Export enqueue/list/detail/download API surface is implemented with owner-scoped reads.
-- Export generation worker path and terminal status transitions to ready/downloadable are still pending.
+1. Export workflow production hardening
+- Replace placeholder download URL generation with durable artifact storage and signed URL delivery.
 
 2. Authorization parity
 - Principal extraction is active on protected routes.

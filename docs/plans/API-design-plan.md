@@ -81,7 +81,7 @@ Design objective:
 
 ### Planned
 
-- Export generation completion path to terminal downloadable artifacts.
+- Export artifact storage and signed URL delivery hardening path.
 - Analytics/dashboard endpoints.
 
 ## Phased Delivery

@@ -51,6 +51,7 @@ const configSchema = z.object({
     .string()
     .url('GOOGLE_FORMS_API_BASE_URL must be a valid URL')
     .default('https://forms.googleapis.com/v1'),
+  EXPORT_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
 });
 
 type WorkerConfig = z.infer<typeof configSchema>;
@@ -321,6 +322,87 @@ async function markJobFailed(pool: Pool, jobId: string, errorMessage: string): P
     `,
     [jobId, errorMessage],
   );
+}
+
+type ExportJobRow = {
+  id: string;
+  format: 'csv' | 'json' | 'excel';
+};
+
+function getExportFileExtension(format: ExportJobRow['format']): string {
+  if (format === 'excel') {
+    return 'xlsx';
+  }
+
+  return format;
+}
+
+function buildExportDownloadUrl(exportId: string, format: ExportJobRow['format']): string {
+  const extension = getExportFileExtension(format);
+  return `https://example.com/downloads/${exportId}.${extension}`;
+}
+
+async function processQueuedExportJobs(pool: Pool, logger: Logger): Promise<number> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const queued = await client.query<ExportJobRow>(
+      `
+        SELECT id, format
+        FROM export_jobs
+        WHERE status = 'queued'
+        ORDER BY requested_at ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT 20
+      `,
+    );
+
+    for (const job of queued.rows) {
+      try {
+        const downloadUrl = buildExportDownloadUrl(job.id, job.format);
+        await client.query(
+          `
+            UPDATE export_jobs
+            SET
+              status = 'ready',
+              download_url = $2,
+              error = NULL,
+              completed_at = NOW()
+            WHERE id = $1
+          `,
+          [job.id, downloadUrl],
+        );
+      } catch (error) {
+        await client.query(
+          `
+            UPDATE export_jobs
+            SET
+              status = 'failed',
+              error = $2,
+              completed_at = NOW()
+            WHERE id = $1
+          `,
+          [job.id, extractErrorMessage(error)],
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    const processedCount = queued.rows.length;
+    if (processedCount > 0) {
+      logger.info({ processedExports: processedCount }, 'Processed queued export jobs');
+    }
+
+    return processedCount;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error({ error: serializeError(error) }, 'Failed processing queued export jobs');
+    return 0;
+  } finally {
+    client.release();
+  }
 }
 
 function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient {
@@ -722,6 +804,25 @@ async function main(): Promise<void> {
     status: 'running',
   };
 
+  let exportLifecycleRunning = false;
+  const runExportLifecycleTick = async () => {
+    if (exportLifecycleRunning) {
+      return;
+    }
+
+    exportLifecycleRunning = true;
+    try {
+      await processQueuedExportJobs(pool, logger);
+    } finally {
+      exportLifecycleRunning = false;
+    }
+  };
+
+  await runExportLifecycleTick();
+  const exportInterval = setInterval(() => {
+    void runExportLifecycleTick();
+  }, config.EXPORT_POLL_INTERVAL_MS);
+
   const consumer = await channel.consume(QUEUES.SYNC_JOBS, async (message) => {
     if (!message) {
       return;
@@ -735,6 +836,7 @@ async function main(): Promise<void> {
       queue: QUEUES.SYNC_JOBS,
       prefetch: config.RABBITMQ_PREFETCH,
       consumerTag: consumer.consumerTag,
+      exportPollIntervalMs: config.EXPORT_POLL_INTERVAL_MS,
     },
     'Worker started',
   );
@@ -746,6 +848,7 @@ async function main(): Promise<void> {
     };
 
     try {
+      clearInterval(exportInterval);
       await channel.cancel(consumer.consumerTag);
       await channel.close();
       await connection.close();
