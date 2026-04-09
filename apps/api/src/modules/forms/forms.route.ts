@@ -9,8 +9,8 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
 export async function formsRoutes(
   app: FastifyInstance,
-  _deps?: {
-    db: Kysely<Database>;
+  deps?: {
+    db?: Kysely<Database>;
     rabbitmq: RabbitMQClient;
   },
 ) {
@@ -19,7 +19,36 @@ export async function formsRoutes(
   // GET /forms
   zApp.get('/forms', async (request, reply) => {
     const principal = getPrincipal(request);
-    const forms = mockForms.filter((form) => form.ownerId === principal.userId);
+    const forms = deps?.db
+      ? (
+          await deps.db
+            .selectFrom('forms')
+            .select([
+              'id',
+              'owner_id',
+              'connection_id',
+              'external_form_id',
+              'title',
+              'description',
+              'response_count',
+              'created_at',
+              'updated_at',
+            ])
+            .where('owner_id', '=', principal.userId)
+            .orderBy('updated_at', 'desc')
+            .execute()
+        ).map((row) => ({
+          id: row.id,
+          ownerId: row.owner_id,
+          connectionId: row.connection_id,
+          externalFormId: row.external_form_id,
+          title: row.title,
+          description: row.description ?? undefined,
+          responseCount: row.response_count,
+          createdAt: new Date(row.created_at),
+          updatedAt: new Date(row.updated_at),
+        }))
+      : mockForms.filter((form) => form.ownerId === principal.userId);
 
     // Basic mock pagination envelope
     return reply.send({
@@ -36,9 +65,41 @@ export async function formsRoutes(
   zApp.get('/forms/:id', async (request, reply) => {
     const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const form = mockForms.find((f) => f.id === id && f.ownerId === principal.userId);
+    const resolvedForm = deps?.db
+      ? await deps.db
+          .selectFrom('forms')
+          .select([
+            'id',
+            'owner_id',
+            'connection_id',
+            'external_form_id',
+            'title',
+            'description',
+            'response_count',
+            'created_at',
+            'updated_at',
+          ])
+          .where('id', '=', id)
+          .where('owner_id', '=', principal.userId)
+          .executeTakeFirst()
+          .then((form) =>
+            form
+              ? {
+                  id: form.id,
+                  ownerId: form.owner_id,
+                  connectionId: form.connection_id,
+                  externalFormId: form.external_form_id,
+                  title: form.title,
+                  description: form.description ?? undefined,
+                  responseCount: form.response_count,
+                  createdAt: new Date(form.created_at),
+                  updatedAt: new Date(form.updated_at),
+                }
+              : null,
+          )
+      : mockForms.find((f) => f.id === id && f.ownerId === principal.userId);
 
-    if (!form) {
+    if (!resolvedForm) {
       return reply.status(404).send({
         success: false,
         error: { code: 'not_found', message: 'Form not found' },
@@ -46,7 +107,7 @@ export async function formsRoutes(
       });
     }
 
-    return reply.send({ success: true, data: form, meta: { requestId: request.id } });
+    return reply.send({ success: true, data: resolvedForm, meta: { requestId: request.id } });
   });
 
   // POST /forms/:id/sync

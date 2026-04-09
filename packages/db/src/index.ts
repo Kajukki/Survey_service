@@ -73,12 +73,25 @@ export interface ProviderConnectionsTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface FormsTable {
+  id: ColumnType<string, string | undefined, string>;
+  owner_id: string;
+  connection_id: string;
+  external_form_id: string;
+  title: string;
+  description: string | null;
+  response_count: number;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface DatabaseSchema {
   jobs: JobsTable;
   users: UsersTable;
   auth_refresh_tokens: AuthRefreshTokensTable;
   provider_auth_states: ProviderAuthStatesTable;
   provider_connections: ProviderConnectionsTable;
+  forms: FormsTable;
 }
 
 export type Database = DatabaseSchema;
