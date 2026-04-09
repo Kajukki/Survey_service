@@ -72,7 +72,9 @@ function createFakeSharingDb(input: {
   };
   deletedShareId?: string | null;
 }) {
-  const formExecuteTakeFirst = vi.fn(async () => (input.hasOwnedForm ? { id: 'form-1' } : undefined));
+  const formExecuteTakeFirst = vi.fn(async () =>
+    input.hasOwnedForm ? { id: 'form-1' } : undefined,
+  );
   const formWhereOwner = vi.fn(() => ({ executeTakeFirst: formExecuteTakeFirst }));
   const formWhereId = vi.fn(() => ({ where: formWhereOwner }));
   const formSelect = vi.fn(() => ({ where: formWhereId }));
@@ -82,14 +84,15 @@ function createFakeSharingDb(input: {
   const sharesWhere = vi.fn(() => ({ orderBy: sharesOrderBy }));
   const sharesSelect = vi.fn(() => ({ where: sharesWhere }));
 
-  const insertExecuteTakeFirstOrThrow = vi.fn(async () =>
-    input.createdShare ?? {
-      id: 'share-created-1',
-      form_id: '11111111-1111-4111-8111-111111111111',
-      grantee_user_id: '22222222-2222-4222-8222-222222222222',
-      permission_level: 'read',
-      created_at: '2026-04-09T12:00:00.000Z',
-    },
+  const insertExecuteTakeFirstOrThrow = vi.fn(
+    async () =>
+      input.createdShare ?? {
+        id: 'share-created-1',
+        form_id: '11111111-1111-4111-8111-111111111111',
+        grantee_user_id: '22222222-2222-4222-8222-222222222222',
+        permission_level: 'read',
+        created_at: '2026-04-09T12:00:00.000Z',
+      },
   );
   const insertReturning = vi.fn(() => ({ executeTakeFirstOrThrow: insertExecuteTakeFirstOrThrow }));
   const insertDoUpdateSet = vi.fn(() => ({}));

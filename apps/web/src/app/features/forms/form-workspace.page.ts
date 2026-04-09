@@ -56,25 +56,25 @@ export class FormWorkspacePageComponent {
   protected readonly workspaceState = computed(() => parseFormsWorkspaceState(this.queryParams()));
   protected readonly activeTab = computed(() => this.workspaceState().tab);
 
-  protected readonly structureResource = httpResource<ApiSuccessEnvelope<FormStructureDto>>(
-    () => this.buildStructureEndpoint(),
+  protected readonly structureResource = httpResource<ApiSuccessEnvelope<FormStructureDto>>(() =>
+    this.buildStructureEndpoint(),
   );
 
   protected readonly responsesResource = httpResource<ApiSuccessEnvelope<FormResponsesListDto>>(
     () => this.buildResponsesEndpoint(),
   );
 
-  protected readonly analyticsOverviewResource = httpResource<ApiSuccessEnvelope<FormAnalyticsOverviewDto>>(
-    () => this.buildAnalyticsOverviewEndpoint(),
-  );
+  protected readonly analyticsOverviewResource = httpResource<
+    ApiSuccessEnvelope<FormAnalyticsOverviewDto>
+  >(() => this.buildAnalyticsOverviewEndpoint());
 
-  protected readonly analyticsQuestionsResource = httpResource<ApiSuccessEnvelope<FormAnalyticsQuestionsDto>>(
-    () => this.buildAnalyticsQuestionsEndpoint(),
-  );
+  protected readonly analyticsQuestionsResource = httpResource<
+    ApiSuccessEnvelope<FormAnalyticsQuestionsDto>
+  >(() => this.buildAnalyticsQuestionsEndpoint());
 
-  protected readonly analyticsSegmentsResource = httpResource<ApiSuccessEnvelope<FormAnalyticsSegmentsDto>>(
-    () => this.buildAnalyticsSegmentsEndpoint(),
-  );
+  protected readonly analyticsSegmentsResource = httpResource<
+    ApiSuccessEnvelope<FormAnalyticsSegmentsDto>
+  >(() => this.buildAnalyticsSegmentsEndpoint());
 
   protected readonly structure = computed<FormStructureRecord | null>(() => {
     const dto = this.structureResource.value()?.data;
@@ -145,8 +145,12 @@ export class FormWorkspacePageComponent {
 
   protected readonly responsePage = computed(() => this.workspaceState().responsesPage);
   protected readonly responsePerPage = computed(() => this.workspaceState().responsesPerPage);
-  protected readonly responseTotalPages = computed(() => this.responsesResource.value()?.meta?.pagination?.totalPages ?? 0);
-  protected readonly responseTotal = computed(() => this.responsesResource.value()?.meta?.pagination?.total ?? 0);
+  protected readonly responseTotalPages = computed(
+    () => this.responsesResource.value()?.meta?.pagination?.totalPages ?? 0,
+  );
+  protected readonly responseTotal = computed(
+    () => this.responsesResource.value()?.meta?.pagination?.total ?? 0,
+  );
 
   protected readonly canPreviousResponsesPage = computed(() => this.responsePage() > 1);
   protected readonly canNextResponsesPage = computed(() => {
@@ -356,7 +360,9 @@ export class FormWorkspacePageComponent {
     return `${this.apiBaseUrl}/forms/${formId}/analytics/segments?${searchParams.toString()}`;
   }
 
-  private updateWorkspaceState(partial: Partial<ReturnType<typeof parseFormsWorkspaceState>>): void {
+  private updateWorkspaceState(
+    partial: Partial<ReturnType<typeof parseFormsWorkspaceState>>,
+  ): void {
     const next = {
       ...this.workspaceState(),
       ...partial,

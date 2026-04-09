@@ -31,7 +31,9 @@ function formatDateOnly(value: Date): string {
 
 export function defaultFormsWorkspaceState(): FormsWorkspaceState {
   const today = new Date();
-  const defaultTo = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const defaultTo = new Date(
+    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
+  );
   const defaultFrom = new Date(defaultTo);
   defaultFrom.setUTCDate(defaultFrom.getUTCDate() - 29);
 
@@ -116,7 +118,10 @@ export function parseFormsWorkspaceState(params: Params): FormsWorkspaceState {
         ? params['analyticsGranularity']
         : defaults.analyticsGranularity,
     responsesPage: parsePositiveInt(params['responsesPage'], defaults.responsesPage),
-    responsesPerPage: Math.min(parsePositiveInt(params['responsesPerPage'], defaults.responsesPerPage), 100),
+    responsesPerPage: Math.min(
+      parsePositiveInt(params['responsesPerPage'], defaults.responsesPerPage),
+      100,
+    ),
   };
 }
 

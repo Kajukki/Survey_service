@@ -564,7 +564,10 @@ function toPreviewString(value: unknown): string {
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => toPreviewString(item)).filter((item) => item.length > 0).join(', ');
+    return value
+      .map((item) => toPreviewString(item))
+      .filter((item) => item.length > 0)
+      .join(', ');
   }
 
   if (typeof value === 'object') {
@@ -574,7 +577,9 @@ function toPreviewString(value: unknown): string {
       return choiceAnswers.answers.map((item) => toPreviewString(item)).join(', ');
     }
 
-    const textAnswers = candidate.textAnswers as { answers?: Array<{ value?: string }> } | undefined;
+    const textAnswers = candidate.textAnswers as
+      | { answers?: Array<{ value?: string }> }
+      | undefined;
     if (textAnswers?.answers && Array.isArray(textAnswers.answers)) {
       return textAnswers.answers
         .map((item) => (typeof item?.value === 'string' ? item.value : ''))
@@ -986,7 +991,7 @@ async function main(): Promise<void> {
       await pool.end();
       process.exit(0);
     } catch (error) {
-        logger.error({ error: serializeError(error) }, 'Worker shutdown failed');
+      logger.error({ error: serializeError(error) }, 'Worker shutdown failed');
       process.exit(1);
     }
   };

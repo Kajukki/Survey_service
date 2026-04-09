@@ -110,7 +110,16 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config);
 
-    const [connections, forms, shares, structure, responses, analyticsOverview, analyticsQuestions, analyticsSegments] = await Promise.all([
+    const [
+      connections,
+      forms,
+      shares,
+      structure,
+      responses,
+      analyticsOverview,
+      analyticsQuestions,
+      analyticsSegments,
+    ] = await Promise.all([
       app.inject({
         method: 'GET',
         url: '/connections',
@@ -190,7 +199,15 @@ describe('protected domain routes', () => {
     const { app, config } = await buildApp();
     const token = await signAccessToken(config, 'other-user');
 
-    const [deleteConnection, syncForm, structure, responses, analyticsOverview, analyticsQuestions, analyticsSegments] = await Promise.all([
+    const [
+      deleteConnection,
+      syncForm,
+      structure,
+      responses,
+      analyticsOverview,
+      analyticsQuestions,
+      analyticsSegments,
+    ] = await Promise.all([
       app.inject({
         method: 'DELETE',
         url: `/connections/${connectionId}`,

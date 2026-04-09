@@ -36,18 +36,18 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
     const principal = getPrincipal(request);
     const exportsList = deps?.db
       ? (
-            await deps.db
-              .selectFrom('export_jobs')
-              .select(['id', 'format', 'status', 'requested_at'])
-              .where('requested_by', '=', principal.userId)
-              .orderBy('requested_at', 'desc')
-              .execute()
-          ).map((item) => ({
-            id: item.id,
-            format: item.format,
-            status: item.status,
-            requested_at: new Date(item.requested_at).toISOString(),
-          }))
+          await deps.db
+            .selectFrom('export_jobs')
+            .select(['id', 'format', 'status', 'requested_at'])
+            .where('requested_by', '=', principal.userId)
+            .orderBy('requested_at', 'desc')
+            .execute()
+        ).map((item) => ({
+          id: item.id,
+          format: item.format,
+          status: item.status,
+          requested_at: new Date(item.requested_at).toISOString(),
+        }))
       : mockExports;
 
     return reply.send({
@@ -111,7 +111,9 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
           requested_at: new Date(exportJob.requested_at).toISOString(),
           download_url: exportJob.download_url,
           error: exportJob.error,
-          completed_at: exportJob.completed_at ? new Date(exportJob.completed_at).toISOString() : null,
+          completed_at: exportJob.completed_at
+            ? new Date(exportJob.completed_at).toISOString()
+            : null,
         },
         meta: {
           requestId: request.id,

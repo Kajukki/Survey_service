@@ -185,19 +185,17 @@ export async function formsRoutes(
       .filter((item): item is FormResponseRecord['answerPreview'][number] => Boolean(item));
   }
 
-  async function loadFormResponses(formId: string, fallbackCount: number): Promise<FormResponseRecord[]> {
+  async function loadFormResponses(
+    formId: string,
+    fallbackCount: number,
+  ): Promise<FormResponseRecord[]> {
     if (!db) {
       return buildMockResponses(formId, fallbackCount);
     }
 
     const rows = await db
       .selectFrom('form_responses')
-      .select([
-        'external_response_id',
-        'submitted_at',
-        'completion',
-        'answer_preview_json',
-      ])
+      .select(['external_response_id', 'submitted_at', 'completion', 'answer_preview_json'])
       .where('form_id', '=', formId)
       .orderBy('submitted_at', 'desc')
       .execute();
@@ -348,12 +346,18 @@ export async function formsRoutes(
     for (const response of responses) {
       const score = response.answerPreview.find((item) => item.questionId === 'q-overall');
       if (score) {
-        scoreDistribution.set(score.valuePreview, (scoreDistribution.get(score.valuePreview) ?? 0) + 1);
+        scoreDistribution.set(
+          score.valuePreview,
+          (scoreDistribution.get(score.valuePreview) ?? 0) + 1,
+        );
       }
 
       const channel = response.answerPreview.find((item) => item.questionId === 'q-channel');
       if (channel) {
-        channelDistribution.set(channel.valuePreview, (channelDistribution.get(channel.valuePreview) ?? 0) + 1);
+        channelDistribution.set(
+          channel.valuePreview,
+          (channelDistribution.get(channel.valuePreview) ?? 0) + 1,
+        );
       }
 
       const comment = response.answerPreview.find((item) => item.questionId === 'q-comment');
@@ -375,7 +379,10 @@ export async function formsRoutes(
         questionLabel: 'Acquisition channel',
         questionType: 'single_choice' as const,
         responses: responses.length,
-        distribution: [...channelDistribution.entries()].map(([label, value]) => ({ label, value })),
+        distribution: [...channelDistribution.entries()].map(([label, value]) => ({
+          label,
+          value,
+        })),
       },
       {
         questionId: 'q-comment',
@@ -415,7 +422,9 @@ export async function formsRoutes(
       if (segmentBy === 'completion') {
         key = response.completion;
       } else if (segmentBy === 'channel') {
-        key = response.answerPreview.find((item) => item.questionId === 'q-channel')?.valuePreview ?? 'unknown';
+        key =
+          response.answerPreview.find((item) => item.questionId === 'q-channel')?.valuePreview ??
+          'unknown';
       }
 
       const current = grouped.get(key) ?? {
@@ -430,7 +439,9 @@ export async function formsRoutes(
         current.completed += 1;
       }
 
-      const scoreValue = response.answerPreview.find((item) => item.questionId === 'q-overall')?.valuePreview;
+      const scoreValue = response.answerPreview.find(
+        (item) => item.questionId === 'q-overall',
+      )?.valuePreview;
       const score = scoreValue ? Number.parseInt(scoreValue.split('/')[0] ?? '', 10) : Number.NaN;
       if (Number.isFinite(score)) {
         current.scoreTotal += score;
@@ -456,7 +467,8 @@ export async function formsRoutes(
         metrics: [
           {
             label: 'avgSatisfaction',
-            value: value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
+            value:
+              value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
           },
         ],
       }))
@@ -477,20 +489,20 @@ export async function formsRoutes(
       ? await (async () => {
           const [ownedForms, sharedForms] = await Promise.all([
             db
-            .selectFrom('forms')
-            .select([
-              'id',
-              'owner_id',
-              'connection_id',
-              'external_form_id',
-              'title',
-              'description',
-              'response_count',
-              'created_at',
-              'updated_at',
-            ])
-            .where('owner_id', '=', principal.userId)
-            .execute(),
+              .selectFrom('forms')
+              .select([
+                'id',
+                'owner_id',
+                'connection_id',
+                'external_form_id',
+                'title',
+                'description',
+                'response_count',
+                'created_at',
+                'updated_at',
+              ])
+              .where('owner_id', '=', principal.userId)
+              .execute(),
             db
               .selectFrom('forms')
               .innerJoin('form_shares', 'form_shares.form_id', 'forms.id')
@@ -515,7 +527,10 @@ export async function formsRoutes(
           }
 
           return [...dedupedForms.values()]
-            .sort((left, right) => new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime())
+            .sort(
+              (left, right) =>
+                new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+            )
             .map(mapFormRow);
         })()
       : mockForms.filter((form) => form.ownerId === principal.userId);
@@ -610,7 +625,9 @@ export async function formsRoutes(
         ? query.answerContains.trim().toLowerCase()
         : undefined;
     const completion =
-      query.completion === 'completed' || query.completion === 'partial' ? query.completion : undefined;
+      query.completion === 'completed' || query.completion === 'partial'
+        ? query.completion
+        : undefined;
 
     const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
     const filteredResponses = allResponses.filter((response) => {
@@ -630,13 +647,18 @@ export async function formsRoutes(
         }
       }
 
-      if (questionId && !response.answerPreview.some((preview) => preview.questionId === questionId)) {
+      if (
+        questionId &&
+        !response.answerPreview.some((preview) => preview.questionId === questionId)
+      ) {
         return false;
       }
 
       if (
         answerContains &&
-        !response.answerPreview.some((preview) => preview.valuePreview.toLowerCase().includes(answerContains))
+        !response.answerPreview.some((preview) =>
+          preview.valuePreview.toLowerCase().includes(answerContains),
+        )
       ) {
         return false;
       }
@@ -708,11 +730,19 @@ export async function formsRoutes(
       return submittedAt >= from.getTime() && submittedAt <= to.getTime();
     });
 
-    const completedResponses = filteredResponses.filter((response) => response.completion === 'completed').length;
-    const completionRate = filteredResponses.length > 0 ? Math.round((completedResponses / filteredResponses.length) * 100) : 0;
+    const completedResponses = filteredResponses.filter(
+      (response) => response.completion === 'completed',
+    ).length;
+    const completionRate =
+      filteredResponses.length > 0
+        ? Math.round((completedResponses / filteredResponses.length) * 100)
+        : 0;
 
     const scoreValues = filteredResponses
-      .map((response) => response.answerPreview.find((item) => item.questionId === 'q-overall')?.valuePreview)
+      .map(
+        (response) =>
+          response.answerPreview.find((item) => item.questionId === 'q-overall')?.valuePreview,
+      )
       .filter((value): value is string => Boolean(value))
       .map((value) => Number.parseInt(value.split('/')[0] ?? '', 10))
       .filter((value) => Number.isFinite(value));

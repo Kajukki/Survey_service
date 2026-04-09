@@ -252,7 +252,9 @@ export function mapFormResponses(input: FormResponsesListDto): FormResponseSumma
   }));
 }
 
-export function mapFormAnalyticsOverview(input: FormAnalyticsOverviewDto): FormAnalyticsOverviewRecord {
+export function mapFormAnalyticsOverview(
+  input: FormAnalyticsOverviewDto,
+): FormAnalyticsOverviewRecord {
   return {
     kpis: input.kpis,
     series: input.series,
@@ -261,7 +263,9 @@ export function mapFormAnalyticsOverview(input: FormAnalyticsOverviewDto): FormA
   };
 }
 
-export function mapFormAnalyticsQuestions(input: FormAnalyticsQuestionsDto): FormAnalyticsQuestionsRecord {
+export function mapFormAnalyticsQuestions(
+  input: FormAnalyticsQuestionsDto,
+): FormAnalyticsQuestionsRecord {
   return {
     questions: input.questions.map((question) => ({
       questionId: question.questionId,
@@ -275,7 +279,9 @@ export function mapFormAnalyticsQuestions(input: FormAnalyticsQuestionsDto): For
   };
 }
 
-export function mapFormAnalyticsSegments(input: FormAnalyticsSegmentsDto): FormAnalyticsSegmentsRecord {
+export function mapFormAnalyticsSegments(
+  input: FormAnalyticsSegmentsDto,
+): FormAnalyticsSegmentsRecord {
   return {
     segments: input.segments,
     appliedFilters: input.appliedFilters,

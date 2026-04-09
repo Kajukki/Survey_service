@@ -205,7 +205,9 @@ export async function sharingRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       return reply.status(204).send();
     }
 
-    const existingIndex = mockShares.findIndex((share) => share.form_id === id && share.id === share_id);
+    const existingIndex = mockShares.findIndex(
+      (share) => share.form_id === id && share.id === share_id,
+    );
 
     if (existingIndex === -1) {
       return reply.status(404).send({
