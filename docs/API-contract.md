@@ -120,11 +120,11 @@ Complete Google OAuth authorization code exchange and create/update a linked pro
 ## 3. Connections
 Manages integrations with external survey providers (Google Forms, Microsoft Forms).
 
-Current implementation note: route surface is present, but persistence and policy enforcement are still being completed.
+Current implementation note: list/delete paths are DB-backed with owner-scoped access checks; create remains partial.
 
 ### `GET /api/v1/connections`
 List all configured connections for the authenticated user.
-- **Status:** `Partial` (currently mock-backed)
+- **Status:** `Implemented`
 - **200 OK**: Returns paginated collection of `Connection` objects.
 
 ### `POST /api/v1/connections`
@@ -135,7 +135,7 @@ Create a new provider connection.
 
 ### `DELETE /api/v1/connections/:id`
 Revoke and remove a provider connection.
-- **Status:** `Partial` (route implemented; persistence integration pending)
+- **Status:** `Implemented`
 - **204 No Content**: Successful deletion.
 - **404 Not Found**: Connection not found or not accessible to requester.
 
@@ -144,23 +144,23 @@ Revoke and remove a provider connection.
 ## 4. Forms
 Manages ingested survey configurations and metadata.
 
-Current implementation note: route surface is present and responses are currently mock-backed for list/detail in active development.
+Current implementation note: list/detail and form-level sync trigger are DB-backed in runtime.
 
 ### `GET /api/v1/forms`
 List forms owned by or shared with the user.
-- **Status:** `Partial` (currently mock-backed)
+- **Status:** `Implemented`
 - **Query Params:** `?page=1&perPage=20&search=survey&connectionId=...`
 - **200 OK**: Returns paginated collection of `Form` objects.
 
 ### `GET /api/v1/forms/:id`
 Get detailed metadata for a specific form.
-- **Status:** `Partial` (currently mock-backed)
+- **Status:** `Implemented`
 - **200 OK**: Returns the `Form` object.
 - **403 / 404**: Unauthorized or not found.
 
 ### `POST /api/v1/forms/:id/sync`
 Trigger a manual synchronization job for the specified form.
-- **Status:** `Partial` (currently returns placeholder `job_id` in forms module)
+- **Status:** `Implemented`
 - **202 Accepted**: Enqueues a job to RabbitMQ.
 - **404 Not Found**: Form not found or not accessible to requester.
 - **Response:**
@@ -179,24 +179,24 @@ Trigger a manual synchronization job for the specified form.
 ## 5. Sharing
 Manages access grants to resources.
 
-Current implementation note: route surface is present and currently mock-backed, with owner-scoped access checks on form shares.
+Current implementation note: sharing routes are DB-backed with owner-scoped form checks.
 
 ### `GET /api/v1/forms/:id/shares`
 List all users/groups who have access to this form.
-- **Status:** `Partial` (currently mock-backed)
+- **Status:** `Implemented`
 - **200 OK**: Returns collection of `Share` objects.
 - **404 Not Found**: Form not found or not accessible to requester.
 
 ### `POST /api/v1/forms/:id/shares`
 Grant access to another user in the organization.
-- **Status:** `Partial` (currently mock-backed)
+- **Status:** `Implemented`
 - **Body:** `{ "grantee_user_id": "user-uuid", "permission_level": "read" }`
 - **201 Created**: Returns the created `Share`.
 - **404 Not Found**: Form not found or not accessible to requester.
 
 ### `DELETE /api/v1/forms/:id/shares/:share_id`
 Revoke access.
-- **Status:** `Partial` (currently mock-backed)
+- **Status:** `Implemented`
 - **204 No Content**: Successfully revoked.
 - **404 Not Found**: Form or share not found, or not accessible to requester.
 
@@ -243,8 +243,24 @@ Check the status of a previously enqueued job.
 ## 7. Exports
 Data extraction endpoints.
 
+### `GET /api/v1/exports`
+List export jobs for the authenticated requester.
+- **Status:** `Implemented`
+- **200 OK**: Returns paginated collection of export job summaries.
+
 ### `POST /api/v1/exports`
 Trigger an async export generation for form responses.
-- **Status:** `Planned`
-- **Body:** `{ "form_id": "form-uuid", "format": "csv" }`
-- **202 Accepted**: Returns job track info similar to form sync. Download URL will be provided in the job result once `completed`.
+- **Status:** `Implemented`
+- **Body:** `{ "formId": "form-uuid", "format": "csv|json|excel" }`
+- **202 Accepted**: Returns queued export job metadata.
+
+---
+
+## 8. Dashboard Analytics
+
+### `GET /api/v1/dashboard`
+Read dashboard metrics for a form and date range.
+- **Status:** `Implemented`
+- **Query Params:** `?formId=<uuid>&from=<iso-date>&to=<iso-date>&granularity=day|week|month&questionId=<optional-uuid>`
+- **200 OK**: Returns dashboard payload with `{ kpis, series, questions }`.
+- **404 Not Found**: Form not found or not accessible to requester.

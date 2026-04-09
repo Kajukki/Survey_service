@@ -42,7 +42,8 @@ src/
 │   ├── forms/
 │   ├── sharing/
 │   ├── jobs/
-│   └── exports/
+│   ├── exports/
+│   └── dashboard/
 ├── policy/             # Authorization & permissions
 │   └── authorization.ts # Owner/share enforcement
 └── index.ts            # Process entrypoint
@@ -127,10 +128,11 @@ Additional endpoints are implemented in feature modules under `modules/`.
 | `/auth/*` | Implemented with DB-backed users and refresh tokens |
 | `/providers/google/auth/*` | Implemented route flow for auth start/callback with DB-backed provider auth state/connection persistence groundwork |
 | `/jobs/*` | Implemented with DB + RabbitMQ publish and requester-scoped reads |
-| `/connections/*` | Implemented route surface, mock-backed with owner-scoped list/delete checks |
-| `/forms/*` | Implemented route surface, mock-backed with owner-scoped list/detail/sync checks |
-| `/forms/:id/shares/*` | Implemented route surface, mock-backed with owner-scoped access checks |
-| `/exports/*` | Scaffolded route module, feature completion pending |
+| `/connections/*` | List/delete are DB-backed with owner scoping; create remains partial |
+| `/forms/*` | DB-backed list/detail and form-level sync enqueue |
+| `/forms/:id/shares/*` | DB-backed list/create/delete with owner-scoped form checks |
+| `/exports/*` | DB-backed list/create with owner-scoped form checks |
+| `/dashboard` | Implemented analytics read endpoint returning `{ kpis, series, questions }` |
 
 See [docs/plans/API-design-plan.md](../../docs/plans/API-design-plan.md) for full endpoint specification and design decisions.
 

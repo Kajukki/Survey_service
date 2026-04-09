@@ -20,6 +20,7 @@ import { formsRoutes } from '../modules/forms/forms.route';
 import { sharingRoutes } from '../modules/sharing/sharing.route';
 import { jobsRoutes } from '../modules/jobs/jobs.route';
 import { exportsRoutes } from '../modules/exports/exports.route';
+import { dashboardRoutes } from '../modules/dashboard/dashboard.route';
 import { registerGoogleAuthRoutes } from '../modules/providers/google/google-auth.route';
 import { registerPrincipalPlugin } from './principal';
 
@@ -118,6 +119,9 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
         rabbitmq: context.rabbitmq,
       });
       await exportsRoutes(_api, {
+        db: context.db,
+      });
+      await dashboardRoutes(_api, {
         db: context.db,
       });
     },
