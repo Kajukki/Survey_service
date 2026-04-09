@@ -25,6 +25,10 @@ This document is the execution backlog for API delivery, based on the current im
 - Request principal extraction from bearer access tokens is wired in API runtime.
 - Protected jobs/connections/forms/sharing routes now consume principal from request context.
 
+7. Auth mode matrix baseline
+- Runtime now supports explicit `AUTH_MODE=local|oidc` verification strategy selection.
+- Config validation enforces mode-specific required variables.
+
 5. Domain persistence parity for core modules
 - Connections/forms/sharing routes are DB-backed in runtime with owner/share-scoped access checks.
 
@@ -37,13 +41,9 @@ This document is the execution backlog for API delivery, based on the current im
 1. Export workflow production hardening
 - Replace placeholder download URL generation with durable artifact storage and signed URL delivery.
 
-2. Authorization parity
-- Principal extraction is active on protected routes.
-- Jobs read paths now enforce requester-scoped lookup.
-- Sharing routes now enforce owner-scoped access checks for form share access.
-- Connections delete path now enforces owner-scoped lookup.
-- Forms sync path now enforces owner-scoped lookup.
-- Owner/share policy matrix parity is not yet universal across mock-backed domain paths.
+2. Auth strategy consolidation
+- Runtime supports both local secret and OIDC JWKS verification modes.
+- Environment policy and rollout hardening are still pending.
 
 3. Google connector boundary setup
 - Provider connector DTOs now exist in `packages/contracts`.

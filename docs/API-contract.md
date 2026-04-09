@@ -15,9 +15,16 @@ All requests should be prefixed with `/api/v1`.
 
 ## Authentication & Authorization
 - **Current mode:** local credential auth (`/auth/register`, `/auth/login`, `/auth/refresh`) returns bearer access tokens and refresh tokens.
+- **Implemented mode selection:** `AUTH_MODE=local|oidc` controls protected-route token verification strategy.
 - **Target mode:** external IdP JWT verification with full owner/share policy checks at every protected route.
 - **Implemented in current runtime:** protected domain routes require a valid bearer token-backed request principal.
-- **Important:** owner/share authorization parity is still in progress for mock-backed domain paths.
+
+### Auth Mode Matrix
+
+| Mode | Verification strategy | Required env |
+|---|---|---|
+| `local` | HS256 shared secret token verification | `AUTH_MODE`, `AUTH_JWT_SECRET`, `OIDC_ISSUER`, `OIDC_AUDIENCE` |
+| `oidc` | OIDC remote JWKS token verification | `AUTH_MODE`, `OIDC_ISSUER`, `OIDC_AUDIENCE`, `OIDC_JWKS_URI` |
 
 ## Common Data Formats
 

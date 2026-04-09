@@ -23,10 +23,11 @@ const envSchema = z.object({
   RABBITMQ_PREFETCH: z.coerce.number().default(10),
 
   // Authentication
+  AUTH_MODE: z.enum(['local', 'oidc']).default('local'),
   OIDC_ISSUER: z.string().min(1, 'OIDC_ISSUER is required'),
   OIDC_AUDIENCE: z.string().min(1, 'OIDC_AUDIENCE is required'),
-  OIDC_JWKS_URI: z.string().min(1, 'OIDC_JWKS_URI is required'),
-  AUTH_JWT_SECRET: z.string().min(32, 'AUTH_JWT_SECRET must be at least 32 chars'),
+  OIDC_JWKS_URI: z.string().url('OIDC_JWKS_URI must be a valid URL').optional(),
+  AUTH_JWT_SECRET: z.string().min(32, 'AUTH_JWT_SECRET must be at least 32 chars').optional(),
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(604800),
 
@@ -86,6 +87,22 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   RATE_LIMIT_TTL: z.coerce.number().default(60),
   RATE_LIMIT_MAX: z.coerce.number().default(100),
+}).superRefine((value, context) => {
+  if (value.AUTH_MODE === 'local' && !value.AUTH_JWT_SECRET) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['AUTH_JWT_SECRET'],
+      message: 'AUTH_JWT_SECRET is required when AUTH_MODE=local',
+    });
+  }
+
+  if (value.AUTH_MODE === 'oidc' && !value.OIDC_JWKS_URI) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['OIDC_JWKS_URI'],
+      message: 'OIDC_JWKS_URI is required when AUTH_MODE=oidc',
+    });
+  }
 });
 
 /**

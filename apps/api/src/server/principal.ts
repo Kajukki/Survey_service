@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { jwtVerify } from 'jose';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import type { Config } from './config';
 import { UnauthorizedError } from './errors';
 import type { Principal } from './types';
@@ -34,6 +34,14 @@ export function getPrincipal(request: FastifyRequest): Principal {
 export async function registerPrincipalPlugin(app: FastifyInstance, config: Config): Promise<void> {
   app.decorateRequest('principal', null);
 
+  const localSecret = config.AUTH_JWT_SECRET
+    ? new TextEncoder().encode(config.AUTH_JWT_SECRET)
+    : null;
+  const remoteJwks =
+    config.AUTH_MODE === 'oidc' && config.OIDC_JWKS_URI
+      ? createRemoteJWKSet(new URL(config.OIDC_JWKS_URI))
+      : null;
+
   app.addHook('onRequest', async (request) => {
     const token = readBearerToken(request.headers.authorization);
     if (!token) {
@@ -41,11 +49,29 @@ export async function registerPrincipalPlugin(app: FastifyInstance, config: Conf
     }
 
     try {
-      const secret = new TextEncoder().encode(config.AUTH_JWT_SECRET);
-      const { payload } = await jwtVerify(token, secret, {
-        issuer: config.OIDC_ISSUER,
-        audience: config.OIDC_AUDIENCE,
-      });
+      const payload = await (async () => {
+        if (config.AUTH_MODE === 'oidc') {
+          if (!remoteJwks) {
+            throw new UnauthorizedError('OIDC JWKS verifier is not configured');
+          }
+
+          const result = await jwtVerify(token, remoteJwks, {
+            issuer: config.OIDC_ISSUER,
+            audience: config.OIDC_AUDIENCE,
+          });
+          return result.payload;
+        }
+
+        if (!localSecret) {
+          throw new UnauthorizedError('Local JWT verifier is not configured');
+        }
+
+        const result = await jwtVerify(token, localSecret, {
+          issuer: config.OIDC_ISSUER,
+          audience: config.OIDC_AUDIENCE,
+        });
+        return result.payload;
+      })();
 
       if (typeof payload.sub !== 'string') {
         throw new UnauthorizedError('Invalid access token');
