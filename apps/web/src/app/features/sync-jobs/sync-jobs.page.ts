@@ -107,11 +107,19 @@ export class SyncJobsPageComponent {
 
   private toStatusTone(status: string): 'result' | 'queued' | 'error' | 'connected' {
     const normalized = status.toLowerCase();
-    if (normalized.includes('success') || normalized.includes('done') || normalized.includes('completed')) {
+    if (
+      normalized.includes('success') ||
+      normalized.includes('done') ||
+      normalized.includes('completed')
+    ) {
       return 'result';
     }
 
-    if (normalized.includes('pending') || normalized.includes('queue') || normalized.includes('running')) {
+    if (
+      normalized.includes('pending') ||
+      normalized.includes('queue') ||
+      normalized.includes('running')
+    ) {
       return 'queued';
     }
 

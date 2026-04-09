@@ -32,7 +32,10 @@ function mapDbConnection(row: DbConnectionRow) {
   };
 }
 
-function createTokenSetFromCredentialToken(input: { provider: 'google' | 'microsoft'; credentialToken: string }) {
+function createTokenSetFromCredentialToken(input: {
+  provider: 'google' | 'microsoft';
+  credentialToken: string;
+}) {
   return {
     provider: input.provider,
     accessToken: input.credentialToken,

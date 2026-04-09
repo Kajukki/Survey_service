@@ -125,9 +125,9 @@ function isGoogleAuthCodeExchangeResult(value: unknown): value is GoogleAuthCode
 
   return Boolean(
     tokenSet &&
-      typeof tokenSet.accessToken === 'string' &&
-      typeof candidate.externalAccountId === 'string' &&
-      typeof candidate.idToken === 'string',
+    typeof tokenSet.accessToken === 'string' &&
+    typeof candidate.externalAccountId === 'string' &&
+    typeof candidate.idToken === 'string',
   );
 }
 
@@ -256,10 +256,12 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
     'https://www.googleapis.com/auth/drive.metadata.readonly',
   ];
   const allowedScopes = new Set(
-    (deps.allowedScopes ?? [
-      'https://www.googleapis.com/auth/forms.body.readonly',
-      'https://www.googleapis.com/auth/forms.responses.readonly',
-    ]).map((scope) => scope.trim()),
+    (
+      deps.allowedScopes ?? [
+        'https://www.googleapis.com/auth/forms.body.readonly',
+        'https://www.googleapis.com/auth/forms.responses.readonly',
+      ]
+    ).map((scope) => scope.trim()),
   );
   for (const requiredScope of requiredScopes) {
     allowedScopes.add(requiredScope);
@@ -357,12 +359,18 @@ export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuth
 
         if (isProviderLikeError(error)) {
           const statusCode = typeof error.status === 'number' ? error.status : 400;
-          const errorCode = statusCode >= 500 ? ErrorCode.SERVICE_UNAVAILABLE : ErrorCode.BAD_REQUEST;
-          throw new AppError(errorCode, statusCode, error.message ?? 'Google OAuth exchange failed', {
-            provider: error.provider,
-            providerCode: error.code,
-            retryable: error.retryable,
-          });
+          const errorCode =
+            statusCode >= 500 ? ErrorCode.SERVICE_UNAVAILABLE : ErrorCode.BAD_REQUEST;
+          throw new AppError(
+            errorCode,
+            statusCode,
+            error.message ?? 'Google OAuth exchange failed',
+            {
+              provider: error.provider,
+              providerCode: error.code,
+              retryable: error.retryable,
+            },
+          );
         }
 
         throw error;

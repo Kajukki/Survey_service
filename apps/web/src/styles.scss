@@ -93,7 +93,9 @@ select {
   font-size: 0.95rem;
   color: var(--text-body);
   outline: none;
-  transition: border-color var(--motion-fast), box-shadow var(--motion-fast);
+  transition:
+    border-color var(--motion-fast),
+    box-shadow var(--motion-fast);
 }
 
 .text-input::placeholder {
@@ -259,7 +261,6 @@ select {
   text-align: left;
   white-space: nowrap;
 }
-
 
 .empty-state {
   text-align: center;

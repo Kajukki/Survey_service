@@ -39,7 +39,11 @@ function addStep(date: Date, granularity: Granularity): Date {
   return next;
 }
 
-function buildBuckets(from: Date, to: Date, granularity: Granularity): Array<{ start: Date; key: string }> {
+function buildBuckets(
+  from: Date,
+  to: Date,
+  granularity: Granularity,
+): Array<{ start: Date; key: string }> {
   const buckets: Array<{ start: Date; key: string }> = [];
   let current = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()));
   const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()));
@@ -55,7 +59,11 @@ function buildBuckets(from: Date, to: Date, granularity: Granularity): Array<{ s
   return buckets;
 }
 
-function findBucketIndex(timestamp: Date, buckets: Array<{ start: Date }>, granularity: Granularity): number {
+function findBucketIndex(
+  timestamp: Date,
+  buckets: Array<{ start: Date }>,
+  granularity: Granularity,
+): number {
   for (let index = buckets.length - 1; index >= 0; index -= 1) {
     const bucketStart = buckets[index]!.start;
     const bucketEnd = addStep(bucketStart, granularity);

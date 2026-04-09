@@ -31,7 +31,9 @@ import { ExportRecord } from '../../shared/models/domain.models';
                 <span class="status-badge__dot" aria-hidden="true"></span>
                 {{ exportItem.status }}
               </strong>
-              <span class="surface-list-item__time">{{ exportItem.requestedAt | date: 'short' }}</span>
+              <span class="surface-list-item__time">{{
+                exportItem.requestedAt | date: 'short'
+              }}</span>
             </li>
           } @empty {
             <li class="surface-list-item empty-state">No exports created yet.</li>
@@ -67,11 +69,19 @@ export class ExportsPageComponent {
 
   private toStatusTone(status: string): 'result' | 'queued' | 'error' | 'connected' {
     const normalized = status.toLowerCase();
-    if (normalized.includes('done') || normalized.includes('ready') || normalized.includes('completed')) {
+    if (
+      normalized.includes('done') ||
+      normalized.includes('ready') ||
+      normalized.includes('completed')
+    ) {
       return 'result';
     }
 
-    if (normalized.includes('pending') || normalized.includes('queue') || normalized.includes('running')) {
+    if (
+      normalized.includes('pending') ||
+      normalized.includes('queue') ||
+      normalized.includes('running')
+    ) {
       return 'queued';
     }
 
