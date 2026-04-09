@@ -2,18 +2,41 @@
   padding: 1rem;
 }
 
-table {
+.page-header h2 {
+  color: var(--text-strong);
+  font-family: 'DM Serif Display', Georgia, serif;
+}
+
+.page-header p {
+  margin-top: 0.3rem;
+  color: var(--text-muted);
+}
+
+.sharing-table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 1rem;
 }
 
 th,
 td {
   text-align: left;
-  border-bottom: 1px solid var(--line-color);
+  border-bottom: 1px solid var(--line-default);
   padding: 0.7rem;
 }
 
+th {
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.78rem;
+}
+
+td {
+  color: var(--text-body);
+}
+
 .error {
+  margin-top: 0.9rem;
   color: var(--danger);
 }

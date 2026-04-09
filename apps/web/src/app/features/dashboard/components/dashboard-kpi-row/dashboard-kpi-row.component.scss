@@ -2,23 +2,26 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .tile {
-  padding: 0.85rem;
+  padding: 0.95rem;
+  background: linear-gradient(180deg, rgb(255 255 255 / 2%), transparent 65%), var(--bg-surface);
+  border-color: var(--line-default);
 }
 
 .tile p {
-  margin: 0;
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: var(--text-subtle);
 }
 
 .tile h3 {
   margin: 0.45rem 0;
   font-size: 1.55rem;
+  color: var(--text-strong);
 }
 
 .tile span {
@@ -28,7 +31,7 @@
 
 .skeleton {
   min-height: 94px;
-  background: linear-gradient(90deg, #f2f4f7 10%, #e8ebef 35%, #f2f4f7 60%);
+  background: linear-gradient(90deg, #1a2130 10%, #242d3d 35%, #1a2130 60%);
   background-size: 220% 100%;
   animation: pulse 1.2s linear infinite;
 }

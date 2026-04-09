@@ -18,7 +18,7 @@ import { FormRecord } from '../../shared/models/domain.models';
           <h2>Forms</h2>
           <p>Owned and shared forms available for analysis.</p>
         </div>
-        <button type="button" (click)="nextPage()">Next page</button>
+        <button type="button" class="btn-primary" (click)="nextPage()">Next page</button>
       </header>
 
       @if (forms.isLoading()) {

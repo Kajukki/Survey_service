@@ -5,35 +5,65 @@
 .header {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.header h2 {
+  color: var(--text-strong);
+  font-family: 'DM Serif Display', Georgia, serif;
+}
+
+.header p {
+  margin-top: 0.3rem;
+  color: var(--text-muted);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  margin-top: 1rem;
 }
 
 th,
 td {
   text-align: left;
   padding: 0.7rem;
-  border-bottom: 1px solid var(--line-color);
+  border-bottom: 1px solid var(--line-default);
+}
+
+th {
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+td {
+  color: var(--text-body);
 }
 
 .badge {
-  border-radius: 999px;
-  border: 1px solid var(--line-color);
-  padding: 0.1rem 0.5rem;
-}
-
-button {
-  border: 0;
-  border-radius: 0.6rem;
-  padding: 0.5rem 0.8rem;
-  background: var(--accent);
-  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line-default);
+  background: var(--bg-subtle);
+  color: var(--text-subtle);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0 10px;
 }
 
 .error {
+  margin-top: 0.9rem;
   color: var(--danger);
+}
+
+@media (max-width: 900px) {
+  .header {
+    flex-direction: column;
+  }
 }
