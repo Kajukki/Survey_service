@@ -3,9 +3,7 @@
     <div>
       <a routerLink="/forms" class="back-link">Back to forms</a>
       <h2>{{ structure()?.title ?? 'Form workspace' }}</h2>
-      <p>
-        Explore form structure now, with response and analytics tabs prepared for the next slices.
-      </p>
+      <p>Explore form structure, responses, and persisted analytics.</p>
     </div>
     <button type="button" class="btn-primary" [disabled]="isLoadingAny()" (click)="refresh()">
       @if (isLoadingAny()) {
@@ -18,436 +16,382 @@
 
   @if (structure(); as currentStructure) {
     <section class="workspace-status card">
-      <span>
-        <strong>{{ currentStructure.questionCount }}</strong> questions indexed
-      </span>
-      <span>
-        <strong>{{ currentStructure.responseCount }}</strong> responses synced
-      </span>
-      @if (analyticsFreshness()?.lastSuccessfulSyncAt) {
-        <span>Last sync {{ analyticsFreshness()!.lastSuccessfulSyncAt | date: 'short' }}</span>
+      <span><strong>{{ currentStructure.questionCount }}</strong> questions indexed</span>
+      <span><strong>{{ currentStructure.responseCount }}</strong> responses synced</span>
+      @if (analyticsFreshness()) {
+        <span>Analytics generated {{ analyticsFreshness() | date: 'short' }}</span>
       }
     </section>
   }
 
   @if (structureResource.isLoading()) {
-  <section class="card empty-state">
-    <h3>Loading form structure...</h3>
-  </section>
+    <section class="card empty-state">
+      <h3>Loading form structure...</h3>
+    </section>
   } @else if (structureResource.error()) {
-  <section class="card empty-state">
-    <h3>Unable to load form structure</h3>
-    <p>Try refreshing. If this continues, verify that you have access to this form.</p>
-    <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
-  </section>
+    <section class="card empty-state">
+      <h3>Unable to load form structure</h3>
+      <p>Try refreshing. If this continues, verify that you have access to this form.</p>
+      <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
+    </section>
   } @else if (!structure()) {
-  <section class="card empty-state">
-    <h3>Form not available</h3>
-    <p>The requested form could not be resolved.</p>
-  </section>
+    <section class="card empty-state">
+      <h3>Form not available</h3>
+      <p>The requested form could not be resolved.</p>
+    </section>
   } @else {
-  <section class="tabs card">
-    <button
-      type="button"
-      [class.active]="activeTab() === 'overview'"
-      (click)="selectTab('overview')"
-    >
-      Overview
-    </button>
-    <button
-      type="button"
-      [class.active]="activeTab() === 'questions'"
-      (click)="selectTab('questions')"
-    >
-      Questions
-    </button>
-    <button
-      type="button"
-      [class.active]="activeTab() === 'responses'"
-      (click)="selectTab('responses')"
-    >
-      Responses
-    </button>
-    <button
-      type="button"
-      [class.active]="activeTab() === 'analytics'"
-      (click)="selectTab('analytics')"
-    >
-      Analytics
-    </button>
-  </section>
+    <section class="tabs card">
+      <button type="button" [class.active]="activeTab() === 'overview'" (click)="selectTab('overview')">
+        Overview
+      </button>
+      <button type="button" [class.active]="activeTab() === 'questions'" (click)="selectTab('questions')">
+        Questions
+      </button>
+      <button type="button" [class.active]="activeTab() === 'responses'" (click)="selectTab('responses')">
+        Responses
+      </button>
+      <button type="button" [class.active]="activeTab() === 'analytics'" (click)="selectTab('analytics')">
+        Analytics
+      </button>
+    </section>
 
-  @if (activeTab() === 'overview') {
-  <section class="overview-grid">
-    <article class="card metric">
-      <h3>Responses</h3>
-      <p class="metric-value">{{ structure()!.responseCount }}</p>
-    </article>
-    <article class="card metric">
-      <h3>Sections</h3>
-      <p class="metric-value">{{ structure()!.sections.length }}</p>
-    </article>
-    <article class="card metric">
-      <h3>Questions</h3>
-      <p class="metric-value">{{ structure()!.questionCount }}</p>
-    </article>
-  </section>
-
-  <section class="card section-list">
-    <h3>Form Sections</h3>
-    @for (section of structure()!.sections; track section.id) {
-    <article>
-      <h4>{{ section.title }}</h4>
-      <p>{{ section.description || 'No section description provided.' }}</p>
-      <span>{{ section.questions.length }} questions</span>
-    </article>
-    } @empty {
-    <p class="empty-inline">No structured sections are available yet.</p>
+    @if (activeTab() === 'overview') {
+      <section class="overview-grid">
+        <article class="card metric">
+          <h3>Sections</h3>
+          <p class="metric-value">{{ structure()!.sectionCount }}</p>
+        </article>
+        <article class="card metric">
+          <h3>Questions</h3>
+          <p class="metric-value">{{ structure()!.questionCount }}</p>
+        </article>
+        <article class="card metric">
+          <h3>Responses</h3>
+          <p class="metric-value">{{ structure()!.responseCount }}</p>
+        </article>
+      </section>
     }
-  </section>
-  } @if (activeTab() === 'questions') {
-  <section class="card question-filters">
-    <label>
-      Search
-      <input
-        type="search"
-        [value]="workspaceState().questionSearch ?? ''"
-        placeholder="Search questions"
-        (input)="updateSearch($any($event.target).value)"
-      />
-    </label>
 
-    <label>
-      Type
-      <select
-        [value]="workspaceState().questionType ?? ''"
-        (change)="updateQuestionType($any($event.target).value)"
-      >
-        <option value="">All types</option>
-        <option value="single_choice">Single choice</option>
-        <option value="multi_choice">Multi choice</option>
-        <option value="text">Text</option>
-        <option value="rating">Rating</option>
-        <option value="date">Date</option>
-        <option value="number">Number</option>
-      </select>
-    </label>
-  </section>
+    @if (activeTab() === 'questions') {
+      <section class="card question-filters">
+        <label>
+          Search
+          <input
+            type="search"
+            placeholder="Find a question"
+            [value]="workspaceState().questionSearch ?? ''"
+            (input)="updateSearch($any($event.target).value)"
+          />
+        </label>
 
-  <section class="card section-list">
-    <h3>Questions</h3>
-    @for (section of filteredSections(); track section.id) {
-    <article>
-      <h4>{{ section.title }}</h4>
-      <ul>
-        @for (question of section.questions; track question.id) {
-        <li>
-          <div>
-            <strong>{{ question.label }}</strong>
-            <small>{{ question.description || 'No description' }}</small>
-          </div>
-          <div class="question-meta">
-            <span class="badge">{{ question.type }}</span>
-            @if (question.required) {
-            <span class="required">Required</span>
+        <label>
+          Type
+          <select [value]="workspaceState().questionType ?? ''" (change)="updateQuestionType($any($event.target).value)">
+            <option value="">All types</option>
+            <option value="text">Text</option>
+            <option value="single_choice">Single choice</option>
+            <option value="multi_choice">Multi choice</option>
+            <option value="rating">Rating</option>
+            <option value="number">Number</option>
+            <option value="date">Date</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="card section-list">
+        <h3>Questions</h3>
+        @for (section of filteredSections(); track section.id) {
+          <article>
+            <h4>{{ section.title }}</h4>
+            <ul>
+              @for (question of section.questions; track question.id) {
+                <li>
+                  <div>
+                    <strong>{{ question.label }}</strong>
+                    @if (question.description) {
+                      <small>{{ question.description }}</small>
+                    }
+                  </div>
+                  <div class="question-meta">
+                    <span class="badge">{{ question.type }}</span>
+                    @if (question.required) {
+                      <span class="required">required</span>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          </article>
+        } @empty {
+          <p class="empty-inline">No questions match the current filters.</p>
+        }
+      </section>
+    }
+
+    @if (activeTab() === 'responses') {
+      <section class="card response-filters">
+        <label>
+          Search answers
+          <input
+            type="search"
+            placeholder="Contains text"
+            [value]="workspaceState().responseSearch ?? ''"
+            (input)="updateResponsesSearch($any($event.target).value)"
+          />
+        </label>
+
+        <label>
+          Question
+          <select
+            [value]="workspaceState().responseQuestionId ?? ''"
+            (change)="updateResponsesQuestionId($any($event.target).value)"
+          >
+            <option value="">All questions</option>
+            @for (option of questionOptions(); track option.id) {
+              <option [value]="option.id">{{ option.label }}</option>
             }
+          </select>
+        </label>
+
+        <label>
+          Completion
+          <select [value]="workspaceState().completion ?? ''" (change)="updateResponsesCompletion($any($event.target).value)">
+            <option value="">Any</option>
+            <option value="completed">Completed</option>
+            <option value="partial">Partial</option>
+          </select>
+        </label>
+
+        <label>
+          Per page
+          <select [value]="responsePerPage()" (change)="updateResponsesPerPage($any($event.target).value)">
+            <option [value]="10">10</option>
+            <option [value]="25">25</option>
+            <option [value]="50">50</option>
+            <option [value]="100">100</option>
+          </select>
+        </label>
+      </section>
+
+      @if (responseFiltersActive()) {
+        <button type="button" class="btn-secondary" (click)="resetResponsesFilters()">Reset response filters</button>
+      }
+
+      @if (responsesResource.isLoading()) {
+        <section class="card empty-state">
+          <h3>Loading responses...</h3>
+        </section>
+      } @else if (responsesResource.error()) {
+        <section class="card empty-state">
+          <h3>Unable to load responses</h3>
+          <p>Try refreshing the page or adjusting filters.</p>
+          <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
+        </section>
+      } @else {
+        <section class="card responses-list">
+          <header>
+            <h3>Responses</h3>
+            <p>{{ responseTotal() }} total</p>
+          </header>
+
+          @for (response of responses(); track response.id) {
+            <article class="response-item">
+              <div class="response-meta">
+                <span class="response-id">{{ response.id }}</span>
+                <span class="badge">{{ response.completion }}</span>
+                @if (response.submittedAt) {
+                  <span class="submitted">{{ response.submittedAt | date: 'medium' }}</span>
+                }
+              </div>
+
+              <ul>
+                @for (preview of response.answerPreview; track preview.questionId + preview.valuePreview) {
+                  <li>
+                    <strong>{{ preview.questionLabel }}</strong>
+                    <span>{{ preview.valuePreview }}</span>
+                  </li>
+                }
+              </ul>
+            </article>
+          } @empty {
+            <p class="empty-inline">No responses match the current filters.</p>
+          }
+
+          <footer class="responses-pagination">
+            <button type="button" class="btn-secondary" [disabled]="!canPreviousResponsesPage()" (click)="previousResponsesPage()">
+              Previous
+            </button>
+            <span>
+              Page {{ responsePage() }}
+              @if (responseTotalPages() > 0) {
+                <span>of {{ responseTotalPages() }}</span>
+              }
+            </span>
+            <button type="button" class="btn-secondary" [disabled]="!canNextResponsesPage()" (click)="nextResponsesPage()">
+              Next
+            </button>
+          </footer>
+        </section>
+      }
+    }
+
+    @if (activeTab() === 'analytics') {
+      @if (analyticsReportResource.isLoading()) {
+        <section class="card empty-state">
+          <h3>Loading analytics...</h3>
+        </section>
+      } @else if (analyticsReportResource.error()) {
+        <section class="card empty-state">
+          <h3>Unable to load analytics</h3>
+          <p>Try refreshing after the next sync run.</p>
+          <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
+        </section>
+      } @else if (!hasAnalyticsResponses()) {
+        <section class="card empty-state">
+          <h3>No responses to analyze yet.</h3>
+          <p>Run a sync and collect responses to generate analytics.</p>
+        </section>
+      } @else {
+        <section class="overview-banner card">
+          <div class="overview-stat">
+            <span class="stat-value">{{ analyticsReport()!.totalResponses }}</span>
+            <span class="stat-label">Total Responses</span>
           </div>
-        </li>
+          <div class="overview-stat">
+            <span class="stat-value">{{ formatDate(analyticsReport()!.firstResponseTime) }}</span>
+            <span class="stat-label">First Response</span>
+          </div>
+          <div class="overview-stat">
+            <span class="stat-value">{{ formatDate(analyticsReport()!.lastResponseTime) }}</span>
+            <span class="stat-label">Latest Response</span>
+          </div>
+
+          @if (analyticsReport()!.scoreStats; as scores) {
+            <div class="overview-stat">
+              <span class="stat-value">{{ formatNum(scores.mean) }}</span>
+              <span class="stat-label">Avg Score</span>
+            </div>
+            <div class="overview-stat">
+              <span class="stat-value">{{ scores.min }} - {{ scores.max }}</span>
+              <span class="stat-label">Score Range</span>
+            </div>
+            <div class="overview-stat">
+              <span class="stat-value">{{ formatNum(scores.median) }}</span>
+              <span class="stat-label">Median Score</span>
+            </div>
+          }
+        </section>
+
+        @if (analyticsFreshness()) {
+          <p class="analytics-meta">Generated {{ analyticsFreshness() | date: 'medium' }}</p>
         }
-      </ul>
-    </article>
-    } @empty {
-    <p class="empty-inline">No questions match the current filters.</p>
-    }
-  </section>
-  } @if (activeTab() === 'responses') {
-  <section class="card response-filters">
-        <header class="filter-header">
-          <h3>Filter responses</h3>
-          <button
-            type="button"
-            class="btn-secondary"
-            [disabled]="!responseFiltersActive()"
-            (click)="resetResponsesFilters()"
-          >
-            Reset
-          </button>
-        </header>
 
-    <label>
-      Answer contains
-      <input
-        type="search"
-        [value]="workspaceState().responseSearch ?? ''"
-        placeholder="Search preview text"
-        (input)="updateResponsesSearch($any($event.target).value)"
-      />
-    </label>
+        @if (scaleQuestions().length > 0) {
+          <h3 class="section-title">Scale Questions</h3>
+          @for (q of scaleQuestions(); track q.questionId) {
+            <section class="card analytics-card">
+              <header class="card-header">
+                <h4 class="card-title">{{ q.questionTitle || 'Untitled' }}</h4>
+                <div class="card-badges">
+                  <span class="mono-chip">{{ q.answerCount }} answered</span>
+                  <span class="mono-chip">{{ responseRate(q) }}% rate</span>
+                </div>
+              </header>
 
-    <label>
-      Question
-      <select
-        [value]="workspaceState().responseQuestionId ?? ''"
-        (change)="updateResponsesQuestionId($any($event.target).value)"
-      >
-        <option value="">All questions</option>
-        @for (option of questionOptions(); track option.id) {
-        <option [value]="option.id">{{ option.label }}</option>
+              @if (q.scaleAnalytics; as scale) {
+                <div class="stats-row">
+                  <div class="stat-pill"><span class="pill-label">Mean</span><span class="pill-value">{{ formatNum(scale.stats.mean) }}</span></div>
+                  <div class="stat-pill"><span class="pill-label">Median</span><span class="pill-value">{{ formatNum(scale.stats.median) }}</span></div>
+                  <div class="stat-pill"><span class="pill-label">Min</span><span class="pill-value">{{ scale.stats.min }}</span></div>
+                  <div class="stat-pill"><span class="pill-label">Max</span><span class="pill-value">{{ scale.stats.max }}</span></div>
+                  <div class="stat-pill"><span class="pill-label">Std Dev</span><span class="pill-value">{{ formatNum(scale.stats.standardDeviation) }}</span></div>
+                </div>
+
+                <div class="select-breakdown">
+                  <div class="breakdown-header">
+                    <span class="breakdown-col">Value</span>
+                    <span class="breakdown-col right">Count</span>
+                    <span class="breakdown-col right"> </span>
+                  </div>
+                  @for (key of objectKeys(scale.distribution); track key) {
+                    <div class="breakdown-row">
+                      <span class="breakdown-option">{{ key }}</span>
+                      <span class="breakdown-count">{{ scale.distribution[key] }}</span>
+                      <span class="breakdown-pct"> </span>
+                    </div>
+                  }
+                </div>
+              }
+            </section>
+          }
         }
-      </select>
-    </label>
 
-    <label>
-      Completion
-      <select
-        [value]="workspaceState().completion ?? ''"
-        (change)="updateResponsesCompletion($any($event.target).value)"
-      >
-        <option value="">All</option>
-        <option value="completed">Completed</option>
-        <option value="partial">Partial</option>
-      </select>
-    </label>
+        @if (selectQuestions().length > 0) {
+          <h3 class="section-title">Choice Questions</h3>
+          @for (q of selectQuestions(); track q.questionId) {
+            <section class="card analytics-card">
+              <header class="card-header">
+                <h4 class="card-title">{{ q.questionTitle || 'Untitled' }}</h4>
+                <div class="card-badges">
+                  <span class="mono-chip">{{ q.selectAnalytics?.isMultiChoice ? 'Multi-select' : 'Single-select' }}</span>
+                  <span class="mono-chip">{{ q.answerCount }} answered</span>
+                  <span class="mono-chip">{{ responseRate(q) }}% rate</span>
+                </div>
+              </header>
 
-    <label>
-      Per page
-      <select
-        [value]="workspaceState().responsesPerPage"
-        (change)="updateResponsesPerPage($any($event.target).value)"
-      >
-        <option value="20">20</option>
-        <option value="50">50</option>
-        <option value="100">100</option>
-      </select>
-    </label>
-  </section>
-
-  @if (responsesResource.isLoading()) {
-  <section class="card empty-state">
-    <h3>Loading responses...</h3>
-  </section>
-  } @else if (responsesResource.error()) {
-  <section class="card empty-state">
-    <h3>Unable to load responses</h3>
-    <p>Try refreshing the page or adjusting filters.</p>
-    <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
-  </section>
-  } @else {
-  <section class="card responses-list">
-    <header>
-      <h3>Responses</h3>
-      <p>{{ responseTotal() }} total</p>
-    </header>
-
-    @for (response of responses(); track response.id) {
-    <article class="response-item">
-      <div class="response-meta">
-        <span class="response-id">{{ response.id }}</span>
-        <span class="badge">{{ response.completion }}</span>
-        @if (response.submittedAt) {
-        <span class="submitted">{{ response.submittedAt | date: 'medium' }}</span>
+              @if (q.selectAnalytics; as select) {
+                <div class="select-breakdown">
+                  <div class="breakdown-header">
+                    <span class="breakdown-col">Option</span>
+                    <span class="breakdown-col right">Count</span>
+                    <span class="breakdown-col right">%</span>
+                  </div>
+                  @for (opt of objectKeys(select.optionCounts); track opt) {
+                    <div class="breakdown-row" [class.popular]="select.mostPopular.includes(opt)">
+                      <span class="breakdown-option">{{ opt }}</span>
+                      <span class="breakdown-count">{{ select.optionCounts[opt] }}</span>
+                      <span class="breakdown-pct">{{ select.optionPercentages[opt] }}%</span>
+                    </div>
+                  }
+                  <div class="breakdown-footer">
+                    <span class="mono-chip sm">Total selections: {{ select.totalSelections }}</span>
+                  </div>
+                </div>
+              }
+            </section>
+          }
         }
-      </div>
 
-      <ul>
-        @for (preview of response.answerPreview; track preview.questionId + preview.valuePreview) {
-        <li>
-          <strong>{{ preview.questionLabel }}</strong>
-          <span>{{ preview.valuePreview }}</span>
-        </li>
+        @if (textQuestions().length > 0) {
+          <h3 class="section-title">Text Responses</h3>
+          @for (q of textQuestions(); track q.questionId) {
+            <section class="card analytics-card">
+              <header class="card-header">
+                <h4 class="card-title">{{ q.questionTitle || 'Untitled' }}</h4>
+                <div class="card-badges">
+                  <span class="mono-chip">{{ q.answerCount }} answered</span>
+                  <span class="mono-chip">{{ responseRate(q) }}% rate</span>
+                </div>
+              </header>
+
+              @if (q.textAnalytics; as text) {
+                <div class="stats-row">
+                  <div class="stat-pill"><span class="pill-label">Avg Words</span><span class="pill-value">{{ formatNum(text.wordCountStats.mean) }}</span></div>
+                  <div class="stat-pill"><span class="pill-label">Min Words</span><span class="pill-value">{{ text.wordCountStats.min }}</span></div>
+                  <div class="stat-pill"><span class="pill-label">Max Words</span><span class="pill-value">{{ text.wordCountStats.max }}</span></div>
+                  <div class="stat-pill"><span class="pill-label">Avg Chars</span><span class="pill-value">{{ formatNum(text.charCountStats.mean) }}</span></div>
+                </div>
+
+                <ul class="text-list">
+                  @for (resp of text.responses; track $index) {
+                    <li class="text-item">{{ resp }}</li>
+                  }
+                </ul>
+              }
+            </section>
+          }
         }
-      </ul>
-    </article>
-    } @empty {
-    <p class="empty-inline">No responses match the current filters.</p>
-    }
-
-    <footer class="responses-pagination">
-      <button
-        type="button"
-        class="btn-secondary"
-        [disabled]="!canPreviousResponsesPage()"
-        (click)="previousResponsesPage()"
-      >
-        Previous
-      </button>
-      <span>
-        Page {{ responsePage() }} @if (responseTotalPages() > 0) {
-        <span>of {{ responseTotalPages() }}</span>
-        }
-      </span>
-      <button
-        type="button"
-        class="btn-secondary"
-        [disabled]="!canNextResponsesPage()"
-        (click)="nextResponsesPage()"
-      >
-        Next
-      </button>
-    </footer>
-  </section>
-  } } @if (activeTab() === 'analytics') {
-  <section class="card analytics-filters">
-        <header class="filter-header">
-          <h3>Filter analytics</h3>
-          <button
-            type="button"
-            class="btn-secondary"
-            [disabled]="!analyticsFiltersActive()"
-            (click)="resetAnalyticsFilters()"
-          >
-            Reset
-          </button>
-        </header>
-
-    <label>
-      From
-      <input
-        type="date"
-        [value]="workspaceState().analyticsFrom"
-        (change)="updateAnalyticsFrom($any($event.target).value)"
-      />
-    </label>
-
-    <label>
-      To
-      <input
-        type="date"
-        [value]="workspaceState().analyticsTo"
-        (change)="updateAnalyticsTo($any($event.target).value)"
-      />
-    </label>
-
-    <label>
-      Question
-      <select
-        [value]="workspaceState().analyticsQuestionId ?? ''"
-        (change)="updateAnalyticsQuestionId($any($event.target).value)"
-      >
-        <option value="">All questions</option>
-        @for (option of questionOptions(); track option.id) {
-        <option [value]="option.id">{{ option.label }}</option>
-        }
-      </select>
-    </label>
-
-    <label>
-      Granularity
-      <select
-        [value]="workspaceState().analyticsGranularity"
-        (change)="updateAnalyticsGranularity($any($event.target).value)"
-      >
-        <option value="day">Day</option>
-        <option value="week">Week</option>
-        <option value="month">Month</option>
-      </select>
-    </label>
-
-    <label>
-      Segment by
-      <select
-        [value]="workspaceState().analyticsSegmentBy"
-        (change)="updateAnalyticsSegmentBy($any($event.target).value)"
-      >
-        <option value="completion">Completion</option>
-        <option value="channel">Channel</option>
-      </select>
-    </label>
-  </section>
-
-  @if (analyticsOverviewResource.isLoading() || analyticsQuestionsResource.isLoading() ||
-  analyticsSegmentsResource.isLoading()) {
-  <section class="card empty-state">
-    <h3>Loading analytics...</h3>
-  </section>
-  } @else if (analyticsOverviewResource.error() || analyticsQuestionsResource.error() ||
-  analyticsSegmentsResource.error()) {
-  <section class="card empty-state">
-    <h3>Unable to load analytics</h3>
-    <p>Try refreshing or broadening the selected date range.</p>
-    <button type="button" class="btn-primary" (click)="refresh()">Retry</button>
-  </section>
-  } @else {
-  <section class="analytics-kpis">
-    @for (kpi of analyticsOverview()?.kpis ?? []; track kpi.label) {
-    <article class="card metric">
-      <h3>{{ kpi.label }}</h3>
-      <p class="metric-value">{{ kpi.value }}</p>
-      @if (kpi.delta) {
-      <p class="metric-delta">{{ kpi.delta }}</p>
       }
-    </article>
     }
-  </section>
-
-  <section class="card analytics-series">
-    <header>
-      <h3>Trend</h3>
-      <p>Generated {{ analyticsOverview()?.dataFreshness?.generatedAt | date: 'medium' }}</p>
-    </header>
-
-    <ul>
-      @for (point of analyticsOverview()?.series ?? []; track point.date) {
-      <li>
-        <span>{{ point.date }}</span>
-        <strong>{{ point.count }}</strong>
-      </li>
-      }
-    </ul>
-  </section>
-
-  <section class="card analytics-questions">
-    <h3>Question Breakdown</h3>
-
-    @for (question of analyticsQuestions()?.questions ?? []; track question.questionId) {
-    <article>
-      <header>
-        <h4>{{ question.questionLabel }}</h4>
-        <span class="badge">{{ question.questionType }}</span>
-      </header>
-      <p>{{ question.responses }} responses in selected range</p>
-
-      @if (question.distribution?.length) {
-      <ul>
-        @for (item of question.distribution ?? []; track item.label) {
-        <li>
-          <span>{{ item.label }}</span>
-          <strong>{{ item.value }}</strong>
-        </li>
-        }
-      </ul>
-      }
-    </article>
-    } @empty {
-    <p class="empty-inline">No analytics question data is available for this filter range.</p>
-    }
-  </section>
-
-  <section class="card analytics-segments">
-    <h3>Segment Insights</h3>
-
-    @for (segment of analyticsSegments()?.segments ?? []; track segment.segmentKey) {
-    <article>
-      <header>
-        <h4>{{ segment.segmentLabel }}</h4>
-        <span>{{ segment.responses }} responses</span>
-      </header>
-      @if (segment.completionRate !== undefined) {
-      <p>Completion rate: {{ (segment.completionRate * 100).toFixed(0) }}%</p>
-      } @if (segment.metrics.length) {
-      <ul>
-        @for (metric of segment.metrics; track metric.label) {
-        <li>
-          <span>{{ metric.label }}</span>
-          <strong>{{ metric.value }}</strong>
-        </li>
-        }
-      </ul>
-      }
-    </article>
-    } @empty {
-    <p class="empty-inline">No segment data is available for this filter range.</p>
-    }
-  </section>
-  } } }
+  }
 </section>

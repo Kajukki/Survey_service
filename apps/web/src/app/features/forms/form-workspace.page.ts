@@ -7,21 +7,16 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { API_BASE_URL } from '../../core/api/api-config.token';
 import { ApiSuccessEnvelope } from '../../core/api/api-envelope';
 import {
-  FormAnalyticsSegmentsDto,
-  FormAnalyticsOverviewDto,
-  FormAnalyticsQuestionsDto,
+  FormAnalyticsReportDto,
   FormResponsesListDto,
   FormStructureDto,
-  mapFormAnalyticsSegments,
-  mapFormAnalyticsOverview,
-  mapFormAnalyticsQuestions,
+  mapFormAnalyticsReport,
   mapFormResponses,
   mapFormStructure,
 } from '../../core/api/survey-api.adapters';
 import {
-  FormAnalyticsSegmentsRecord,
-  FormAnalyticsOverviewRecord,
-  FormAnalyticsQuestionsRecord,
+  FormAnalyticsQuestionRecordV2,
+  FormAnalyticsReportRecord,
   FormResponseSummaryRecord,
   FormSectionRecord,
   FormStructureRecord,
@@ -64,17 +59,9 @@ export class FormWorkspacePageComponent {
     () => this.buildResponsesEndpoint(),
   );
 
-  protected readonly analyticsOverviewResource = httpResource<
-    ApiSuccessEnvelope<FormAnalyticsOverviewDto>
-  >(() => this.buildAnalyticsOverviewEndpoint());
-
-  protected readonly analyticsQuestionsResource = httpResource<
-    ApiSuccessEnvelope<FormAnalyticsQuestionsDto>
-  >(() => this.buildAnalyticsQuestionsEndpoint());
-
-  protected readonly analyticsSegmentsResource = httpResource<
-    ApiSuccessEnvelope<FormAnalyticsSegmentsDto>
-  >(() => this.buildAnalyticsSegmentsEndpoint());
+  protected readonly analyticsReportResource = httpResource<ApiSuccessEnvelope<FormAnalyticsReportDto>>(
+    () => this.buildAnalyticsReportEndpoint(),
+  );
 
   protected readonly structure = computed<FormStructureRecord | null>(() => {
     const dto = this.structureResource.value()?.data;
@@ -128,20 +115,36 @@ export class FormWorkspacePageComponent {
     return dto ? mapFormResponses(dto) : [];
   });
 
-  protected readonly analyticsOverview = computed<FormAnalyticsOverviewRecord | null>(() => {
-    const dto = this.analyticsOverviewResource.value()?.data;
-    return dto ? mapFormAnalyticsOverview(dto) : null;
+  protected readonly analyticsReport = computed<FormAnalyticsReportRecord | null>(() => {
+    const dto = this.analyticsReportResource.value()?.data;
+    return dto ? mapFormAnalyticsReport(dto) : null;
   });
 
-  protected readonly analyticsQuestions = computed<FormAnalyticsQuestionsRecord | null>(() => {
-    const dto = this.analyticsQuestionsResource.value()?.data;
-    return dto ? mapFormAnalyticsQuestions(dto) : null;
-  });
+  protected readonly hasAnalyticsResponses = computed(
+    () => (this.analyticsReport()?.totalResponses ?? 0) > 0,
+  );
 
-  protected readonly analyticsSegments = computed<FormAnalyticsSegmentsRecord | null>(() => {
-    const dto = this.analyticsSegmentsResource.value()?.data;
-    return dto ? mapFormAnalyticsSegments(dto) : null;
-  });
+  protected readonly scaleQuestions = computed(() =>
+    (this.analyticsReport()?.questionAnalytics ?? []).filter(
+      (question) => question.questionType === 'rating' || question.questionType === 'number',
+    ),
+  );
+
+  protected readonly selectQuestions = computed(() =>
+    (this.analyticsReport()?.questionAnalytics ?? []).filter(
+      (question) =>
+        question.questionType === 'single_choice' || question.questionType === 'multi_choice',
+    ),
+  );
+
+  protected readonly textQuestions = computed(() =>
+    (this.analyticsReport()?.questionAnalytics ?? []).filter(
+      (question) =>
+        question.questionType === 'text' ||
+        question.questionType === 'date' ||
+        question.questionType === 'number',
+    ),
+  );
 
   protected readonly responsePage = computed(() => this.workspaceState().responsesPage);
   protected readonly responsePerPage = computed(() => this.workspaceState().responsesPerPage);
@@ -162,21 +165,14 @@ export class FormWorkspacePageComponent {
     () =>
       this.structureResource.isLoading() ||
       this.responsesResource.isLoading() ||
-      this.analyticsOverviewResource.isLoading() ||
-      this.analyticsQuestionsResource.isLoading() ||
-      this.analyticsSegmentsResource.isLoading(),
+      this.analyticsReportResource.isLoading(),
   );
 
-  protected readonly analyticsFreshness = computed(() => this.analyticsOverview()?.dataFreshness ?? null);
+  protected readonly analyticsFreshness = computed(() => this.analyticsReport()?.generatedAt);
 
   protected readonly responseFiltersActive = computed(() => {
     const state = this.workspaceState();
     return Boolean(state.responseSearch || state.responseQuestionId || state.completion);
-  });
-
-  protected readonly analyticsFiltersActive = computed(() => {
-    const state = this.workspaceState();
-    return Boolean(state.analyticsQuestionId || state.analyticsGranularity !== 'day' || state.analyticsSegmentBy !== 'completion');
   });
 
   protected selectTab(tab: FormsWorkspaceTab): void {
@@ -240,48 +236,10 @@ export class FormWorkspacePageComponent {
     this.updateWorkspaceState({ responsesPage: this.responsePage() + 1 });
   }
 
-  protected updateAnalyticsFrom(value: string): void {
-    if (!value) {
-      return;
-    }
-
-    this.updateWorkspaceState({ analyticsFrom: value });
-  }
-
-  protected updateAnalyticsTo(value: string): void {
-    if (!value) {
-      return;
-    }
-
-    this.updateWorkspaceState({ analyticsTo: value });
-  }
-
-  protected updateAnalyticsGranularity(value: string): void {
-    if (value !== 'day' && value !== 'week' && value !== 'month') {
-      return;
-    }
-
-    this.updateWorkspaceState({ analyticsGranularity: value });
-  }
-
-  protected updateAnalyticsQuestionId(value: string): void {
-    this.updateWorkspaceState({ analyticsQuestionId: value || undefined });
-  }
-
-  protected updateAnalyticsSegmentBy(value: string): void {
-    if (value !== 'completion' && value !== 'channel') {
-      return;
-    }
-
-    this.updateWorkspaceState({ analyticsSegmentBy: value });
-  }
-
   protected refresh(): void {
     this.structureResource.reload();
     this.responsesResource.reload();
-    this.analyticsOverviewResource.reload();
-    this.analyticsQuestionsResource.reload();
-    this.analyticsSegmentsResource.reload();
+    this.analyticsReportResource.reload();
   }
 
   protected resetResponsesFilters(): void {
@@ -293,14 +251,34 @@ export class FormWorkspacePageComponent {
     });
   }
 
-  protected resetAnalyticsFilters(): void {
-    const defaults = parseFormsWorkspaceState({});
-    this.updateWorkspaceState({
-      analyticsQuestionId: undefined,
-      analyticsGranularity: defaults.analyticsGranularity,
-      analyticsSegmentBy: defaults.analyticsSegmentBy,
-      analyticsFrom: defaults.analyticsFrom,
-      analyticsTo: defaults.analyticsTo,
+  protected objectKeys(input: Record<string, number>): string[] {
+    return Object.keys(input);
+  }
+
+  protected responseRate(question: FormAnalyticsQuestionRecordV2): number {
+    const total = question.answerCount + question.skippedCount;
+    if (total === 0) {
+      return 0;
+    }
+
+    return Math.round((question.answerCount / total) * 100);
+  }
+
+  protected formatNum(value: number): string {
+    return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  }
+
+  protected formatDate(value?: string): string {
+    if (!value) {
+      return '—';
+    }
+
+    return new Date(value).toLocaleString('en-FI', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
     });
   }
 
@@ -340,65 +318,13 @@ export class FormWorkspacePageComponent {
     return `${this.apiBaseUrl}/forms/${formId}/responses?${searchParams.toString()}`;
   }
 
-  private buildAnalyticsOverviewEndpoint(): string | undefined {
+  private buildAnalyticsReportEndpoint(): string | undefined {
     const formId = this.routeParams()['id'];
     if (!formId || typeof formId !== 'string') {
       return undefined;
     }
 
-    const state = this.workspaceState();
-    const searchParams = new URLSearchParams({
-      from: state.analyticsFrom,
-      to: state.analyticsTo,
-      granularity: state.analyticsGranularity,
-    });
-
-    if (state.analyticsQuestionId) {
-      searchParams.set('questionId', state.analyticsQuestionId);
-    }
-
-    return `${this.apiBaseUrl}/forms/${formId}/analytics/overview?${searchParams.toString()}`;
-  }
-
-  private buildAnalyticsQuestionsEndpoint(): string | undefined {
-    const formId = this.routeParams()['id'];
-    if (!formId || typeof formId !== 'string') {
-      return undefined;
-    }
-
-    const state = this.workspaceState();
-    const searchParams = new URLSearchParams({
-      from: state.analyticsFrom,
-      to: state.analyticsTo,
-      granularity: state.analyticsGranularity,
-    });
-
-    if (state.analyticsQuestionId) {
-      searchParams.set('questionId', state.analyticsQuestionId);
-    }
-
-    return `${this.apiBaseUrl}/forms/${formId}/analytics/questions?${searchParams.toString()}`;
-  }
-
-  private buildAnalyticsSegmentsEndpoint(): string | undefined {
-    const formId = this.routeParams()['id'];
-    if (!formId || typeof formId !== 'string') {
-      return undefined;
-    }
-
-    const state = this.workspaceState();
-    const searchParams = new URLSearchParams({
-      from: state.analyticsFrom,
-      to: state.analyticsTo,
-      granularity: state.analyticsGranularity,
-      segmentBy: state.analyticsSegmentBy,
-    });
-
-    if (state.analyticsQuestionId) {
-      searchParams.set('questionId', state.analyticsQuestionId);
-    }
-
-    return `${this.apiBaseUrl}/forms/${formId}/analytics/segments?${searchParams.toString()}`;
+    return `${this.apiBaseUrl}/forms/${formId}/analytics`;
   }
 
   private updateWorkspaceState(
