@@ -100,7 +100,8 @@ interface SyncJobProcessingContext {
     | 'decrypt-credentials'
     | 'refresh-token'
     | 'persist-refreshed-token'
-    | 'list-forms';
+    | 'list-forms'
+    | 'persist-forms';
   effectiveConnectionId?: string;
   provider?: 'google' | 'microsoft';
 }
@@ -583,6 +584,38 @@ async function processSyncJob(
     const formsPage = await connector.listForms({
       accessToken: tokenSet.accessToken,
     });
+
+    stage = 'persist-forms';
+    for (const form of formsPage.items) {
+      await pool.query(
+        `
+          INSERT INTO forms (
+            owner_id,
+            connection_id,
+            external_form_id,
+            title,
+            description,
+            response_count,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          ON CONFLICT (owner_id, connection_id, external_form_id)
+          DO UPDATE SET
+            title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            response_count = EXCLUDED.response_count,
+            updated_at = NOW()
+        `,
+        [
+          connection.owner_id,
+          connection.id,
+          form.externalFormId,
+          form.title,
+          form.description ?? null,
+          form.responseCount,
+        ],
+      );
+    }
 
     logger.info(
       {
