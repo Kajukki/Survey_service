@@ -89,6 +89,40 @@ function createFakeDbDeleteResult(deletedId: string | null) {
   };
 }
 
+function createFakeDbCreateResult(createdRow: {
+  id: string;
+  owner_id: string;
+  provider: 'google' | 'microsoft';
+  external_account_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}) {
+  const executeTakeFirstOrThrow = vi.fn(async () => createdRow);
+  const returning = vi.fn(() => ({ executeTakeFirstOrThrow }));
+  const doUpdateSet = vi.fn(() => ({ returning }));
+  const columns = vi.fn(() => ({ doUpdateSet }));
+  const onConflict = vi.fn((builder: (oc: { columns: typeof columns }) => unknown) => {
+    builder({ columns });
+    return { returning };
+  });
+  const values = vi.fn(() => ({ onConflict }));
+  const insertInto = vi.fn(() => ({ values }));
+
+  return {
+    insertInto,
+    values,
+    onConflict,
+    columns,
+    doUpdateSet,
+    returning,
+    executeTakeFirstOrThrow,
+    db: {
+      insertInto,
+    },
+  };
+}
+
 async function buildApp(db?: unknown) {
   const config = buildConfig();
   const app = Fastify();
@@ -97,7 +131,7 @@ async function buildApp(db?: unknown) {
   app.setSerializerCompiler(serializerCompiler);
 
   await registerPrincipalPlugin(app, config);
-  await connectionsRoutes(app, db ? { db: db as any } : undefined);
+  await connectionsRoutes(app, db ? { db: db as any, config } : undefined);
 
   return { app, config };
 }
@@ -183,6 +217,91 @@ describe('connections routes', () => {
     expect(fakeDb.deleteFrom).toHaveBeenCalledWith('provider_connections');
     expect(fakeDb.whereFirst).toHaveBeenCalledWith('id', '=', 'conn-db-1');
     expect(fakeDb.whereSecond).toHaveBeenCalledWith('owner_id', '=', 'user-one');
+  });
+
+  it('creates DB-backed connection with encrypted credential payload', async () => {
+    const fakeDb = createFakeDbCreateResult({
+      id: 'conn-created-1',
+      owner_id: 'user-one',
+      provider: 'google',
+      external_account_id: 'google-account-9',
+      name: 'Primary Google',
+      created_at: '2026-04-09T00:00:00.000Z',
+      updated_at: '2026-04-09T00:00:00.000Z',
+    });
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/connections',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+      payload: {
+        type: 'google',
+        name: 'Primary Google',
+        externalId: 'google-account-9',
+        credentialToken: 'opaque-credential-token',
+      },
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(fakeDb.insertInto).toHaveBeenCalledWith('provider_connections');
+    expect(fakeDb.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner_id: 'user-one',
+        provider: 'google',
+        external_account_id: 'google-account-9',
+        name: 'Primary Google',
+        encrypted_token_payload: expect.any(String),
+        encrypted_token_iv: expect.any(String),
+        encrypted_token_tag: expect.any(String),
+        encrypted_token_key_version: 'v1',
+      }),
+    );
+
+    const payload = response.json();
+    expect(payload.success).toBe(true);
+    expect(payload.data).toEqual({
+      id: 'conn-created-1',
+      type: 'google',
+      name: 'Primary Google',
+      externalId: 'google-account-9',
+      ownerId: 'user-one',
+      syncStatus: 'idle',
+      createdAt: '2026-04-09T00:00:00.000Z',
+      updatedAt: '2026-04-09T00:00:00.000Z',
+    });
+  });
+
+  it('returns 400 when create payload validation fails', async () => {
+    const fakeDb = createFakeDbCreateResult({
+      id: 'conn-created-1',
+      owner_id: 'user-one',
+      provider: 'google',
+      external_account_id: 'google-account-9',
+      name: 'Primary Google',
+      created_at: '2026-04-09T00:00:00.000Z',
+      updated_at: '2026-04-09T00:00:00.000Z',
+    });
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/connections',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+      payload: {
+        type: 'google',
+        name: '',
+        externalId: 'google-account-9',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it('returns 404 when DB-backed connection is outside owner scope', async () => {

@@ -128,7 +128,7 @@ Additional endpoints are implemented in feature modules under `modules/`.
 | `/auth/*` | Implemented with DB-backed users and refresh tokens |
 | `/providers/google/auth/*` | Implemented route flow for auth start/callback with DB-backed provider auth state/connection persistence groundwork |
 | `/jobs/*` | Implemented with DB + RabbitMQ publish and requester-scoped reads |
-| `/connections/*` | List/delete are DB-backed with owner scoping; create remains partial |
+| `/connections/*` | DB-backed list/create/delete with owner scoping |
 | `/forms/*` | DB-backed list/detail and form-level sync enqueue |
 | `/forms/:id/shares/*` | DB-backed list/create/delete with owner-scoped form checks |
 | `/exports/*` | DB-backed list/create with owner-scoped form checks |

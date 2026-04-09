@@ -106,6 +106,7 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
       });
       await connectionsRoutes(_api, {
         db: context.db,
+        config: context.config,
       });
       await formsRoutes(_api, {
         db: context.db,

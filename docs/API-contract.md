@@ -120,7 +120,7 @@ Complete Google OAuth authorization code exchange and create/update a linked pro
 ## 3. Connections
 Manages integrations with external survey providers (Google Forms, Microsoft Forms).
 
-Current implementation note: list/delete paths are DB-backed with owner-scoped access checks; create remains partial.
+Current implementation note: list/create/delete paths are DB-backed with owner-scoped access checks.
 
 ### `GET /api/v1/connections`
 List all configured connections for the authenticated user.
@@ -129,7 +129,7 @@ List all configured connections for the authenticated user.
 
 ### `POST /api/v1/connections`
 Create a new provider connection.
-- **Status:** `Partial` (currently mock-backed)
+- **Status:** `Implemented`
 - **Body:** `{ "type": "google|microsoft", "name": "My Workspace", "externalId": "provider-id", "credentialToken": "opaque-token" }`
 - **201 Created**: Returns the created `Connection` object.
 
