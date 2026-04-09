@@ -93,6 +93,18 @@ export interface FormSharesTable {
   created_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface ExportJobsTable {
+  id: ColumnType<string, string | undefined, string>;
+  requested_by: string;
+  form_id: string;
+  format: 'csv' | 'json' | 'excel';
+  status: 'queued' | 'ready' | 'failed';
+  download_url: string | null;
+  error: string | null;
+  requested_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  completed_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+}
+
 export interface DatabaseSchema {
   jobs: JobsTable;
   users: UsersTable;
@@ -101,6 +113,7 @@ export interface DatabaseSchema {
   provider_connections: ProviderConnectionsTable;
   forms: FormsTable;
   form_shares: FormSharesTable;
+  export_jobs: ExportJobsTable;
 }
 
 export type Database = DatabaseSchema;
