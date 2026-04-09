@@ -7,16 +7,19 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { API_BASE_URL } from '../../core/api/api-config.token';
 import { ApiSuccessEnvelope } from '../../core/api/api-envelope';
 import {
+  FormAnalyticsSegmentsDto,
   FormAnalyticsOverviewDto,
   FormAnalyticsQuestionsDto,
   FormResponsesListDto,
   FormStructureDto,
+  mapFormAnalyticsSegments,
   mapFormAnalyticsOverview,
   mapFormAnalyticsQuestions,
   mapFormResponses,
   mapFormStructure,
 } from '../../core/api/survey-api.adapters';
 import {
+  FormAnalyticsSegmentsRecord,
   FormAnalyticsOverviewRecord,
   FormAnalyticsQuestionsRecord,
   FormResponseSummaryRecord,
@@ -67,6 +70,10 @@ export class FormWorkspacePageComponent {
 
   protected readonly analyticsQuestionsResource = httpResource<ApiSuccessEnvelope<FormAnalyticsQuestionsDto>>(
     () => this.buildAnalyticsQuestionsEndpoint(),
+  );
+
+  protected readonly analyticsSegmentsResource = httpResource<ApiSuccessEnvelope<FormAnalyticsSegmentsDto>>(
+    () => this.buildAnalyticsSegmentsEndpoint(),
   );
 
   protected readonly structure = computed<FormStructureRecord | null>(() => {
@@ -129,6 +136,11 @@ export class FormWorkspacePageComponent {
   protected readonly analyticsQuestions = computed<FormAnalyticsQuestionsRecord | null>(() => {
     const dto = this.analyticsQuestionsResource.value()?.data;
     return dto ? mapFormAnalyticsQuestions(dto) : null;
+  });
+
+  protected readonly analyticsSegments = computed<FormAnalyticsSegmentsRecord | null>(() => {
+    const dto = this.analyticsSegmentsResource.value()?.data;
+    return dto ? mapFormAnalyticsSegments(dto) : null;
   });
 
   protected readonly responsePage = computed(() => this.workspaceState().responsesPage);
@@ -231,11 +243,20 @@ export class FormWorkspacePageComponent {
     this.updateWorkspaceState({ analyticsQuestionId: value || undefined });
   }
 
+  protected updateAnalyticsSegmentBy(value: string): void {
+    if (value !== 'completion' && value !== 'channel') {
+      return;
+    }
+
+    this.updateWorkspaceState({ analyticsSegmentBy: value });
+  }
+
   protected refresh(): void {
     this.structureResource.reload();
     this.responsesResource.reload();
     this.analyticsOverviewResource.reload();
     this.analyticsQuestionsResource.reload();
+    this.analyticsSegmentsResource.reload();
   }
 
   private buildStructureEndpoint(): string | undefined {
@@ -312,6 +333,27 @@ export class FormWorkspacePageComponent {
     }
 
     return `${this.apiBaseUrl}/forms/${formId}/analytics/questions?${searchParams.toString()}`;
+  }
+
+  private buildAnalyticsSegmentsEndpoint(): string | undefined {
+    const formId = this.routeParams()['id'];
+    if (!formId || typeof formId !== 'string') {
+      return undefined;
+    }
+
+    const state = this.workspaceState();
+    const searchParams = new URLSearchParams({
+      from: state.analyticsFrom,
+      to: state.analyticsTo,
+      granularity: state.analyticsGranularity,
+      segmentBy: state.analyticsSegmentBy,
+    });
+
+    if (state.analyticsQuestionId) {
+      searchParams.set('questionId', state.analyticsQuestionId);
+    }
+
+    return `${this.apiBaseUrl}/forms/${formId}/analytics/segments?${searchParams.toString()}`;
   }
 
   private updateWorkspaceState(partial: Partial<ReturnType<typeof parseFormsWorkspaceState>>): void {

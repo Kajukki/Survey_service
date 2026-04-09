@@ -1,4 +1,5 @@
 import {
+  FormAnalyticsSegmentsRecord,
   Connection,
   ExportRecord,
   FormAnalyticsOverviewRecord,
@@ -131,6 +132,35 @@ export interface FormAnalyticsQuestionsDto {
   };
 }
 
+export interface FormAnalyticsSegmentMetricDto {
+  label: string;
+  value: number;
+}
+
+export interface FormAnalyticsSegmentDto {
+  segmentKey: string;
+  segmentLabel: string;
+  responses: number;
+  completionRate?: number;
+  metrics: FormAnalyticsSegmentMetricDto[];
+}
+
+export interface FormAnalyticsSegmentsDto {
+  segments: FormAnalyticsSegmentDto[];
+  appliedFilters: {
+    from: string;
+    to: string;
+    granularity: 'day' | 'week' | 'month';
+    segmentBy: string;
+    questionId?: string;
+  };
+  dataFreshness: {
+    generatedAt: string;
+    lastSuccessfulSyncAt?: string;
+    lastAttemptedSyncAt?: string;
+  };
+}
+
 export interface JobDto {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
@@ -240,6 +270,14 @@ export function mapFormAnalyticsQuestions(input: FormAnalyticsQuestionsDto): For
       responses: question.responses,
       distribution: question.distribution,
     })),
+    appliedFilters: input.appliedFilters,
+    dataFreshness: input.dataFreshness,
+  };
+}
+
+export function mapFormAnalyticsSegments(input: FormAnalyticsSegmentsDto): FormAnalyticsSegmentsRecord {
+  return {
+    segments: input.segments,
     appliedFilters: input.appliedFilters,
     dataFreshness: input.dataFreshness,
   };

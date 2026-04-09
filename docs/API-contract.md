@@ -192,6 +192,13 @@ Get per-question breakdown analytics for a form.
 - **200 OK**: Returns `{ questions, appliedFilters, dataFreshness }`.
 - **404 Not Found**: Form not found or not accessible to requester.
 
+### `GET /api/v1/forms/:id/analytics/segments`
+Get segmented analytics comparisons for a form.
+- **Status:** `Implemented`
+- **Query Params:** `from`, `to`, `granularity`, `segmentBy`, `questionId`
+- **200 OK**: Returns `{ segments, appliedFilters, dataFreshness }`.
+- **404 Not Found**: Form not found or not accessible to requester.
+
 ### `POST /api/v1/forms/:id/sync`
 Trigger a manual synchronization job for the specified form.
 - **Status:** `Implemented`
