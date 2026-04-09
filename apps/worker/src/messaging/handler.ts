@@ -4,11 +4,7 @@ import type { Pool } from 'pg';
 import { SyncJobMessageSchema, type SyncJobMessage } from '@survey-service/messaging';
 import type { WorkerConfig } from '../config.js';
 import { markJobFailed, markJobRunning, markJobSucceeded } from '../db/jobs.js';
-import {
-  extractErrorMessage,
-  processSyncJob,
-  SyncJobProcessingError,
-} from '../sync/processor.js';
+import { extractErrorMessage, processSyncJob, SyncJobProcessingError } from '../sync/processor.js';
 
 export function serializeError(error: unknown): Record<string, unknown> {
   if (error instanceof SyncJobProcessingError) {

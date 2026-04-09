@@ -79,4 +79,3 @@ async function main(): Promise<void> {
 
 // Start the application
 main();
-

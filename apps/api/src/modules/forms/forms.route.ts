@@ -5,7 +5,11 @@ import type { Database } from '@survey-service/db';
 import type { Metrics } from '../../infra/metrics';
 import { mockForms } from './forms.mock.js';
 import { getPrincipal } from '../../server/principal';
-import { createJobsRepository, type JobsRepository, type SyncJobRecord } from '../jobs/jobs.repository';
+import {
+  createJobsRepository,
+  type JobsRepository,
+  type SyncJobRecord,
+} from '../jobs/jobs.repository';
 import { createJobsCommandService } from '../jobs/jobs.command-service';
 import { createJobsSyncTargetQueryService } from '../jobs/jobs-sync-target.query-service';
 import { createFormsAnalyticsQueryService } from './forms-analytics.query-service';
@@ -701,7 +705,10 @@ export async function formsRoutes(
       });
     }
 
-    const analytics = await formsAnalyticsQueryService.loadPersistedAnalyticsReport(id, resolvedForm.responseCount);
+    const analytics = await formsAnalyticsQueryService.loadPersistedAnalyticsReport(
+      id,
+      resolvedForm.responseCount,
+    );
     return reply.send({
       success: true,
       data: analytics,
@@ -865,4 +872,3 @@ export async function formsRoutes(
     });
   });
 }
-

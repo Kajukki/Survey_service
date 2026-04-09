@@ -314,9 +314,7 @@ function buildPersistedAnalyticsReportFromResponses(
         };
       }
 
-      const textResponses = answeredValues
-        .filter((value) => value.trim().length > 0)
-        .slice(0, 200);
+      const textResponses = answeredValues.filter((value) => value.trim().length > 0).slice(0, 200);
       const wordCounts = textResponses.map(
         (text) =>
           text
@@ -366,7 +364,9 @@ function buildPersistedAnalyticsReportFromResponses(
     firstResponseTime:
       responseTimes.length > 0 ? new Date(responseTimes[0]!).toISOString() : undefined,
     lastResponseTime:
-      responseTimes.length > 0 ? new Date(responseTimes[responseTimes.length - 1]!).toISOString() : undefined,
+      responseTimes.length > 0
+        ? new Date(responseTimes[responseTimes.length - 1]!).toISOString()
+        : undefined,
     ...(scoreStats ? { scoreStats } : {}),
     questionAnalytics,
     generatedAt: new Date().toISOString(),
@@ -511,8 +511,8 @@ function groupResponsesBySegment(
         key = segmentValues[0]!;
       } else {
         key =
-          response.answerPreview.find((item) => item.questionId === segmentQuestionId)?.valuePreview ??
-          'unknown';
+          response.answerPreview.find((item) => item.questionId === segmentQuestionId)
+            ?.valuePreview ?? 'unknown';
       }
     }
 
@@ -558,7 +558,8 @@ function groupResponsesBySegment(
       metrics: [
         {
           label: 'avgValue',
-          value: value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
+          value:
+            value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
         },
       ],
     }))
@@ -597,7 +598,10 @@ export function createFormsAnalyticsQueryService(deps: {
   ): Promise<PersistedAnalyticsReport> {
     if (!deps.db) {
       const mockResponses = await deps.loadFormResponses(formId, fallbackResponseCount);
-      return buildPersistedAnalyticsReportFromResponses({ sections: [], questionCount: 0 }, mockResponses);
+      return buildPersistedAnalyticsReportFromResponses(
+        { sections: [], questionCount: 0 },
+        mockResponses,
+      );
     }
 
     const analyticsDb = deps.db as unknown as Kysely<{

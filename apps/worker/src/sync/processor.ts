@@ -7,10 +7,7 @@ import {
   encryptCredentialPayload,
   isTokenExpiringSoon,
 } from '../crypto/credentials.js';
-import {
-  loadProviderConnection,
-  persistRefreshedProviderToken,
-} from '../db/connections.js';
+import { loadProviderConnection, persistRefreshedProviderToken } from '../db/connections.js';
 import {
   refreshFormResponseCount,
   upsertAnalyticsSnapshot,
@@ -142,7 +139,11 @@ export async function processSyncJob(
   let provider: SyncJobProcessingContext['provider'];
 
   try {
-    const connection = await loadProviderConnection(pool, payload.connectionId, payload.requestedBy);
+    const connection = await loadProviderConnection(
+      pool,
+      payload.connectionId,
+      payload.requestedBy,
+    );
     if (!connection) {
       throw new Error('Provider connection not found for sync job and requester');
     }
