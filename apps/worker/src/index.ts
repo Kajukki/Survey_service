@@ -93,6 +93,30 @@ interface ProviderConnectionRow {
   token_type: string;
 }
 
+interface SyncJobProcessingContext {
+  stage:
+    | 'load-connection'
+    | 'validate-provider'
+    | 'decrypt-credentials'
+    | 'refresh-token'
+    | 'persist-refreshed-token'
+    | 'list-forms';
+  effectiveConnectionId?: string;
+  provider?: 'google' | 'microsoft';
+  usedPlaceholderConnectionId: boolean;
+}
+
+class SyncJobProcessingError extends Error {
+  constructor(
+    message: string,
+    readonly context: SyncJobProcessingContext,
+    readonly causeError: unknown,
+  ) {
+    super(message);
+    this.name = 'SyncJobProcessingError';
+  }
+}
+
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH_BYTES = 12;
 const PLACEHOLDER_CONNECTION_ID = '00000000-0000-0000-0000-000000000000';
@@ -158,6 +182,29 @@ function serializeError(error: unknown): Record<string, unknown> {
   return {
     value: String(error),
   };
+}
+
+function createErrorSummary(error: unknown): string {
+  if (error instanceof SyncJobProcessingError) {
+    const connectionPart = error.context.effectiveConnectionId
+      ? `connection=${error.context.effectiveConnectionId}`
+      : 'connection=unknown';
+
+    return `stage=${error.context.stage}; ${connectionPart}; message=${error.message}`;
+  }
+
+  if (error instanceof Error) {
+    return `${error.name}: ${error.message}`;
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const candidate = error as Record<string, unknown>;
+    if (typeof candidate.message === 'string') {
+      return candidate.message;
+    }
+  }
+
+  return String(error);
 }
 
 function loadEnvironmentFiles(): void {
@@ -370,9 +417,13 @@ async function processSyncJob(
   logger: Logger,
 ): Promise<void> {
   const hasPlaceholderConnectionId = payload.connectionId === PLACEHOLDER_CONNECTION_ID;
+  let stage: SyncJobProcessingContext['stage'] = 'load-connection';
+  let effectiveConnectionId: string | undefined;
+  let provider: SyncJobProcessingContext['provider'];
 
-  const connectionResult = hasPlaceholderConnectionId
-    ? await pool.query<ProviderConnectionRow>(
+  try {
+    const connectionResult = hasPlaceholderConnectionId
+      ? await pool.query<ProviderConnectionRow>(
         `
           SELECT
             id,
@@ -392,7 +443,7 @@ async function processSyncJob(
         `,
         [payload.requestedBy],
       )
-    : await pool.query<ProviderConnectionRow>(
+      : await pool.query<ProviderConnectionRow>(
         `
           SELECT
             id,
@@ -412,109 +463,131 @@ async function processSyncJob(
         [payload.connectionId, payload.requestedBy],
       );
 
-  const connection = connectionResult.rows[0];
-  if (!connection) {
+    const connection = connectionResult.rows[0];
+    if (!connection) {
+      if (hasPlaceholderConnectionId) {
+        throw new Error(
+          'Sync request did not include a connectionId and no Google connection exists for this user',
+        );
+      }
+
+      throw new Error('Provider connection not found for sync job and requester');
+    }
+
+    effectiveConnectionId = connection.id;
+    provider = connection.provider;
+
     if (hasPlaceholderConnectionId) {
-      throw new Error(
-        'Sync request did not include a connectionId and no Google connection exists for this user',
+      logger.warn(
+        {
+          jobId: payload.jobId,
+          requestedBy: payload.requestedBy,
+          resolvedConnectionId: connection.id,
+        },
+        'Resolved placeholder connectionId to most recent Google connection for requester',
       );
     }
 
-    throw new Error('Provider connection not found for sync job and requester');
-  }
-
-  if (hasPlaceholderConnectionId) {
-    logger.warn(
-      {
-        jobId: payload.jobId,
-        requestedBy: payload.requestedBy,
-        resolvedConnectionId: connection.id,
-      },
-      'Resolved placeholder connectionId to most recent Google connection for requester',
-    );
-  }
-
-  if (connection.provider !== 'google') {
-    throw new Error(`Provider ${connection.provider} is not supported by this worker slice`);
-  }
-
-  const connector = new GoogleFormsConnector(
-    {
-      clientId: config.GOOGLE_OAUTH_CLIENT_ID,
-      clientSecret: config.GOOGLE_OAUTH_CLIENT_SECRET,
-      authBaseUrl: config.GOOGLE_OAUTH_AUTH_BASE_URL,
-      tokenUrl: config.GOOGLE_OAUTH_TOKEN_URL,
-      formsApiBaseUrl: config.GOOGLE_FORMS_API_BASE_URL,
-    },
-    createFetchHttpClient(),
-  );
-
-  const decrypted = decryptCredentialPayload(config, connection);
-  let tokenSet = decrypted.tokenSet;
-
-  if (isTokenExpiringSoon(tokenSet.expiresAt)) {
-    if (!tokenSet.refreshToken) {
-      throw new Error('Google access token is expired and no refresh token is available');
+    stage = 'validate-provider';
+    if (connection.provider !== 'google') {
+      throw new Error(`Provider ${connection.provider} is not supported by this worker slice`);
     }
 
-    const refreshedTokenSet = await connector.refreshAccessToken({
-      refreshToken: tokenSet.refreshToken,
+    const connector = new GoogleFormsConnector(
+      {
+        clientId: config.GOOGLE_OAUTH_CLIENT_ID,
+        clientSecret: config.GOOGLE_OAUTH_CLIENT_SECRET,
+        authBaseUrl: config.GOOGLE_OAUTH_AUTH_BASE_URL,
+        tokenUrl: config.GOOGLE_OAUTH_TOKEN_URL,
+        formsApiBaseUrl: config.GOOGLE_FORMS_API_BASE_URL,
+      },
+      createFetchHttpClient(),
+    );
+
+    stage = 'decrypt-credentials';
+    const decrypted = decryptCredentialPayload(config, connection);
+    let tokenSet = decrypted.tokenSet;
+
+    if (isTokenExpiringSoon(tokenSet.expiresAt)) {
+      if (!tokenSet.refreshToken) {
+        throw new Error('Google access token is expired and no refresh token is available');
+      }
+
+      stage = 'refresh-token';
+      const refreshedTokenSet = await connector.refreshAccessToken({
+        refreshToken: tokenSet.refreshToken,
+      });
+
+      tokenSet = {
+        accessToken: refreshedTokenSet.accessToken,
+        refreshToken: refreshedTokenSet.refreshToken,
+        expiresAt: refreshedTokenSet.expiresAt,
+        scope: refreshedTokenSet.scope,
+        tokenType: refreshedTokenSet.tokenType,
+      };
+
+      const encrypted = encryptCredentialPayload(config, {
+        tokenSet,
+        idToken: decrypted.idToken,
+      });
+
+      stage = 'persist-refreshed-token';
+      await pool.query(
+        `
+          UPDATE provider_connections
+          SET
+            encrypted_token_payload = $2,
+            encrypted_token_iv = $3,
+            encrypted_token_tag = $4,
+            encrypted_token_key_version = $5,
+            expires_at = $6,
+            scope = $7,
+            token_type = $8,
+            updated_at = NOW()
+          WHERE id = $1
+        `,
+        [
+          connection.id,
+          encrypted.encryptedTokenPayload,
+          encrypted.encryptedTokenIv,
+          encrypted.encryptedTokenTag,
+          encrypted.encryptedTokenKeyVersion,
+          tokenSet.expiresAt,
+          tokenSet.scope ?? null,
+          tokenSet.tokenType ?? 'Bearer',
+        ],
+      );
+    }
+
+    stage = 'list-forms';
+    const formsPage = await connector.listForms({
+      accessToken: tokenSet.accessToken,
     });
 
-    tokenSet = {
-      accessToken: refreshedTokenSet.accessToken,
-      refreshToken: refreshedTokenSet.refreshToken,
-      expiresAt: refreshedTokenSet.expiresAt,
-      scope: refreshedTokenSet.scope,
-      tokenType: refreshedTokenSet.tokenType,
-    };
-
-    const encrypted = encryptCredentialPayload(config, {
-      tokenSet,
-      idToken: decrypted.idToken,
-    });
-
-    await pool.query(
-      `
-        UPDATE provider_connections
-        SET
-          encrypted_token_payload = $2,
-          encrypted_token_iv = $3,
-          encrypted_token_tag = $4,
-          encrypted_token_key_version = $5,
-          expires_at = $6,
-          scope = $7,
-          token_type = $8,
-          updated_at = NOW()
-        WHERE id = $1
-      `,
-      [
-        connection.id,
-        encrypted.encryptedTokenPayload,
-        encrypted.encryptedTokenIv,
-        encrypted.encryptedTokenTag,
-        encrypted.encryptedTokenKeyVersion,
-        tokenSet.expiresAt,
-        tokenSet.scope ?? null,
-        tokenSet.tokenType ?? 'Bearer',
-      ],
+    logger.info(
+      {
+        jobId: payload.jobId,
+        connectionId: payload.connectionId,
+        effectiveConnectionId,
+        fetchedForms: formsPage.items.length,
+        hasNextPage: Boolean(formsPage.nextPageToken),
+        forcedFullSync: payload.forceFullSync,
+      },
+      'Processed Google sync job using provider API',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown worker error';
+    throw new SyncJobProcessingError(
+      message,
+      {
+        stage,
+        effectiveConnectionId,
+        provider,
+        usedPlaceholderConnectionId: hasPlaceholderConnectionId,
+      },
+      error,
     );
   }
-
-  const formsPage = await connector.listForms({
-    accessToken: tokenSet.accessToken,
-  });
-
-  logger.info(
-    {
-      jobId: payload.jobId,
-      connectionId: payload.connectionId,
-      fetchedForms: formsPage.items.length,
-      hasNextPage: Boolean(formsPage.nextPageToken),
-      forcedFullSync: payload.forceFullSync,
-    },
-    'Processed Google sync job using provider API',
-  );
 }
 
 async function handleMessage(
@@ -549,9 +622,16 @@ async function handleMessage(
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'unknown worker error';
     await markJobFailed(pool, parsedMessage.jobId, reason);
+
+    const processingError = error instanceof SyncJobProcessingError ? error : null;
     logger.error(
       {
         error: serializeError(error),
+        errorSummary: createErrorSummary(error),
+        stage: processingError?.context.stage ?? null,
+        provider: processingError?.context.provider ?? null,
+        effectiveConnectionId: processingError?.context.effectiveConnectionId ?? null,
+        usedPlaceholderConnectionId: processingError?.context.usedPlaceholderConnectionId ?? false,
         jobId: parsedMessage.jobId,
         connectionId: parsedMessage.connectionId,
         requestedBy: parsedMessage.requestedBy,
