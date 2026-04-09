@@ -355,12 +355,43 @@ function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient 
         });
 
         if (!response.ok) {
-          const body = await response.json().catch(() => undefined);
+          const rawBody = await response.text().catch(() => '');
+          const contentType = response.headers.get('content-type') ?? '';
+          const body = (() => {
+            if (!rawBody) {
+              return undefined;
+            }
+
+            if (contentType.includes('application/json')) {
+              try {
+                return JSON.parse(rawBody) as unknown;
+              } catch {
+                return rawBody;
+              }
+            }
+
+            return rawBody;
+          })();
+
+          const bodyPreview =
+            typeof body === 'string'
+              ? body.slice(0, 1000)
+              : body
+                ? JSON.stringify(body).slice(0, 1000)
+                : undefined;
+
+          const responseHeaders = {
+            'content-type': response.headers.get('content-type'),
+            'www-authenticate': response.headers.get('www-authenticate'),
+            'x-goog-request-id': response.headers.get('x-goog-request-id'),
+          };
+
           throw {
-            message: `Google API request failed with status ${response.status} for ${input.method} ${url.toString()}`,
+            message: `Google API request failed with status ${response.status} for ${input.method} ${url.toString()}${bodyPreview ? ` | body: ${bodyPreview}` : ''}`,
             response: {
               status: response.status,
               data: body,
+              headers: responseHeaders,
             },
           };
         }

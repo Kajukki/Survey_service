@@ -249,7 +249,12 @@ function createFetchHttpClient(timeoutMs: number = 10_000): ConnectorHttpClient 
 
 export function createGoogleAuthService(deps: GoogleAuthServiceDeps): GoogleAuthService {
   const now = deps.now ?? (() => new Date());
-  const requiredScopes = ['openid', 'email', 'profile'];
+  const requiredScopes = [
+    'openid',
+    'email',
+    'profile',
+    'https://www.googleapis.com/auth/drive.metadata.readonly',
+  ];
   const allowedScopes = new Set(
     (deps.allowedScopes ?? [
       'https://www.googleapis.com/auth/forms.body.readonly',
