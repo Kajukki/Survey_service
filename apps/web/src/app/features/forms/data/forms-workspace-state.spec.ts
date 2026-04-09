@@ -90,4 +90,31 @@ describe('forms workspace state', () => {
       responsesPerPage: '25',
     });
   });
+
+  it('maps legacy questionId alias when scoped ids are missing', () => {
+    const parsed = parseFormsWorkspaceState({
+      questionId: 'legacy-question-id',
+    });
+
+    expect(parsed.responseQuestionId).toBe('legacy-question-id');
+    expect(parsed.analyticsQuestionId).toBe('legacy-question-id');
+  });
+
+  it('omits optional query params when values are undefined', () => {
+    const params = buildFormsWorkspaceQueryParams({
+      ...defaultFormsWorkspaceState(),
+      tab: 'overview',
+      questionSearch: undefined,
+      responseSearch: undefined,
+      responseQuestionId: undefined,
+      completion: undefined,
+      analyticsQuestionId: undefined,
+    });
+
+    expect(params['questionSearch']).toBeUndefined();
+    expect(params['responseSearch']).toBeUndefined();
+    expect(params['responseQuestionId']).toBeUndefined();
+    expect(params['completion']).toBeUndefined();
+    expect(params['analyticsQuestionId']).toBeUndefined();
+  });
 });

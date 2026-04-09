@@ -7,8 +7,28 @@
         Explore form structure now, with response and analytics tabs prepared for the next slices.
       </p>
     </div>
-    <button type="button" class="btn-primary" (click)="refresh()">Refresh</button>
+    <button type="button" class="btn-primary" [disabled]="isLoadingAny()" (click)="refresh()">
+      @if (isLoadingAny()) {
+        Refreshing...
+      } @else {
+        Refresh
+      }
+    </button>
   </header>
+
+  @if (structure(); as currentStructure) {
+    <section class="workspace-status card">
+      <span>
+        <strong>{{ currentStructure.questionCount }}</strong> questions indexed
+      </span>
+      <span>
+        <strong>{{ currentStructure.responseCount }}</strong> responses synced
+      </span>
+      @if (analyticsFreshness()?.lastSuccessfulSyncAt) {
+        <span>Last sync {{ analyticsFreshness()!.lastSuccessfulSyncAt | date: 'short' }}</span>
+      }
+    </section>
+  }
 
   @if (structureResource.isLoading()) {
   <section class="card empty-state">
@@ -142,6 +162,18 @@
   </section>
   } @if (activeTab() === 'responses') {
   <section class="card response-filters">
+        <header class="filter-header">
+          <h3>Filter responses</h3>
+          <button
+            type="button"
+            class="btn-secondary"
+            [disabled]="!responseFiltersActive()"
+            (click)="resetResponsesFilters()"
+          >
+            Reset
+          </button>
+        </header>
+
     <label>
       Answer contains
       <input
@@ -256,6 +288,18 @@
   </section>
   } } @if (activeTab() === 'analytics') {
   <section class="card analytics-filters">
+        <header class="filter-header">
+          <h3>Filter analytics</h3>
+          <button
+            type="button"
+            class="btn-secondary"
+            [disabled]="!analyticsFiltersActive()"
+            (click)="resetAnalyticsFilters()"
+          >
+            Reset
+          </button>
+        </header>
+
     <label>
       From
       <input

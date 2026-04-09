@@ -128,20 +128,28 @@ export async function formsRoutes(
         id: `${formId}-resp-${ordinal.toString().padStart(4, '0')}`,
         submittedAt,
         completion,
+        answers: {
+          'q-overall': score,
+          'q-channel': channel,
+          'q-comment': comment,
+        },
         answerPreview: [
           {
             questionId: 'q-overall',
             questionLabel: 'Overall satisfaction',
+            questionType: 'rating' as const,
             valuePreview: `${score}/5`,
           },
           {
             questionId: 'q-channel',
             questionLabel: 'Acquisition channel',
+            questionType: 'single_choice' as const,
             valuePreview: channel,
           },
           {
             questionId: 'q-comment',
             questionLabel: 'Additional comments',
+            questionType: 'text' as const,
             valuePreview: comment,
           },
         ],
@@ -153,7 +161,26 @@ export async function formsRoutes(
     id: string;
     submittedAt?: string;
     completion: 'completed' | 'partial';
-    answerPreview: Array<{ questionId: string; questionLabel: string; valuePreview: string }>;
+    answerPreview: Array<{
+      questionId: string;
+      questionLabel: string;
+      questionType?:
+        | 'single_choice'
+        | 'multi_choice'
+        | 'text'
+        | 'rating'
+        | 'date'
+        | 'number';
+      valuePreview: string;
+    }>;
+    answers: Record<string, unknown>;
+  };
+
+  type FormQuestionMeta = {
+    id: string;
+    label: string;
+    type: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+    options?: string[];
   };
 
   type PersistedFormStructureRecord = {
@@ -200,10 +227,26 @@ export async function formsRoutes(
         return {
           questionId: candidate.questionId,
           questionLabel: candidate.questionLabel,
+          ...((candidate.questionType === 'single_choice' ||
+            candidate.questionType === 'multi_choice' ||
+            candidate.questionType === 'text' ||
+            candidate.questionType === 'rating' ||
+            candidate.questionType === 'date' ||
+            candidate.questionType === 'number')
+            ? { questionType: candidate.questionType }
+            : {}),
           valuePreview: candidate.valuePreview,
         };
       })
       .filter((item): item is FormResponseRecord['answerPreview'][number] => Boolean(item));
+  }
+
+  function normalizeAnswersJson(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return {};
+    }
+
+    return value as Record<string, unknown>;
   }
 
   async function loadFormResponses(
@@ -216,7 +259,13 @@ export async function formsRoutes(
 
     const rows = await db
       .selectFrom('form_responses')
-      .select(['external_response_id', 'submitted_at', 'completion', 'answer_preview_json'])
+      .select([
+        'external_response_id',
+        'submitted_at',
+        'completion',
+        'answer_preview_json',
+        'answers_json',
+      ])
       .where('form_id', '=', formId)
       .orderBy('submitted_at', 'desc')
       .execute();
@@ -230,6 +279,7 @@ export async function formsRoutes(
       submittedAt: row.submitted_at ? new Date(row.submitted_at).toISOString() : undefined,
       completion: row.completion,
       answerPreview: normalizeAnswerPreviewJson(row.answer_preview_json),
+      answers: normalizeAnswersJson(row.answers_json),
     }));
   }
 
@@ -375,6 +425,235 @@ export async function formsRoutes(
     return normalized;
   }
 
+  function extractAnswerValues(answer: unknown): string[] {
+    if (answer === null || answer === undefined) {
+      return [];
+    }
+
+    if (typeof answer === 'string' || typeof answer === 'number' || typeof answer === 'boolean') {
+      const value = String(answer).trim();
+      return value.length > 0 ? [value] : [];
+    }
+
+    if (Array.isArray(answer)) {
+      return answer.flatMap((item) => extractAnswerValues(item));
+    }
+
+    if (typeof answer === 'object') {
+      const candidate = answer as Record<string, unknown>;
+      const choiceAnswers = candidate.choiceAnswers as { answers?: unknown[] } | undefined;
+      if (choiceAnswers?.answers && Array.isArray(choiceAnswers.answers)) {
+        return choiceAnswers.answers.flatMap((item) => extractAnswerValues(item));
+      }
+
+      const textAnswers = candidate.textAnswers as
+        | { answers?: Array<{ value?: string }> }
+        | undefined;
+      if (textAnswers?.answers && Array.isArray(textAnswers.answers)) {
+        return textAnswers.answers
+          .map((item) => (typeof item?.value === 'string' ? item.value.trim() : ''))
+          .filter((item) => item.length > 0);
+      }
+
+      return [];
+    }
+
+    return [];
+  }
+
+  function buildQuestionMetaMap(
+    structure: PersistedFormStructureRecord,
+    responses: FormResponseRecord[],
+  ): Map<string, FormQuestionMeta> {
+    const map = new Map<string, FormQuestionMeta>();
+
+    for (const section of structure.sections) {
+      for (const question of section.questions) {
+        map.set(question.id, {
+          id: question.id,
+          label: question.label,
+          type: question.type,
+          options: question.options?.map((option) => option.label),
+        });
+      }
+    }
+
+    for (const response of responses) {
+      for (const preview of response.answerPreview) {
+        if (map.has(preview.questionId)) {
+          continue;
+        }
+
+        map.set(preview.questionId, {
+          id: preview.questionId,
+          label: preview.questionLabel,
+          type: preview.questionType ?? 'text',
+        });
+      }
+    }
+
+    return map;
+  }
+
+  function resolveNumericQuestionId(
+    questionMetaMap: Map<string, FormQuestionMeta>,
+    requestedQuestionId?: string,
+  ): string | undefined {
+    const requested = requestedQuestionId ? questionMetaMap.get(requestedQuestionId) : undefined;
+    if (requested && (requested.type === 'rating' || requested.type === 'number')) {
+      return requested.id;
+    }
+
+    for (const question of questionMetaMap.values()) {
+      if (question.type === 'rating' || question.type === 'number') {
+        return question.id;
+      }
+    }
+
+    return undefined;
+  }
+
+  function buildQuestionBreakdowns(
+    questionMetaMap: Map<string, FormQuestionMeta>,
+    responses: FormResponseRecord[],
+    questionId?: string,
+  ) {
+    const selectedQuestionIds = questionId
+      ? questionMetaMap.has(questionId)
+        ? [questionId]
+        : []
+      : [...questionMetaMap.keys()];
+
+    return selectedQuestionIds.map((selectedQuestionId) => {
+      const meta = questionMetaMap.get(selectedQuestionId)!;
+      const distribution = new Map<string, number>();
+      let responseCount = 0;
+
+      for (const response of responses) {
+        const rawAnswer = response.answers[selectedQuestionId];
+        const preview = response.answerPreview.find((item) => item.questionId === selectedQuestionId);
+        const values = [
+          ...extractAnswerValues(rawAnswer),
+          ...(rawAnswer === undefined && preview ? [preview.valuePreview] : []),
+        ].filter((value) => value.trim().length > 0);
+
+        if (values.length === 0) {
+          continue;
+        }
+
+        responseCount += 1;
+        for (const value of values) {
+          distribution.set(value, (distribution.get(value) ?? 0) + 1);
+        }
+      }
+
+      const distributionItems = [...distribution.entries()]
+        .map(([label, value]) => ({ label, value }))
+        .sort((left, right) => right.value - left.value)
+        .slice(0, 10);
+
+      return {
+        questionId: meta.id,
+        questionLabel: meta.label,
+        questionType: meta.type,
+        responses: responseCount,
+        ...(meta.type === 'text' ? {} : { distribution: distributionItems }),
+      };
+    });
+  }
+
+  function groupResponsesBySegment(
+    questionMetaMap: Map<string, FormQuestionMeta>,
+    responses: FormResponseRecord[],
+    segmentBy: string,
+    requestedQuestionId?: string,
+  ) {
+    const numericQuestionId = resolveNumericQuestionId(questionMetaMap, requestedQuestionId);
+    const segmentQuestionId =
+      segmentBy === 'channel'
+        ? requestedQuestionId && questionMetaMap.has(requestedQuestionId)
+          ? requestedQuestionId
+          : [...questionMetaMap.values()].find(
+              (question) => question.type === 'single_choice' || question.type === 'multi_choice',
+            )?.id
+        : undefined;
+
+    const grouped = new Map<
+      string,
+      {
+        responses: number;
+        completed: number;
+        scoreTotal: number;
+        scoreCount: number;
+      }
+    >();
+
+    for (const response of responses) {
+      let key = 'unknown';
+
+      if (segmentBy === 'completion') {
+        key = response.completion;
+      } else if (segmentQuestionId) {
+        const rawSegment = response.answers[segmentQuestionId];
+        const segmentValues = extractAnswerValues(rawSegment);
+        if (segmentValues.length > 0) {
+          key = segmentValues[0]!;
+        } else {
+          key =
+            response.answerPreview.find((item) => item.questionId === segmentQuestionId)?.valuePreview ??
+            'unknown';
+        }
+      }
+
+      const current = grouped.get(key) ?? {
+        responses: 0,
+        completed: 0,
+        scoreTotal: 0,
+        scoreCount: 0,
+      };
+
+      current.responses += 1;
+      if (response.completion === 'completed') {
+        current.completed += 1;
+      }
+
+      if (numericQuestionId) {
+        const numericValues = extractAnswerValues(response.answers[numericQuestionId])
+          .map((value) => Number.parseFloat(value))
+          .filter((value) => Number.isFinite(value));
+
+        if (numericValues.length > 0) {
+          current.scoreTotal += numericValues.reduce((total, value) => total + value, 0);
+          current.scoreCount += numericValues.length;
+        }
+      }
+
+      grouped.set(key, current);
+    }
+
+    return [...grouped.entries()]
+      .map(([segmentKey, value]) => ({
+        segmentKey,
+        segmentLabel:
+          segmentKey === 'completed'
+            ? 'Completed'
+            : segmentKey === 'partial'
+              ? 'Partial'
+              : segmentKey === 'unknown'
+                ? 'Unknown'
+                : segmentKey,
+        responses: value.responses,
+        completionRate: value.responses > 0 ? value.completed / value.responses : 0,
+        metrics: [
+          {
+            label: 'avgValue',
+            value: value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
+          },
+        ],
+      }))
+      .sort((left, right) => right.responses - left.responses);
+  }
+
   type AnalyticsGranularity = 'day' | 'week' | 'month';
 
   function parseAnalyticsGranularity(value: unknown): AnalyticsGranularity {
@@ -439,147 +718,6 @@ export async function formsRoutes(
     return buckets.map(({ date, count }) => ({ date, count }));
   }
 
-  function buildQuestionBreakdowns(
-    responses: Array<{
-      answerPreview: Array<{ questionId: string; questionLabel: string; valuePreview: string }>;
-    }>,
-    questionId?: string,
-  ) {
-    const scoreDistribution = new Map<string, number>();
-    const channelDistribution = new Map<string, number>();
-    let commentCount = 0;
-
-    for (const response of responses) {
-      const score = response.answerPreview.find((item) => item.questionId === 'q-overall');
-      if (score) {
-        scoreDistribution.set(
-          score.valuePreview,
-          (scoreDistribution.get(score.valuePreview) ?? 0) + 1,
-        );
-      }
-
-      const channel = response.answerPreview.find((item) => item.questionId === 'q-channel');
-      if (channel) {
-        channelDistribution.set(
-          channel.valuePreview,
-          (channelDistribution.get(channel.valuePreview) ?? 0) + 1,
-        );
-      }
-
-      const comment = response.answerPreview.find((item) => item.questionId === 'q-comment');
-      if (comment && comment.valuePreview.trim().length > 0) {
-        commentCount += 1;
-      }
-    }
-
-    const breakdowns = [
-      {
-        questionId: 'q-overall',
-        questionLabel: 'Overall satisfaction',
-        questionType: 'rating' as const,
-        responses: responses.length,
-        distribution: [...scoreDistribution.entries()].map(([label, value]) => ({ label, value })),
-      },
-      {
-        questionId: 'q-channel',
-        questionLabel: 'Acquisition channel',
-        questionType: 'single_choice' as const,
-        responses: responses.length,
-        distribution: [...channelDistribution.entries()].map(([label, value]) => ({
-          label,
-          value,
-        })),
-      },
-      {
-        questionId: 'q-comment',
-        questionLabel: 'Additional comments',
-        questionType: 'text' as const,
-        responses: commentCount,
-      },
-    ];
-
-    if (!questionId) {
-      return breakdowns;
-    }
-
-    return breakdowns.filter((item) => item.questionId === questionId);
-  }
-
-  function groupResponsesBySegment(
-    responses: Array<{
-      completion: string;
-      answerPreview: Array<{ questionId: string; valuePreview: string }>;
-    }>,
-    segmentBy: string,
-  ) {
-    const grouped = new Map<
-      string,
-      {
-        responses: number;
-        completed: number;
-        scoreTotal: number;
-        scoreCount: number;
-      }
-    >();
-
-    for (const response of responses) {
-      let key = 'unknown';
-
-      if (segmentBy === 'completion') {
-        key = response.completion;
-      } else if (segmentBy === 'channel') {
-        key =
-          response.answerPreview.find((item) => item.questionId === 'q-channel')?.valuePreview ??
-          'unknown';
-      }
-
-      const current = grouped.get(key) ?? {
-        responses: 0,
-        completed: 0,
-        scoreTotal: 0,
-        scoreCount: 0,
-      };
-
-      current.responses += 1;
-      if (response.completion === 'completed') {
-        current.completed += 1;
-      }
-
-      const scoreValue = response.answerPreview.find(
-        (item) => item.questionId === 'q-overall',
-      )?.valuePreview;
-      const score = scoreValue ? Number.parseInt(scoreValue.split('/')[0] ?? '', 10) : Number.NaN;
-      if (Number.isFinite(score)) {
-        current.scoreTotal += score;
-        current.scoreCount += 1;
-      }
-
-      grouped.set(key, current);
-    }
-
-    return [...grouped.entries()]
-      .map(([segmentKey, value]) => ({
-        segmentKey,
-        segmentLabel:
-          segmentKey === 'completed'
-            ? 'Completed'
-            : segmentKey === 'partial'
-              ? 'Partial'
-              : segmentKey === 'unknown'
-                ? 'Unknown'
-                : segmentKey,
-        responses: value.responses,
-        completionRate: value.responses > 0 ? value.completed / value.responses : 0,
-        metrics: [
-          {
-            label: 'avgSatisfaction',
-            value:
-              value.scoreCount > 0 ? Number((value.scoreTotal / value.scoreCount).toFixed(2)) : 0,
-          },
-        ],
-      }))
-      .sort((left, right) => right.responses - left.responses);
-  }
 
   const jobsService = deps?.db
     ? createJobsService({
@@ -826,6 +964,7 @@ export async function formsRoutes(
     const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
 
     const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
+    const formStructure = await loadFormStructure(id);
     const filteredResponses = allResponses.filter((response) => {
       if (!response.submittedAt) {
         return false;
@@ -835,6 +974,8 @@ export async function formsRoutes(
       return submittedAt >= from.getTime() && submittedAt <= to.getTime();
     });
 
+    const questionMetaMap = buildQuestionMetaMap(formStructure, filteredResponses);
+
     const completedResponses = filteredResponses.filter(
       (response) => response.completion === 'completed',
     ).length;
@@ -843,14 +984,13 @@ export async function formsRoutes(
         ? Math.round((completedResponses / filteredResponses.length) * 100)
         : 0;
 
-    const scoreValues = filteredResponses
-      .map(
-        (response) =>
-          response.answerPreview.find((item) => item.questionId === 'q-overall')?.valuePreview,
-      )
-      .filter((value): value is string => Boolean(value))
-      .map((value) => Number.parseInt(value.split('/')[0] ?? '', 10))
-      .filter((value) => Number.isFinite(value));
+    const numericQuestionId = resolveNumericQuestionId(questionMetaMap, questionId);
+    const scoreValues = numericQuestionId
+      ? filteredResponses
+          .flatMap((response) => extractAnswerValues(response.answers[numericQuestionId]))
+          .map((value) => Number.parseFloat(value))
+          .filter((value) => Number.isFinite(value))
+      : [];
 
     const averageScore =
       scoreValues.length > 0
@@ -872,9 +1012,11 @@ export async function formsRoutes(
             delta: `${completedResponses} completed`,
           },
           {
-            label: 'Avg satisfaction',
+            label: numericQuestionId
+              ? `Avg ${questionMetaMap.get(numericQuestionId)?.label ?? 'score'}`
+              : 'Avg score',
             value: averageScore,
-            delta: 'Scale: 1 to 5',
+            delta: numericQuestionId ? 'Numeric/rating responses' : 'No numeric question found',
           },
         ],
         series: buildAnalyticsSeries(filteredResponses, from, to, granularity),
@@ -922,6 +1064,7 @@ export async function formsRoutes(
     const questionId = typeof query.questionId === 'string' ? query.questionId : undefined;
 
     const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
+    const formStructure = await loadFormStructure(id);
     const filteredResponses = allResponses.filter((response) => {
       if (!response.submittedAt) {
         return false;
@@ -931,10 +1074,12 @@ export async function formsRoutes(
       return submittedAt >= from.getTime() && submittedAt <= to.getTime();
     });
 
+    const questionMetaMap = buildQuestionMetaMap(formStructure, filteredResponses);
+
     return reply.send({
       success: true,
       data: {
-        questions: buildQuestionBreakdowns(filteredResponses, questionId),
+        questions: buildQuestionBreakdowns(questionMetaMap, filteredResponses, questionId),
         appliedFilters: {
           from: from.toISOString(),
           to: to.toISOString(),
@@ -980,6 +1125,7 @@ export async function formsRoutes(
     const segmentBy = query.segmentBy === 'channel' ? 'channel' : 'completion';
 
     const allResponses = await loadFormResponses(id, resolvedForm.responseCount);
+    const formStructure = await loadFormStructure(id);
     const filteredResponses = allResponses.filter((response) => {
       if (!response.submittedAt) {
         return false;
@@ -998,10 +1144,12 @@ export async function formsRoutes(
       return true;
     });
 
+    const questionMetaMap = buildQuestionMetaMap(formStructure, filteredResponses);
+
     return reply.send({
       success: true,
       data: {
-        segments: groupResponsesBySegment(filteredResponses, segmentBy),
+        segments: groupResponsesBySegment(questionMetaMap, filteredResponses, segmentBy, questionId),
         appliedFilters: {
           from: from.toISOString(),
           to: to.toISOString(),

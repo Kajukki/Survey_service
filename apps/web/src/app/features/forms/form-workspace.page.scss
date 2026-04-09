@@ -34,6 +34,23 @@
   padding: 0.45rem;
 }
 
+.workspace-status {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 0.7rem 0.9rem;
+}
+
+.workspace-status span {
+  color: var(--text-subtle);
+  font-size: 0.82rem;
+}
+
+.workspace-status strong {
+  color: var(--text-strong);
+}
+
 .tabs button {
   border: 1px solid var(--line-default);
   background: var(--bg-subtle);
@@ -125,6 +142,20 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.75rem;
   padding: 0.85rem;
+}
+
+.filter-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.filter-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-strong);
 }
 
 .question-filters label {

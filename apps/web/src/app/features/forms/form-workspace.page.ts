@@ -158,6 +158,27 @@ export class FormWorkspacePageComponent {
     return totalPages > 0 && this.responsePage() < totalPages;
   });
 
+  protected readonly isLoadingAny = computed(
+    () =>
+      this.structureResource.isLoading() ||
+      this.responsesResource.isLoading() ||
+      this.analyticsOverviewResource.isLoading() ||
+      this.analyticsQuestionsResource.isLoading() ||
+      this.analyticsSegmentsResource.isLoading(),
+  );
+
+  protected readonly analyticsFreshness = computed(() => this.analyticsOverview()?.dataFreshness ?? null);
+
+  protected readonly responseFiltersActive = computed(() => {
+    const state = this.workspaceState();
+    return Boolean(state.responseSearch || state.responseQuestionId || state.completion);
+  });
+
+  protected readonly analyticsFiltersActive = computed(() => {
+    const state = this.workspaceState();
+    return Boolean(state.analyticsQuestionId || state.analyticsGranularity !== 'day' || state.analyticsSegmentBy !== 'completion');
+  });
+
   protected selectTab(tab: FormsWorkspaceTab): void {
     this.updateWorkspaceState({ tab });
   }
@@ -261,6 +282,26 @@ export class FormWorkspacePageComponent {
     this.analyticsOverviewResource.reload();
     this.analyticsQuestionsResource.reload();
     this.analyticsSegmentsResource.reload();
+  }
+
+  protected resetResponsesFilters(): void {
+    this.updateWorkspaceState({
+      responseSearch: undefined,
+      responseQuestionId: undefined,
+      completion: undefined,
+      responsesPage: 1,
+    });
+  }
+
+  protected resetAnalyticsFilters(): void {
+    const defaults = parseFormsWorkspaceState({});
+    this.updateWorkspaceState({
+      analyticsQuestionId: undefined,
+      analyticsGranularity: defaults.analyticsGranularity,
+      analyticsSegmentBy: defaults.analyticsSegmentBy,
+      analyticsFrom: defaults.analyticsFrom,
+      analyticsTo: defaults.analyticsTo,
+    });
   }
 
   private buildStructureEndpoint(): string | undefined {
