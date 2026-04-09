@@ -1,4 +1,7 @@
 import {
+  AnalyticsNumericStatsRecord,
+  FormAnalyticsReportRecord,
+  FormAnalyticsQuestionRecordV2,
   FormAnalyticsSegmentsRecord,
   Connection,
   ExportRecord,
@@ -161,6 +164,47 @@ export interface FormAnalyticsSegmentsDto {
   };
 }
 
+export interface AnalyticsNumericStatsDto {
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  standardDeviation: number;
+}
+
+export interface FormAnalyticsQuestionDtoV2 {
+  questionId: string;
+  questionTitle: string;
+  questionType: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  answerCount: number;
+  skippedCount: number;
+  scaleAnalytics?: {
+    distribution: Record<string, number>;
+    stats: AnalyticsNumericStatsDto;
+  };
+  selectAnalytics?: {
+    isMultiChoice: boolean;
+    optionCounts: Record<string, number>;
+    optionPercentages: Record<string, number>;
+    mostPopular: string[];
+    totalSelections: number;
+  };
+  textAnalytics?: {
+    responses: string[];
+    wordCountStats: AnalyticsNumericStatsDto;
+    charCountStats: AnalyticsNumericStatsDto;
+  };
+}
+
+export interface FormAnalyticsReportDto {
+  totalResponses: number;
+  firstResponseTime?: string;
+  lastResponseTime?: string;
+  scoreStats?: AnalyticsNumericStatsDto;
+  questionAnalytics: FormAnalyticsQuestionDtoV2[];
+  generatedAt: string;
+}
+
 export interface JobDto {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
@@ -286,6 +330,65 @@ export function mapFormAnalyticsSegments(
     segments: input.segments,
     appliedFilters: input.appliedFilters,
     dataFreshness: input.dataFreshness,
+  };
+}
+
+function mapNumericStats(input: AnalyticsNumericStatsDto): AnalyticsNumericStatsRecord {
+  return {
+    mean: input.mean,
+    median: input.median,
+    min: input.min,
+    max: input.max,
+    standardDeviation: input.standardDeviation,
+  };
+}
+
+function mapAnalyticsQuestionV2(input: FormAnalyticsQuestionDtoV2): FormAnalyticsQuestionRecordV2 {
+  return {
+    questionId: input.questionId,
+    questionTitle: input.questionTitle,
+    questionType: input.questionType,
+    answerCount: input.answerCount,
+    skippedCount: input.skippedCount,
+    ...(input.scaleAnalytics
+      ? {
+          scaleAnalytics: {
+            distribution: input.scaleAnalytics.distribution,
+            stats: mapNumericStats(input.scaleAnalytics.stats),
+          },
+        }
+      : {}),
+    ...(input.selectAnalytics
+      ? {
+          selectAnalytics: {
+            isMultiChoice: input.selectAnalytics.isMultiChoice,
+            optionCounts: input.selectAnalytics.optionCounts,
+            optionPercentages: input.selectAnalytics.optionPercentages,
+            mostPopular: input.selectAnalytics.mostPopular,
+            totalSelections: input.selectAnalytics.totalSelections,
+          },
+        }
+      : {}),
+    ...(input.textAnalytics
+      ? {
+          textAnalytics: {
+            responses: input.textAnalytics.responses,
+            wordCountStats: mapNumericStats(input.textAnalytics.wordCountStats),
+            charCountStats: mapNumericStats(input.textAnalytics.charCountStats),
+          },
+        }
+      : {}),
+  };
+}
+
+export function mapFormAnalyticsReport(input: FormAnalyticsReportDto): FormAnalyticsReportRecord {
+  return {
+    totalResponses: input.totalResponses,
+    firstResponseTime: input.firstResponseTime,
+    lastResponseTime: input.lastResponseTime,
+    ...(input.scoreStats ? { scoreStats: mapNumericStats(input.scoreStats) } : {}),
+    questionAnalytics: input.questionAnalytics.map((question) => mapAnalyticsQuestionV2(question)),
+    generatedAt: input.generatedAt,
   };
 }
 

@@ -115,6 +115,7 @@ describe('protected domain routes', () => {
       forms,
       shares,
       structure,
+      analytics,
       responses,
       analyticsOverview,
       analyticsQuestions,
@@ -134,6 +135,11 @@ describe('protected domain routes', () => {
       app.inject({
         method: 'GET',
         url: `/forms/${formId}/structure`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/analytics`,
         headers: { authorization: `Bearer ${token}` },
       }),
       app.inject({
@@ -162,6 +168,7 @@ describe('protected domain routes', () => {
     expect(forms.statusCode).toBe(200);
     expect(shares.statusCode).toBe(200);
     expect(structure.statusCode).toBe(200);
+    expect(analytics.statusCode).toBe(200);
     expect(responses.statusCode).toBe(200);
     expect(analyticsOverview.statusCode).toBe(200);
     expect(analyticsQuestions.statusCode).toBe(200);
@@ -203,6 +210,7 @@ describe('protected domain routes', () => {
       deleteConnection,
       syncForm,
       structure,
+      analytics,
       responses,
       analyticsOverview,
       analyticsQuestions,
@@ -221,6 +229,11 @@ describe('protected domain routes', () => {
       app.inject({
         method: 'GET',
         url: `/forms/${formId}/structure`,
+        headers: { authorization: `Bearer ${token}` },
+      }),
+      app.inject({
+        method: 'GET',
+        url: `/forms/${formId}/analytics`,
         headers: { authorization: `Bearer ${token}` },
       }),
       app.inject({
@@ -248,6 +261,7 @@ describe('protected domain routes', () => {
     expect(deleteConnection.statusCode).toBe(404);
     expect(syncForm.statusCode).toBe(404);
     expect(structure.statusCode).toBe(404);
+    expect(analytics.statusCode).toBe(404);
     expect(responses.statusCode).toBe(404);
     expect(analyticsOverview.statusCode).toBe(404);
     expect(analyticsQuestions.statusCode).toBe(404);

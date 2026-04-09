@@ -119,6 +119,17 @@ export interface FormResponsesTable {
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
 
+export interface FormAnalyticsSnapshotsTable {
+  id: ColumnType<string, string | undefined, string>;
+  owner_id: string;
+  form_id: string;
+  total_responses: number;
+  generated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  analytics_json: ColumnType<unknown, unknown, unknown>;
+  created_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+}
+
 export interface DatabaseSchema {
   jobs: JobsTable;
   users: UsersTable;
@@ -128,6 +139,7 @@ export interface DatabaseSchema {
   forms: FormsTable;
   form_shares: FormSharesTable;
   form_responses: FormResponsesTable;
+  form_analytics_snapshots: FormAnalyticsSnapshotsTable;
   export_jobs: ExportJobsTable;
 }
 

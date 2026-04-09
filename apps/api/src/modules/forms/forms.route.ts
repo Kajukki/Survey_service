@@ -183,6 +183,47 @@ export async function formsRoutes(
     options?: string[];
   };
 
+  type NumericStatsRecord = {
+    mean: number;
+    median: number;
+    min: number;
+    max: number;
+    standardDeviation: number;
+  };
+
+  type PersistedAnalyticsQuestionRecord = {
+    questionId: string;
+    questionTitle: string;
+    questionType: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+    answerCount: number;
+    skippedCount: number;
+    scaleAnalytics?: {
+      distribution: Record<string, number>;
+      stats: NumericStatsRecord;
+    };
+    selectAnalytics?: {
+      isMultiChoice: boolean;
+      optionCounts: Record<string, number>;
+      optionPercentages: Record<string, number>;
+      mostPopular: string[];
+      totalSelections: number;
+    };
+    textAnalytics?: {
+      responses: string[];
+      wordCountStats: NumericStatsRecord;
+      charCountStats: NumericStatsRecord;
+    };
+  };
+
+  type PersistedAnalyticsReport = {
+    totalResponses: number;
+    firstResponseTime?: string;
+    lastResponseTime?: string;
+    scoreStats?: NumericStatsRecord;
+    questionAnalytics: PersistedAnalyticsQuestionRecord[];
+    generatedAt: string;
+  };
+
   type PersistedFormStructureRecord = {
     sections: Array<{
       id: string;
@@ -459,6 +500,228 @@ export async function formsRoutes(
     }
 
     return [];
+  }
+
+  function computeNumericStats(values: number[]): NumericStatsRecord | null {
+    if (values.length === 0) {
+      return null;
+    }
+
+    const sorted = [...values].sort((left, right) => left - right);
+    const sum = values.reduce((total, value) => total + value, 0);
+    const mean = sum / values.length;
+    const median =
+      sorted.length % 2 === 0
+        ? (sorted[sorted.length / 2 - 1]! + sorted[sorted.length / 2]!) / 2
+        : sorted[Math.floor(sorted.length / 2)]!;
+    const variance =
+      values.reduce((total, value) => total + (value - mean) * (value - mean), 0) / values.length;
+
+    return {
+      mean: Number(mean.toFixed(2)),
+      median: Number(median.toFixed(2)),
+      min: sorted[0]!,
+      max: sorted[sorted.length - 1]!,
+      standardDeviation: Number(Math.sqrt(variance).toFixed(2)),
+    };
+  }
+
+  function buildPersistedAnalyticsReportFromResponses(
+    formStructure: PersistedFormStructureRecord,
+    responses: FormResponseRecord[],
+  ): PersistedAnalyticsReport {
+    const questionMetaMap = buildQuestionMetaMap(formStructure, responses);
+    const totalResponses = responses.length;
+    const responseTimes = responses
+      .map((response) => (response.submittedAt ? Date.parse(response.submittedAt) : Number.NaN))
+      .filter((value) => Number.isFinite(value))
+      .sort((left, right) => left - right);
+
+    const questionAnalytics: PersistedAnalyticsQuestionRecord[] = [...questionMetaMap.values()].map(
+      (meta) => {
+        const valuesByResponse = responses.map((response) => {
+          const values = extractAnswerValues(response.answers[meta.id]);
+          if (values.length > 0) {
+            return values;
+          }
+
+          const preview = response.answerPreview.find((item) => item.questionId === meta.id);
+          return preview ? [preview.valuePreview] : [];
+        });
+
+        const answeredValues = valuesByResponse.flatMap((value) => value);
+        const answerCount = valuesByResponse.filter((values) => values.length > 0).length;
+        const skippedCount = Math.max(0, totalResponses - answerCount);
+
+        if (meta.type === 'rating' || meta.type === 'number') {
+          const numericValues = answeredValues
+            .map((value) => Number.parseFloat(value))
+            .filter((value) => Number.isFinite(value));
+          const stats = computeNumericStats(numericValues);
+          const distribution = new Map<string, number>();
+          for (const numericValue of numericValues) {
+            const key = String(numericValue);
+            distribution.set(key, (distribution.get(key) ?? 0) + 1);
+          }
+
+          return {
+            questionId: meta.id,
+            questionTitle: meta.label,
+            questionType: meta.type,
+            answerCount,
+            skippedCount,
+            ...(stats
+              ? {
+                  scaleAnalytics: {
+                    distribution: Object.fromEntries(distribution.entries()),
+                    stats,
+                  },
+                }
+              : {}),
+          };
+        }
+
+        if (meta.type === 'single_choice' || meta.type === 'multi_choice') {
+          const optionCounts = new Map<string, number>();
+          for (const value of answeredValues) {
+            optionCounts.set(value, (optionCounts.get(value) ?? 0) + 1);
+          }
+
+          const totalSelections = answeredValues.length;
+          const optionPercentages = Object.fromEntries(
+            [...optionCounts.entries()].map(([option, count]) => [
+              option,
+              totalSelections > 0 ? Number(((count / totalSelections) * 100).toFixed(1)) : 0,
+            ]),
+          );
+          const mostPopular = [...optionCounts.entries()]
+            .sort((left, right) => right[1] - left[1])
+            .slice(0, 3)
+            .map(([option]) => option);
+
+          return {
+            questionId: meta.id,
+            questionTitle: meta.label,
+            questionType: meta.type,
+            answerCount,
+            skippedCount,
+            selectAnalytics: {
+              isMultiChoice: meta.type === 'multi_choice',
+              optionCounts: Object.fromEntries(optionCounts.entries()),
+              optionPercentages,
+              mostPopular,
+              totalSelections,
+            },
+          };
+        }
+
+        const textResponses = answeredValues.filter((value) => value.trim().length > 0).slice(0, 200);
+        const wordCounts = textResponses.map((text) =>
+          text
+            .trim()
+            .split(/\s+/)
+            .filter((token) => token.length > 0).length,
+        );
+        const charCounts = textResponses.map((text) => text.length);
+
+        return {
+          questionId: meta.id,
+          questionTitle: meta.label,
+          questionType: meta.type,
+          answerCount,
+          skippedCount,
+          ...(textResponses.length > 0
+            ? {
+                textAnalytics: {
+                  responses: textResponses,
+                  wordCountStats:
+                    computeNumericStats(wordCounts) ?? {
+                      mean: 0,
+                      median: 0,
+                      min: 0,
+                      max: 0,
+                      standardDeviation: 0,
+                    },
+                  charCountStats:
+                    computeNumericStats(charCounts) ?? {
+                      mean: 0,
+                      median: 0,
+                      min: 0,
+                      max: 0,
+                      standardDeviation: 0,
+                    },
+                },
+              }
+            : {}),
+        };
+      },
+    );
+
+    const scoreStats = questionAnalytics.find(
+      (question) => question.questionType === 'rating' || question.questionType === 'number',
+    )?.scaleAnalytics?.stats;
+
+    return {
+      totalResponses,
+      firstResponseTime:
+        responseTimes.length > 0 ? new Date(responseTimes[0]!).toISOString() : undefined,
+      lastResponseTime:
+        responseTimes.length > 0
+          ? new Date(responseTimes[responseTimes.length - 1]!).toISOString()
+          : undefined,
+      ...(scoreStats ? { scoreStats } : {}),
+      questionAnalytics,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  function normalizePersistedAnalyticsReport(value: unknown): PersistedAnalyticsReport | null {
+    if (!value || typeof value !== 'object') {
+      return null;
+    }
+
+    const candidate = value as Record<string, unknown>;
+    if (typeof candidate.totalResponses !== 'number' || !Array.isArray(candidate.questionAnalytics)) {
+      return null;
+    }
+
+    if (typeof candidate.generatedAt !== 'string') {
+      return null;
+    }
+
+    return candidate as PersistedAnalyticsReport;
+  }
+
+  async function loadPersistedAnalyticsReport(
+    formId: string,
+    fallbackResponseCount: number,
+  ): Promise<PersistedAnalyticsReport> {
+    if (!db) {
+      const mockResponses = buildMockResponses(formId, fallbackResponseCount);
+      return buildPersistedAnalyticsReportFromResponses({ sections: [], questionCount: 0 }, mockResponses);
+    }
+
+    const analyticsDb = db as unknown as Kysely<{
+      form_analytics_snapshots: {
+        form_id: string;
+        analytics_json: unknown;
+      };
+    }>;
+
+    const row = await analyticsDb
+      .selectFrom('form_analytics_snapshots')
+      .select(['analytics_json'])
+      .where('form_id', '=', formId)
+      .executeTakeFirst();
+
+    const normalized = normalizePersistedAnalyticsReport(row?.analytics_json);
+    if (normalized) {
+      return normalized;
+    }
+
+    const formStructure = await loadFormStructure(formId);
+    const responses = await loadFormResponses(formId, fallbackResponseCount);
+    return buildPersistedAnalyticsReportFromResponses(formStructure, responses);
   }
 
   function buildQuestionMetaMap(
@@ -934,6 +1197,30 @@ export async function formsRoutes(
           total,
           totalPages,
         },
+      },
+    });
+  });
+
+  // GET /forms/:id/analytics
+  zApp.get('/forms/:id/analytics', async (request, reply) => {
+    const principal = getPrincipal(request);
+    const { id } = request.params as { id: string };
+
+    const resolvedForm = await resolveAccessibleForm(id, principal.userId);
+    if (!resolvedForm) {
+      return reply.status(404).send({
+        success: false,
+        error: { code: 'not_found', message: 'Form not found' },
+        meta: { requestId: request.id },
+      });
+    }
+
+    const analytics = await loadPersistedAnalyticsReport(id, resolvedForm.responseCount);
+    return reply.send({
+      success: true,
+      data: analytics,
+      meta: {
+        requestId: request.id,
       },
     });
   });

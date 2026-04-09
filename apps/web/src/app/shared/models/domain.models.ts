@@ -176,6 +176,47 @@ export interface FormAnalyticsSegmentsRecord {
   };
 }
 
+export interface AnalyticsNumericStatsRecord {
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  standardDeviation: number;
+}
+
+export interface FormAnalyticsQuestionRecordV2 {
+  questionId: string;
+  questionTitle: string;
+  questionType: 'single_choice' | 'multi_choice' | 'text' | 'rating' | 'date' | 'number';
+  answerCount: number;
+  skippedCount: number;
+  scaleAnalytics?: {
+    distribution: Record<string, number>;
+    stats: AnalyticsNumericStatsRecord;
+  };
+  selectAnalytics?: {
+    isMultiChoice: boolean;
+    optionCounts: Record<string, number>;
+    optionPercentages: Record<string, number>;
+    mostPopular: string[];
+    totalSelections: number;
+  };
+  textAnalytics?: {
+    responses: string[];
+    wordCountStats: AnalyticsNumericStatsRecord;
+    charCountStats: AnalyticsNumericStatsRecord;
+  };
+}
+
+export interface FormAnalyticsReportRecord {
+  totalResponses: number;
+  firstResponseTime?: string;
+  lastResponseTime?: string;
+  scoreStats?: AnalyticsNumericStatsRecord;
+  questionAnalytics: FormAnalyticsQuestionRecordV2[];
+  generatedAt: string;
+}
+
 export interface SyncJob {
   id: string;
   status: 'queued' | 'running' | 'succeeded' | 'failed';
