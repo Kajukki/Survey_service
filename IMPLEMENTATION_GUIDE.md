@@ -24,6 +24,7 @@ It is intentionally split into:
 - Persisted sync jobs in PostgreSQL (`jobs` table).
 - Worker consumption path updates lifecycle state in DB:
   - `queued` -> `running` -> `succeeded` or `failed`.
+- Worker export lifecycle polling updates `export_jobs` from `queued` to `ready` with generated `download_url`.
 
 3. Local authentication flow
 - DB tables for users and refresh tokens.
@@ -43,9 +44,9 @@ It is intentionally split into:
 
 ### Partially Implemented
 
-1. Export workflow completion
-- Export enqueue/list/detail/download endpoints are implemented.
-- Export producer/worker execution path to produce ready downloads is still pending.
+1. Export workflow hardening
+- Export enqueue/list/detail/download and worker lifecycle transitions are implemented.
+- Durable artifact storage + signed URL delivery is still pending (current worker generates deterministic placeholder download URLs).
 
 2. Authorization enforcement
 - Policy helpers exist, and protected routes now require a request principal.
@@ -65,8 +66,7 @@ It is intentionally split into:
 - OIDC/JWKS verification as active runtime path.
 - End-to-end principal mapping from external identity provider.
 
-2. Export and analytics completion
-- Export job worker completion beyond API scaffolding.
+2. Analytics completion
 - Dashboard-oriented analytics endpoints and persistence path.
 
 ## Mandatory Accuracy Gates
@@ -128,7 +128,7 @@ Exit criteria:
 
 Goal: complete functional roadmap beyond sync jobs.
 
-1. Finalize export worker lifecycle to move jobs into `ready` with durable `download_url`.
+1. Replace placeholder export URL generation with durable artifact storage and signed URL delivery.
 2. Implement analytics read endpoints needed by dashboard.
 3. Add end-to-end tests for one export flow and one analytics query.
 

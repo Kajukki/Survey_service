@@ -36,6 +36,7 @@ GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_AUTH_BASE_URL=https://accounts.google.com/o/oauth2/v2/auth
 GOOGLE_OAUTH_TOKEN_URL=https://oauth2.googleapis.com/token
 GOOGLE_FORMS_API_BASE_URL=https://forms.googleapis.com/v1
+EXPORT_POLL_INTERVAL_MS=5000
 ```
 
 You can define these in either:
@@ -55,3 +56,4 @@ Behavior:
 - Validates payload with shared schema
 - Updates `jobs` table status: `queued` -> `running` -> `succeeded` or `failed`
 - Invalid payloads are dead-lettered
+- Polls queued `export_jobs` rows and transitions them to `ready` with generated `download_url`
