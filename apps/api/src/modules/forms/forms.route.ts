@@ -214,6 +214,63 @@ export async function formsRoutes(
     }));
   }
 
+  function inferStructureFromResponses(responses: FormResponseRecord[]) {
+    const byQuestionId = new Map<string, { label: string; order: number }>();
+    let nextOrder = 0;
+
+    for (const response of responses) {
+      for (const preview of response.answerPreview) {
+        if (byQuestionId.has(preview.questionId)) {
+          continue;
+        }
+
+        byQuestionId.set(preview.questionId, {
+          label: preview.questionLabel,
+          order: nextOrder,
+        });
+        nextOrder += 1;
+      }
+    }
+
+    const questions = [...byQuestionId.entries()]
+      .sort((left, right) => left[1].order - right[1].order)
+      .map(([questionId, question]) => ({
+        id: questionId,
+        label: question.label,
+        type: 'text' as const,
+        order: question.order,
+      }));
+
+    if (questions.length === 0) {
+      return {
+        sections: [] as Array<{
+          id: string;
+          title: string;
+          order: number;
+          questions: Array<{
+            id: string;
+            label: string;
+            type: 'text';
+            order: number;
+          }>;
+        }>,
+        questionCount: 0,
+      };
+    }
+
+    return {
+      sections: [
+        {
+          id: 'inferred-section',
+          title: 'Inferred from responses',
+          order: 0,
+          questions,
+        },
+      ],
+      questionCount: questions.length,
+    };
+  }
+
   type AnalyticsGranularity = 'day' | 'week' | 'month';
 
   function parseAnalyticsGranularity(value: unknown): AnalyticsGranularity {
@@ -505,6 +562,9 @@ export async function formsRoutes(
       });
     }
 
+    const responses = await loadFormResponses(id, resolvedForm.responseCount);
+    const inferredStructure = inferStructureFromResponses(responses);
+
     return reply.send({
       success: true,
       data: {
@@ -516,8 +576,8 @@ export async function formsRoutes(
           responseCount: resolvedForm.responseCount,
           updatedAt: resolvedForm.updatedAt.toISOString(),
         },
-        sections: [],
-        questionCount: 0,
+        sections: inferredStructure.sections,
+        questionCount: inferredStructure.questionCount,
       },
       meta: {
         requestId: request.id,
