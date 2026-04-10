@@ -1,0 +1,30 @@
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.metric {
+  padding: 0.9rem;
+}
+
+.metric h3 {
+  margin: 0;
+  color: var(--text-subtle);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-value {
+  margin: 0.35rem 0 0;
+  color: var(--text-strong);
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+@media (max-width: 920px) {
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+}

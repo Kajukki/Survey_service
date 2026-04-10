@@ -1,0 +1,56 @@
+<section class="card question-filters">
+  <label>
+    Search
+    <input
+      type="search"
+      placeholder="Find a question"
+      [value]="workspaceState().questionSearch || ''"
+      (input)="searchChanged.emit($any($event.target).value)"
+    />
+  </label>
+
+  <label>
+    Type
+    <select
+      [value]="workspaceState().questionType || ''"
+      (change)="questionTypeChanged.emit($any($event.target).value)"
+    >
+      <option value="">All types</option>
+      <option value="text">Text</option>
+      <option value="single_choice">Single choice</option>
+      <option value="multi_choice">Multi choice</option>
+      <option value="rating">Rating</option>
+      <option value="number">Number</option>
+      <option value="date">Date</option>
+    </select>
+  </label>
+</section>
+
+<section class="card section-list">
+  <h3>Questions</h3>
+  @for (section of filteredSections(); track section.id) {
+    <article>
+      <h4>{{ section.title }}</h4>
+      <ul>
+        @for (question of section.questions; track question.id) {
+          <li>
+            <div>
+              <strong>{{ question.label }}</strong>
+              @if (question.description) {
+                <small>{{ question.description }}</small>
+              }
+            </div>
+            <div class="question-meta">
+              <span class="badge">{{ question.type }}</span>
+              @if (question.required) {
+                <span class="required">required</span>
+              }
+            </div>
+          </li>
+        }
+      </ul>
+    </article>
+  } @empty {
+    <p class="empty-inline">No questions match the current filters.</p>
+  }
+</section>

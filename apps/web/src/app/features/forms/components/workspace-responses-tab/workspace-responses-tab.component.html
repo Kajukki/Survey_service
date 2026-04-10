@@ -1,0 +1,125 @@
+<section class="card response-filters">
+  <label>
+    Search answers
+    <input
+      type="search"
+      placeholder="Contains text"
+      [value]="workspaceState().responseSearch || ''"
+      (input)="responsesSearchChanged.emit($any($event.target).value)"
+    />
+  </label>
+
+  <label>
+    Question
+    <select
+      [value]="workspaceState().responseQuestionId || ''"
+      (change)="responsesQuestionIdChanged.emit($any($event.target).value)"
+    >
+      <option value="">All questions</option>
+      @for (option of questionOptions(); track option.id) {
+        <option [value]="option.id">{{ option.label }}</option>
+      }
+    </select>
+  </label>
+
+  <label>
+    Completion
+    <select
+      [value]="workspaceState().completion || ''"
+      (change)="responsesCompletionChanged.emit($any($event.target).value)"
+    >
+      <option value="">Any</option>
+      <option value="completed">Completed</option>
+      <option value="partial">Partial</option>
+    </select>
+  </label>
+
+  <label>
+    Per page
+    <select
+      [value]="responsePerPage()"
+      (change)="responsesPerPageChanged.emit($any($event.target).value)"
+    >
+      <option [value]="10">10</option>
+      <option [value]="25">25</option>
+      <option [value]="50">50</option>
+      <option [value]="100">100</option>
+    </select>
+  </label>
+</section>
+
+@if (responseFiltersActive()) {
+  <button type="button" class="btn-secondary" (click)="resetFilters.emit()">
+    Reset response filters
+  </button>
+}
+
+@if (isLoading()) {
+  <section class="card empty-state">
+    <h3>Loading responses...</h3>
+  </section>
+} @else if (hasError()) {
+  <section class="card empty-state">
+    <h3>Unable to load responses</h3>
+    <p>Try refreshing the page or adjusting filters.</p>
+    <button type="button" class="btn-primary" (click)="retry.emit()">Retry</button>
+  </section>
+} @else {
+  <section class="card responses-list">
+    <header>
+      <h3>Responses</h3>
+      <p>{{ responseTotal() }} total</p>
+    </header>
+
+    @for (response of responses(); track response.id) {
+      <article class="response-item">
+        <div class="response-meta">
+          <span class="response-id">{{ response.id }}</span>
+          <span class="badge">{{ response.completion }}</span>
+          @if (response.submittedAt) {
+            <span class="submitted">{{ response.submittedAt | date: 'medium' }}</span>
+          }
+        </div>
+
+        <ul>
+          @for (
+            preview of response.answerPreview;
+            track preview.questionId + preview.valuePreview
+          ) {
+            <li>
+              <strong>{{ preview.questionLabel }}</strong>
+              <span>{{ preview.valuePreview }}</span>
+            </li>
+          }
+        </ul>
+      </article>
+    } @empty {
+      <p class="empty-inline">No responses match the current filters.</p>
+    }
+
+    <footer class="responses-pagination">
+      <button
+        type="button"
+        class="btn-secondary"
+        [disabled]="!canPreviousResponsesPage()"
+        (click)="previousPage.emit()"
+      >
+        Previous
+      </button>
+      <span>
+        Page {{ responsePage() }}
+        @if (responseTotalPages() > 0) {
+          <span>of {{ responseTotalPages() }}</span>
+        }
+      </span>
+      <button
+        type="button"
+        class="btn-secondary"
+        [disabled]="!canNextResponsesPage()"
+        (click)="nextPage.emit()"
+      >
+        Next
+      </button>
+    </footer>
+  </section>
+}

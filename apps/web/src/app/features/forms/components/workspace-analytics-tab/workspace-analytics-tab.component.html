@@ -1,0 +1,185 @@
+@if (isLoading()) {
+  <section class="card empty-state">
+    <h3>Loading analytics...</h3>
+  </section>
+} @else if (hasError()) {
+  <section class="card empty-state">
+    <h3>Unable to load analytics</h3>
+    <p>Try refreshing after the next sync run.</p>
+    <button type="button" class="btn-primary" (click)="retry.emit()">Retry</button>
+  </section>
+} @else if (!hasAnalyticsResponses()) {
+  <section class="card empty-state">
+    <h3>No responses to analyze yet.</h3>
+    <p>Run a sync and collect responses to generate analytics.</p>
+  </section>
+} @else {
+  <section class="overview-banner card">
+    <div class="overview-stat">
+      <span class="stat-value">{{ analyticsReport()!.totalResponses }}</span>
+      <span class="stat-label">Total Responses</span>
+    </div>
+    <div class="overview-stat">
+      <span class="stat-value">{{ formatDate(analyticsReport()!.firstResponseTime) }}</span>
+      <span class="stat-label">First Response</span>
+    </div>
+    <div class="overview-stat">
+      <span class="stat-value">{{ formatDate(analyticsReport()!.lastResponseTime) }}</span>
+      <span class="stat-label">Latest Response</span>
+    </div>
+
+    @if (analyticsReport()!.scoreStats; as scores) {
+      <div class="overview-stat">
+        <span class="stat-value">{{ formatNum(scores.mean) }}</span>
+        <span class="stat-label">Avg Score</span>
+      </div>
+      <div class="overview-stat">
+        <span class="stat-value">{{ scores.min }} - {{ scores.max }}</span>
+        <span class="stat-label">Score Range</span>
+      </div>
+      <div class="overview-stat">
+        <span class="stat-value">{{ formatNum(scores.median) }}</span>
+        <span class="stat-label">Median Score</span>
+      </div>
+    }
+  </section>
+
+  @if (analyticsFreshness()) {
+    <p class="analytics-meta">Generated {{ formatDate(analyticsFreshness()) }}</p>
+  }
+
+  @if (scaleQuestions().length > 0) {
+    <h3 class="section-title">Scale Questions</h3>
+    @for (q of scaleQuestions(); track q.questionId) {
+      <section class="card analytics-card">
+        <header class="card-header">
+          <h4 class="card-title">{{ q.questionTitle || 'Untitled' }}</h4>
+          <div class="card-badges">
+            <span class="mono-chip">{{ q.answerCount }} answered</span>
+            <span class="mono-chip">{{ responseRate(q) }}% rate</span>
+          </div>
+        </header>
+
+        @if (q.scaleAnalytics; as scale) {
+          <div class="stats-row">
+            <div class="stat-pill">
+              <span class="pill-label">Mean</span
+              ><span class="pill-value">{{ formatNum(scale.stats.mean) }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-label">Median</span
+              ><span class="pill-value">{{ formatNum(scale.stats.median) }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-label">Min</span
+              ><span class="pill-value">{{ scale.stats.min }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-label">Max</span
+              ><span class="pill-value">{{ scale.stats.max }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-label">Std Dev</span>
+              <span class="pill-value">{{ formatNum(scale.stats.standardDeviation) }}</span>
+            </div>
+          </div>
+
+          <div class="select-breakdown">
+            <div class="breakdown-header">
+              <span class="breakdown-col">Value</span>
+              <span class="breakdown-col right">Count</span>
+              <span class="breakdown-col right"></span>
+            </div>
+            @for (key of objectKeys(scale.distribution); track key) {
+              <div class="breakdown-row">
+                <span class="breakdown-option">{{ key }}</span>
+                <span class="breakdown-count">{{ scale.distribution[key] }}</span>
+                <span class="breakdown-pct"></span>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    }
+  }
+
+  @if (selectQuestions().length > 0) {
+    <h3 class="section-title">Choice Questions</h3>
+    @for (q of selectQuestions(); track q.questionId) {
+      <section class="card analytics-card">
+        <header class="card-header">
+          <h4 class="card-title">{{ q.questionTitle || 'Untitled' }}</h4>
+          <div class="card-badges">
+            <span class="mono-chip">{{
+              q.selectAnalytics?.isMultiChoice ? 'Multi-select' : 'Single-select'
+            }}</span>
+            <span class="mono-chip">{{ q.answerCount }} answered</span>
+            <span class="mono-chip">{{ responseRate(q) }}% rate</span>
+          </div>
+        </header>
+
+        @if (q.selectAnalytics; as select) {
+          <div class="select-breakdown">
+            <div class="breakdown-header">
+              <span class="breakdown-col">Option</span>
+              <span class="breakdown-col right">Count</span>
+              <span class="breakdown-col right">%</span>
+            </div>
+            @for (opt of objectKeys(select.optionCounts); track opt) {
+              <div class="breakdown-row" [class.popular]="select.mostPopular.includes(opt)">
+                <span class="breakdown-option">{{ opt }}</span>
+                <span class="breakdown-count">{{ select.optionCounts[opt] }}</span>
+                <span class="breakdown-pct">{{ select.optionPercentages[opt] }}%</span>
+              </div>
+            }
+            <div class="breakdown-footer">
+              <span class="mono-chip sm">Total selections: {{ select.totalSelections }}</span>
+            </div>
+          </div>
+        }
+      </section>
+    }
+  }
+
+  @if (textQuestions().length > 0) {
+    <h3 class="section-title">Text Responses</h3>
+    @for (q of textQuestions(); track q.questionId) {
+      <section class="card analytics-card">
+        <header class="card-header">
+          <h4 class="card-title">{{ q.questionTitle || 'Untitled' }}</h4>
+          <div class="card-badges">
+            <span class="mono-chip">{{ q.answerCount }} answered</span>
+            <span class="mono-chip">{{ responseRate(q) }}% rate</span>
+          </div>
+        </header>
+
+        @if (q.textAnalytics; as text) {
+          <div class="stats-row">
+            <div class="stat-pill">
+              <span class="pill-label">Avg Words</span
+              ><span class="pill-value">{{ formatNum(text.wordCountStats.mean) }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-label">Min Words</span
+              ><span class="pill-value">{{ text.wordCountStats.min }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-label">Max Words</span
+              ><span class="pill-value">{{ text.wordCountStats.max }}</span>
+            </div>
+            <div class="stat-pill">
+              <span class="pill-label">Avg Chars</span
+              ><span class="pill-value">{{ formatNum(text.charCountStats.mean) }}</span>
+            </div>
+          </div>
+
+          <ul class="text-list">
+            @for (resp of text.responses; track $index) {
+              <li class="text-item">{{ resp }}</li>
+            }
+          </ul>
+        }
+      </section>
+    }
+  }
+}
