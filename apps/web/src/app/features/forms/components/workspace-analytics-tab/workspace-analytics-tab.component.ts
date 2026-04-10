@@ -134,6 +134,19 @@ export class WorkspaceAnalyticsTabComponent {
     });
   }
 
+  hasAnyQuestionAnalytics(): boolean {
+    return (
+      this.scaleQuestions().length > 0 ||
+      this.selectQuestions().length > 0 ||
+      this.textQuestions().length > 0
+    );
+  }
+
+  textResponseListId(questionId: string): string {
+    const safeId = questionId.replace(/[^a-zA-Z0-9_-]/g, '-');
+    return `text-responses-${safeId}`;
+  }
+
   private getChartColors(): {
     text: string;
     muted: string;
