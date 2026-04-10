@@ -38,6 +38,10 @@ function buildConfig(): Config {
       'https://www.googleapis.com/auth/forms.body.readonly',
       'https://www.googleapis.com/auth/forms.responses.readonly',
     ],
+    OUTBOX_POLL_INTERVAL_MS: 5000,
+    OUTBOX_BATCH_SIZE: 100,
+    OUTBOX_MAX_ATTEMPTS: 3,
+    OUTBOX_RETRY_BASE_MS: 1000,
   };
 }
 
@@ -82,7 +86,10 @@ function createFakeExportsDb(input: {
     status: 'queued';
     requested_at: string;
   };
-}) {
+}): {
+  db: ReturnType<typeof createFakeExportsDb>['db'];
+  spies: Record<string, ReturnType<typeof vi.fn>>;
+} {
   const exportJobsExecute = vi.fn(async () => input.exportJobs);
   const exportJobsOrderBy = vi.fn(() => ({ execute: exportJobsExecute }));
   const exportJobsWhere = vi.fn(() => ({ orderBy: exportJobsOrderBy }));
@@ -161,7 +168,7 @@ function createFakeExportsDb(input: {
   };
 }
 
-async function buildApp(fakeDb: unknown) {
+async function buildApp(fakeDb: ReturnType<typeof createFakeExportsDb>['db']) {
   const config = buildConfig();
   const app = Fastify();
 
@@ -169,7 +176,7 @@ async function buildApp(fakeDb: unknown) {
   app.setSerializerCompiler(serializerCompiler);
 
   await registerPrincipalPlugin(app, config);
-  await exportsRoutes(app, { db: fakeDb as any });
+  await exportsRoutes(app, { db: fakeDb });
 
   return { app, config };
 }
