@@ -1,3 +1,8 @@
+:host {
+  display: grid;
+  gap: 1rem;
+}
+
 .response-filters {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

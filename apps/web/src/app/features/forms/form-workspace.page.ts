@@ -149,10 +149,7 @@ export class FormWorkspacePageComponent {
 
   protected readonly textQuestions = computed(() =>
     (this.analyticsReport()?.questionAnalytics ?? []).filter(
-      (question) =>
-        question.questionType === 'text' ||
-        question.questionType === 'date' ||
-        question.questionType === 'number',
+      (question) => question.questionType === 'text' || question.questionType === 'date',
     ),
   );
 

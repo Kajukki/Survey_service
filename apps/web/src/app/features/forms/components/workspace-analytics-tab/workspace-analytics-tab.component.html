@@ -84,19 +84,8 @@
             </div>
           </div>
 
-          <div class="select-breakdown">
-            <div class="breakdown-header">
-              <span class="breakdown-col">Value</span>
-              <span class="breakdown-col right">Count</span>
-              <span class="breakdown-col right"></span>
-            </div>
-            @for (key of objectKeys(scale.distribution); track key) {
-              <div class="breakdown-row">
-                <span class="breakdown-option">{{ key }}</span>
-                <span class="breakdown-count">{{ scale.distribution[key] }}</span>
-                <span class="breakdown-pct"></span>
-              </div>
-            }
+          <div class="chart-container">
+            <canvas #scaleCanvas></canvas>
           </div>
         }
       </section>
@@ -119,21 +108,27 @@
         </header>
 
         @if (q.selectAnalytics; as select) {
-          <div class="select-breakdown">
-            <div class="breakdown-header">
-              <span class="breakdown-col">Option</span>
-              <span class="breakdown-col right">Count</span>
-              <span class="breakdown-col right">%</span>
+          <div class="select-layout">
+            <div class="chart-container chart-doughnut">
+              <canvas #selectCanvas></canvas>
             </div>
-            @for (opt of objectKeys(select.optionCounts); track opt) {
-              <div class="breakdown-row" [class.popular]="select.mostPopular.includes(opt)">
-                <span class="breakdown-option">{{ opt }}</span>
-                <span class="breakdown-count">{{ select.optionCounts[opt] }}</span>
-                <span class="breakdown-pct">{{ select.optionPercentages[opt] }}%</span>
+
+            <div class="select-breakdown">
+              <div class="breakdown-header">
+                <span class="breakdown-col">Option</span>
+                <span class="breakdown-col right">Count</span>
+                <span class="breakdown-col right">%</span>
               </div>
-            }
-            <div class="breakdown-footer">
-              <span class="mono-chip sm">Total selections: {{ select.totalSelections }}</span>
+              @for (opt of objectKeys(select.optionCounts); track opt) {
+                <div class="breakdown-row" [class.popular]="select.mostPopular.includes(opt)">
+                  <span class="breakdown-option">{{ opt }}</span>
+                  <span class="breakdown-count">{{ select.optionCounts[opt] }}</span>
+                  <span class="breakdown-pct">{{ select.optionPercentages[opt] }}%</span>
+                </div>
+              }
+              <div class="breakdown-footer">
+                <span class="mono-chip sm">Total selections: {{ select.totalSelections }}</span>
+              </div>
             </div>
           </div>
         }
