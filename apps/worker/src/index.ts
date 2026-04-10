@@ -65,7 +65,6 @@ async function processQueuedExportJobs(pool: Pool, logger: Logger): Promise<numb
   }
 }
 
-
 async function main(): Promise<void> {
   loadEnvironmentFiles();
   const config = loadConfig();

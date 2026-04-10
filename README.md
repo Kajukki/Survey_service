@@ -90,10 +90,11 @@ Core API, worker, and frontend flows are implemented for local development and i
 
 Known in-progress areas:
 
-- Several API domain routes still use mock-backed data paths.
-- Bearer token principal extraction is active on protected domain routes, but full owner/share authorization parity is still in progress.
+- Dashboard focuses on form health/activity metrics; detailed question analytics live under the forms workspace endpoints.
+- Export artifact storage and signed URL delivery hardening is still in progress.
 - Target enterprise IdP integration remains planned and is not the active runtime path.
 
 ## License
 
 Private / internal — adjust as appropriate for your organization.
+

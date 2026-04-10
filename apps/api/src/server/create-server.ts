@@ -202,5 +202,3 @@ export async function closeServer(app: FastifyInstance, logger: Logger): Promise
   await app.close();
   logger.info('Server closed');
 }
-
-

@@ -3,9 +3,8 @@ import type { Kysely } from 'kysely';
 import type { Logger } from 'pino';
 import type { Database } from '@survey-service/db';
 import type { Metrics } from '../../infra/metrics';
-import { mockForms } from './forms.mock.js';
 import { getPrincipal } from '../../server/principal';
-import { createJobsRepository, type JobsRepository, type SyncJobRecord } from '../jobs/jobs.repository';
+import { createJobsRepository } from '../jobs/jobs.repository';
 import { createJobsCommandService } from '../jobs/jobs.command-service';
 import { createJobsSyncTargetQueryService } from '../jobs/jobs-sync-target.query-service';
 import { createFormsAnalyticsQueryService } from './forms-analytics.query-service';
@@ -14,14 +13,10 @@ import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
 export async function formsRoutes(
   app: FastifyInstance,
-  deps?: {
-    db?: Kysely<Database>;
-    logger?: Logger;
-    metrics?: Metrics;
-  },
+  deps: { db: Kysely<Database>; logger?: Logger; metrics?: Metrics },
 ) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
-  const db = deps?.db;
+  const db = deps.db;
 
   function mapFormRow(row: {
     id: string;
@@ -48,10 +43,6 @@ export async function formsRoutes(
   }
 
   async function resolveAccessibleForm(id: string, userId: string) {
-    if (!db) {
-      return mockForms.find((form) => form.id === id && form.ownerId === userId) ?? null;
-    }
-
     const ownedForm = await db
       .selectFrom('forms')
       .select([
@@ -115,52 +106,6 @@ export async function formsRoutes(
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
-
-  function buildMockResponses(formId: string, total: number) {
-    const boundedTotal = Math.max(0, Math.min(total, 600));
-    const now = Date.now();
-
-    return Array.from({ length: boundedTotal }, (_, index) => {
-      const ordinal = index + 1;
-      const completion: 'completed' | 'partial' = ordinal % 4 === 0 ? 'partial' : 'completed';
-      const submittedAt = new Date(now - ordinal * 6 * 60 * 60 * 1000).toISOString();
-      const score = ((ordinal % 5) + 1).toString();
-      const channel = ['Organic', 'Referral', 'Paid', 'Social'][ordinal % 4]!;
-      const comment = `Response ${ordinal} for ${formId.slice(0, 8)}`;
-
-      return {
-        id: `${formId}-resp-${ordinal.toString().padStart(4, '0')}`,
-        submittedAt,
-        completion,
-        answers: {
-          'q-overall': score,
-          'q-channel': channel,
-          'q-comment': comment,
-        },
-        answerPreview: [
-          {
-            questionId: 'q-overall',
-            questionLabel: 'Overall satisfaction',
-            questionType: 'rating' as const,
-            valuePreview: `${score}/5`,
-          },
-          {
-            questionId: 'q-channel',
-            questionLabel: 'Acquisition channel',
-            questionType: 'single_choice' as const,
-            valuePreview: channel,
-          },
-          {
-            questionId: 'q-comment',
-            questionLabel: 'Additional comments',
-            questionType: 'text' as const,
-            valuePreview: comment,
-          },
-        ],
-      };
-    });
-  }
-
   type FormResponseRecord = {
     id: string;
     submittedAt?: string;
@@ -242,12 +187,8 @@ export async function formsRoutes(
 
   async function loadFormResponses(
     formId: string,
-    fallbackCount: number,
+    _fallbackCount: number,
   ): Promise<FormResponseRecord[]> {
-    if (!db) {
-      return buildMockResponses(formId, fallbackCount);
-    }
-
     const rows = await db
       .selectFrom('form_responses')
       .select([
@@ -411,13 +352,6 @@ export async function formsRoutes(
   }
 
   async function loadFormStructure(formId: string): Promise<PersistedFormStructureRecord> {
-    if (!db) {
-      return {
-        sections: [],
-        questionCount: 0,
-      };
-    }
-
     const row = await db
       .selectFrom('forms')
       .select(['form_schema_json'])
@@ -439,37 +373,8 @@ export async function formsRoutes(
     loadFormResponses,
     loadFormStructure,
   });
-
-  const mockJobsRepository: JobsRepository = {
-    async createSyncJob(input) {
-      const createdAt = new Date().toISOString();
-      const record: SyncJobRecord = {
-        id: input.id,
-        type: 'sync',
-        status: 'queued',
-        requestedBy: input.requestedBy,
-        connectionId: input.connectionId,
-        formId: input.formId,
-        trigger: input.trigger,
-        source: input.trigger === 'manual' ? 'manual_sync' : 'scheduled_sync',
-        createdAt,
-        startedAt: null,
-        completedAt: null,
-        error: null,
-      };
-
-      return record;
-    },
-    async listJobs() {
-      return { items: [], total: 0 };
-    },
-    async getJobById() {
-      return null;
-    },
-  };
-
   const jobsCommandService = createJobsCommandService({
-    repository: db ? createJobsRepository(db) : mockJobsRepository,
+    repository: createJobsRepository(db),
     syncTargetQuery: createJobsSyncTargetQueryService(db),
     logger: deps?.logger,
     metrics: deps?.metrics,
@@ -478,55 +383,53 @@ export async function formsRoutes(
   // GET /forms
   zApp.get('/forms', async (request, reply) => {
     const principal = getPrincipal(request);
-    const forms = db
-      ? await (async () => {
-          const [ownedForms, sharedForms] = await Promise.all([
-            db
-              .selectFrom('forms')
-              .select([
-                'id',
-                'owner_id',
-                'connection_id',
-                'external_form_id',
-                'title',
-                'description',
-                'response_count',
-                'created_at',
-                'updated_at',
-              ])
-              .where('owner_id', '=', principal.userId)
-              .execute(),
-            db
-              .selectFrom('forms')
-              .innerJoin('form_shares', 'form_shares.form_id', 'forms.id')
-              .select([
-                'forms.id as id',
-                'forms.owner_id as owner_id',
-                'forms.connection_id as connection_id',
-                'forms.external_form_id as external_form_id',
-                'forms.title as title',
-                'forms.description as description',
-                'forms.response_count as response_count',
-                'forms.created_at as created_at',
-                'forms.updated_at as updated_at',
-              ])
-              .where('form_shares.grantee_user_id', '=', principal.userId)
-              .execute(),
-          ]);
+    const forms = await (async () => {
+      const [ownedForms, sharedForms] = await Promise.all([
+        db
+          .selectFrom('forms')
+          .select([
+            'id',
+            'owner_id',
+            'connection_id',
+            'external_form_id',
+            'title',
+            'description',
+            'response_count',
+            'created_at',
+            'updated_at',
+          ])
+          .where('owner_id', '=', principal.userId)
+          .execute(),
+        db
+          .selectFrom('forms')
+          .innerJoin('form_shares', 'form_shares.form_id', 'forms.id')
+          .select([
+            'forms.id as id',
+            'forms.owner_id as owner_id',
+            'forms.connection_id as connection_id',
+            'forms.external_form_id as external_form_id',
+            'forms.title as title',
+            'forms.description as description',
+            'forms.response_count as response_count',
+            'forms.created_at as created_at',
+            'forms.updated_at as updated_at',
+          ])
+          .where('form_shares.grantee_user_id', '=', principal.userId)
+          .execute(),
+      ]);
 
-          const dedupedForms = new Map<string, (typeof ownedForms)[number]>();
-          for (const row of [...ownedForms, ...sharedForms]) {
-            dedupedForms.set(row.id, row);
-          }
+      const dedupedForms = new Map<string, (typeof ownedForms)[number]>();
+      for (const row of [...ownedForms, ...sharedForms]) {
+        dedupedForms.set(row.id, row);
+      }
 
-          return [...dedupedForms.values()]
-            .sort(
-              (left, right) =>
-                new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
-            )
-            .map(mapFormRow);
-        })()
-      : mockForms.filter((form) => form.ownerId === principal.userId);
+      return [...dedupedForms.values()]
+        .sort(
+          (left, right) =>
+            new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime(),
+        )
+        .map(mapFormRow);
+    })();
 
     // Basic mock pagination envelope
     return reply.send({
@@ -701,7 +604,10 @@ export async function formsRoutes(
       });
     }
 
-    const analytics = await formsAnalyticsQueryService.loadPersistedAnalyticsReport(id, resolvedForm.responseCount);
+    const analytics = await formsAnalyticsQueryService.loadPersistedAnalyticsReport(
+      id,
+      resolvedForm.responseCount,
+    );
     return reply.send({
       success: true,
       data: analytics,
@@ -865,4 +771,3 @@ export async function formsRoutes(
     });
   });
 }
-

@@ -130,8 +130,11 @@ export function createOutboxPublisher(deps: {
           await deps.rabbitmq.publishSyncJob(message);
           await markPublished(event.id);
 
-          const durationSeconds = Number(process.hrtime.bigint() - publishStartedAt) / 1_000_000_000;
-          deps.metrics?.queuePublishDuration.labels(QUEUES.SYNC_JOBS, 'success').observe(durationSeconds);
+          const durationSeconds =
+            Number(process.hrtime.bigint() - publishStartedAt) / 1_000_000_000;
+          deps.metrics?.queuePublishDuration
+            .labels(QUEUES.SYNC_JOBS, 'success')
+            .observe(durationSeconds);
 
           deps.logger.info(
             {
@@ -143,10 +146,13 @@ export function createOutboxPublisher(deps: {
             'Outbox event published',
           );
         } catch (error) {
-          const durationSeconds = Number(process.hrtime.bigint() - publishStartedAt) / 1_000_000_000;
+          const durationSeconds =
+            Number(process.hrtime.bigint() - publishStartedAt) / 1_000_000_000;
           const errorCode = error instanceof Error ? error.name : 'unknown_error';
 
-          deps.metrics?.queuePublishDuration.labels(QUEUES.SYNC_JOBS, 'error').observe(durationSeconds);
+          deps.metrics?.queuePublishDuration
+            .labels(QUEUES.SYNC_JOBS, 'error')
+            .observe(durationSeconds);
           deps.metrics?.queuePublishErrorCount.labels(QUEUES.SYNC_JOBS, errorCode).inc();
           deps.metrics?.outboxPublishFailureCount.labels(eventType, errorCode).inc();
 
@@ -210,4 +216,3 @@ export function createOutboxPublisher(deps: {
     processOnce,
   };
 }
-

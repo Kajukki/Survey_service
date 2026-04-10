@@ -71,8 +71,8 @@ It is intentionally split into:
 - OIDC/JWKS verification as active runtime path.
 - End-to-end principal mapping from external identity provider.
 
-2. Analytics completion
-- Dashboard-oriented analytics endpoints and persistence path.
+2. Analytics delivery tuning
+- Dashboard health/activity endpoint is implemented; detailed analytics are served by forms workspace endpoints and continue to be tuned for UX/data quality.
 
 ## Mandatory Accuracy Gates
 
@@ -102,17 +102,17 @@ Exit criteria:
 - No protected route relies on hardcoded user IDs.
 - Permission regression suite passes.
 
-### Track B: Replace Mock Domain Paths
+### Track B: Replace Mock Domain Paths (Completed Runtime Slice)
 
-Goal: move domain routes to DB-backed behavior and stable contracts.
+Goal: keep runtime behavior DB-backed and remove in-memory fallback branches from domain routes.
 
-1. Implement repositories/services for connections, forms, sharing.
-2. Replace in-memory mocks in route handlers.
-3. Preserve response envelope and DTO compatibility for web adapters.
-4. Add route-level tests for list/detail/create/delete paths.
+Completed:
+1. Removed runtime fallback branches from connections/forms/sharing/exports route modules.
+2. Removed mock fallback logic from jobs sync-target resolution service.
+3. Updated route tests to exercise DB-backed stubs only.
 
 Exit criteria:
-- Connections/forms/sharing routes are persistence-backed.
+- Runtime routes are persistence-backed.
 - Contract tests pass for payload and envelope stability.
 
 ### Track C: Auth Model Consolidation
@@ -187,3 +187,4 @@ npm --workspace @survey-service/web run test
 ```
 
 For local integration verification, see `LOCAL_DEVELOPMENT.md`.
+

@@ -281,10 +281,9 @@ This removes containers and local PostgreSQL/RabbitMQ data. Be careful—this de
 
 ## Next Steps
 
-- **Frontend integration:** Implement sync job polling UI in Angular (see [apps/web/README.md](apps/web/README.md))
-- **Worker logic:** Add provider-specific sync handlers in [apps/worker/src/index.ts](apps/worker/src/index.ts)
-- **Database schema:** Extend tables (connections, forms, responses) in [packages/db/migrations/](packages/db/migrations/)
-- **Tests:** Run `npm run test` to validate all changes
+- **Dashboard workflow:** Use Dashboard for form health/activity and click **Open Workspace** for deep analytics drill-down.
+- **Export hardening:** Replace placeholder export URLs with durable artifact storage and signed URLs.
+- **Tests:** Run npm run test and npm run typecheck after each feature slice.
 
 ## Environment Variables Reference
 
@@ -362,3 +361,6 @@ After generating sync traffic, inspect `GET /metrics` and verify these metric fa
 - `queue_publish_errors_total`
 
 Use these together to detect whether failures happen at API command time, outbox dispatch, or downstream worker processing.
+
+
+

@@ -319,8 +319,12 @@ Resolve a ready export download URL for the authenticated requester.
 ## 8. Dashboard Analytics
 
 ### `GET /api/v1/dashboard`
-Read dashboard metrics for a form and date range.
+Read form health/activity metrics for a form and date range.
 - **Status:** `Implemented`
 - **Query Params:** `?formId=<uuid>&from=<iso-date>&to=<iso-date>&granularity=day|week|month&questionId=<optional-uuid>`
-- **200 OK**: Returns dashboard payload with `{ kpis, series, questions }`.
+- **200 OK**: Returns dashboard payload with `{ kpis, series, questions }` focused on response totals/trend, sync health, and sharing activity.
+- **Scope note:** Detailed per-question analytics are provided by `/forms/:id/analytics/*` and surfaced in the form workspace UI.
 - **404 Not Found**: Form not found or not accessible to requester.
+
+
+

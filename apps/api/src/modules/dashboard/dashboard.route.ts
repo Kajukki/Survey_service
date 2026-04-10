@@ -99,7 +99,7 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
     const query = queryResult.data;
     let form = await deps.db
       .selectFrom('forms')
-      .select(['id', 'title', 'response_count'])
+      .select(['id', 'title', 'response_count', 'updated_at'])
       .where('id', '=', query.formId)
       .where('owner_id', '=', principal.userId)
       .executeTakeFirst();
@@ -115,7 +115,7 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
       if (share) {
         form = await deps.db
           .selectFrom('forms')
-          .select(['id', 'title', 'response_count'])
+          .select(['id', 'title', 'response_count', 'updated_at'])
           .where('id', '=', query.formId)
           .executeTakeFirst();
       }
@@ -134,26 +134,54 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
       });
     }
 
-    const [syncJobs, formShares] = await Promise.all([
-      deps.db
-        .selectFrom('jobs')
-        .select(['id', 'status', 'trigger', 'created_at'])
-        .where('form_id', '=', query.formId)
-        .where('created_at', '>=', query.from)
-        .where('created_at', '<=', query.to)
-        .execute(),
-      deps.db
-        .selectFrom('form_shares')
-        .select(['permission_level'])
-        .where('form_id', '=', query.formId)
-        .execute(),
-    ]);
+    const [syncJobsInRange, latestSucceededSyncJob, formShares, responsesInRange] =
+      await Promise.all([
+        deps.db
+          .selectFrom('jobs')
+          .select(['id', 'status', 'trigger', 'created_at'])
+          .where('form_id', '=', query.formId)
+          .where('created_at', '>=', query.from)
+          .where('created_at', '<=', query.to)
+          .execute(),
+        deps.db
+          .selectFrom('jobs')
+          .select(['id', 'created_at', 'completed_at'])
+          .where('form_id', '=', query.formId)
+          .where('status', '=', 'succeeded')
+          .orderBy('completed_at', 'desc')
+          .orderBy('created_at', 'desc')
+          .executeTakeFirst(),
+        deps.db
+          .selectFrom('form_shares')
+          .select(['permission_level'])
+          .where('form_id', '=', query.formId)
+          .execute(),
+        deps.db
+          .selectFrom('form_responses')
+          .select(['id', 'submitted_at', 'completion'])
+          .where('form_id', '=', query.formId)
+          .where('submitted_at', '>=', query.from)
+          .where('submitted_at', '<=', query.to)
+          .execute(),
+      ]);
 
-    const totalSyncJobs = syncJobs.length;
-    const succeededSyncJobs = syncJobs.filter((job) => job.status === 'succeeded').length;
-    const failedSyncJobs = syncJobs.filter((job) => job.status === 'failed').length;
-    const manualSyncJobs = syncJobs.filter((job) => job.trigger === 'manual').length;
-    const scheduledSyncJobs = syncJobs.filter((job) => job.trigger === 'scheduled').length;
+    const totalSyncJobsInRange = syncJobsInRange.length;
+    const succeededSyncJobs = syncJobsInRange.filter((job) => job.status === 'succeeded').length;
+    const failedSyncJobs = syncJobsInRange.filter((job) => job.status === 'failed').length;
+    const manualSyncJobs = syncJobsInRange.filter((job) => job.trigger === 'manual').length;
+    const scheduledSyncJobs = syncJobsInRange.filter((job) => job.trigger === 'scheduled').length;
+
+    const totalResponsesInRange = responsesInRange.length;
+    const completedResponsesInRange = responsesInRange.filter(
+      (response) => response.completion === 'completed',
+    ).length;
+    const partialResponsesInRange = responsesInRange.filter(
+      (response) => response.completion === 'partial',
+    ).length;
+
+    const lastSuccessfulSyncAt = latestSucceededSyncJob
+      ? new Date(latestSucceededSyncJob.completed_at ?? latestSucceededSyncJob.created_at)
+      : null;
 
     const buckets = buildBuckets(query.from, query.to, query.granularity);
     const series = buckets.map((bucket) => ({
@@ -161,8 +189,16 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
       count: 0,
     }));
 
-    for (const job of syncJobs) {
-      const bucketIndex = findBucketIndex(new Date(job.created_at), buckets, query.granularity);
+    for (const response of responsesInRange) {
+      if (!response.submitted_at) {
+        continue;
+      }
+
+      const bucketIndex = findBucketIndex(
+        new Date(response.submitted_at),
+        buckets,
+        query.granularity,
+      );
       if (bucketIndex >= 0) {
         series[bucketIndex]!.count += 1;
       }
@@ -175,43 +211,48 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
     return reply.send({
       kpis: [
         {
-          label: 'Responses',
+          label: 'Total responses',
           value: String(form.response_count),
-          delta: `${totalSyncJobs} sync jobs in range`,
+          delta: `${totalResponsesInRange} in selected range`,
         },
         {
-          label: 'Successful syncs',
-          value: String(succeededSyncJobs),
-          delta: `${failedSyncJobs} failed`,
+          label: 'Last synced',
+          value: lastSuccessfulSyncAt ? formatBucketDate(lastSuccessfulSyncAt) : 'Never',
+          delta: `${succeededSyncJobs}/${totalSyncJobsInRange} syncs succeeded in range`,
+        },
+        {
+          label: 'Completed responses',
+          value: String(completedResponsesInRange),
+          delta: `${partialResponsesInRange} partial in range`,
         },
         {
           label: 'Collaborators',
           value: String(formShares.length),
-          delta: `${manualSyncJobs} manual / ${scheduledSyncJobs} scheduled`,
+          delta: `${manualSyncJobs} manual / ${scheduledSyncJobs} scheduled syncs`,
         },
       ],
       series,
       questions: [
         {
+          id: `${form.id}:response-completion`,
+          label: 'Response completion distribution',
+          responses: totalResponsesInRange,
+          distribution: [
+            { label: 'Completed', value: completedResponsesInRange },
+            { label: 'Partial', value: partialResponsesInRange },
+          ],
+        },
+        {
           id: `${form.id}:sync-status`,
-          label: 'Sync status distribution',
-          responses: totalSyncJobs,
+          label: 'Sync status distribution (selected range)',
+          responses: totalSyncJobsInRange,
           distribution: [
             { label: 'Succeeded', value: succeededSyncJobs },
             { label: 'Failed', value: failedSyncJobs },
             {
               label: 'Other',
-              value: Math.max(totalSyncJobs - succeededSyncJobs - failedSyncJobs, 0),
+              value: Math.max(totalSyncJobsInRange - succeededSyncJobs - failedSyncJobs, 0),
             },
-          ],
-        },
-        {
-          id: `${form.id}:sync-trigger`,
-          label: 'Sync trigger distribution',
-          responses: totalSyncJobs,
-          distribution: [
-            { label: 'Manual', value: manualSyncJobs },
-            { label: 'Scheduled', value: scheduledSyncJobs },
           ],
         },
         {

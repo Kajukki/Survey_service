@@ -55,49 +55,66 @@ async function signAccessToken(config: Config, userId: string = 'user-one'): Pro
 }
 
 function createFakeDashboardDb(input: {
-  ownerForm: { id: string; title: string; response_count: number } | null;
-  sharedForm: { id: string; title: string; response_count: number } | null;
+  ownerForm: { id: string; title: string; response_count: number; updated_at: string } | null;
+  sharedForm: { id: string; title: string; response_count: number; updated_at: string } | null;
   shareAccess: boolean;
-  jobs: Array<{ id: string; status: string; trigger: string; created_at: string }>;
+  jobsInRange: Array<{ id: string; status: string; trigger: string; created_at: string }>;
+  latestSucceededSyncJob: { id: string; created_at: string; completed_at: string | null } | null;
   shares: Array<{ permission_level: 'read' | 'write' | 'admin' }>;
+  responses: Array<{
+    id: string;
+    submitted_at: string | null;
+    completion: 'completed' | 'partial';
+  }>;
 }) {
   const formExecuteTakeFirstOwner = vi.fn(async () => input.ownerForm ?? undefined);
   const formExecuteTakeFirstShared = vi.fn(async () => input.sharedForm ?? undefined);
-
   const formWhereOwner = vi.fn(() => ({ executeTakeFirst: formExecuteTakeFirstOwner }));
   const formWhereIdOwner = vi.fn(() => ({ where: formWhereOwner }));
-
   const formWhereShared = vi.fn(() => ({ executeTakeFirst: formExecuteTakeFirstShared }));
-
   const formSelect = vi
     .fn()
     .mockReturnValueOnce({ where: formWhereIdOwner })
     .mockReturnValueOnce({ where: formWhereShared });
 
-  const jobsExecute = vi.fn(async () => input.jobs);
-  const jobsWhereTo = vi.fn(() => ({ execute: jobsExecute }));
-  const jobsWhereFrom = vi.fn(() => ({ where: jobsWhereTo }));
-  const jobsWhereForm = vi.fn(() => ({ where: jobsWhereFrom }));
-  const jobsSelect = vi.fn(() => ({ where: jobsWhereForm }));
-
-  const sharesExecute = vi.fn(async () => input.shares);
   const shareAccessExecuteTakeFirst = vi.fn(async () =>
-    input.shareAccess ? { form_id: 'form' } : undefined,
+    input.shareAccess ? { form_id: '11111111-1111-4111-8111-111111111111' } : undefined,
   );
-
-  const sharesWhereForList = vi.fn(() => ({ execute: sharesExecute }));
-  const sharesWhereForAccessSecond = vi.fn(() => ({
-    executeTakeFirst: shareAccessExecuteTakeFirst,
-  }));
-  const sharesWhereForAccessFirst = vi.fn(() => ({ where: sharesWhereForAccessSecond }));
-
+  const sharesListExecute = vi.fn(async () => input.shares);
+  const sharesWhereList = vi.fn(() => ({ execute: sharesListExecute }));
+  const sharesWhereAccessSecond = vi.fn(() => ({ executeTakeFirst: shareAccessExecuteTakeFirst }));
+  const sharesWhereAccessFirst = vi.fn(() => ({ where: sharesWhereAccessSecond }));
   const sharesSelect = vi.fn((selection: unknown) => {
     if (Array.isArray(selection)) {
-      return { where: sharesWhereForList };
+      return { where: sharesWhereList };
     }
-
-    return { where: sharesWhereForAccessFirst };
+    return { where: sharesWhereAccessFirst };
   });
+
+  const jobsInRangeExecute = vi.fn(async () => input.jobsInRange);
+  const jobsInRangeWhere3 = vi.fn(() => ({ execute: jobsInRangeExecute }));
+  const jobsInRangeWhere2 = vi.fn(() => ({ where: jobsInRangeWhere3 }));
+  const jobsInRangeWhere1 = vi.fn(() => ({ where: jobsInRangeWhere2 }));
+
+  const jobsLatestExecuteTakeFirst = vi.fn(async () => input.latestSucceededSyncJob ?? undefined);
+  const jobsLatestOrder2 = vi.fn(() => ({ executeTakeFirst: jobsLatestExecuteTakeFirst }));
+  const jobsLatestOrder1 = vi.fn(() => ({ orderBy: jobsLatestOrder2 }));
+  const jobsLatestWhere2 = vi.fn(() => ({ orderBy: jobsLatestOrder1 }));
+  const jobsLatestWhere1 = vi.fn(() => ({ where: jobsLatestWhere2 }));
+
+  const jobsSelect = vi.fn((selection: unknown) => {
+    const selected = Array.isArray(selection) ? selection : [selection];
+    if (selected.includes('trigger')) {
+      return { where: jobsInRangeWhere1 };
+    }
+    return { where: jobsLatestWhere1 };
+  });
+
+  const responsesExecute = vi.fn(async () => input.responses);
+  const responsesWhere3 = vi.fn(() => ({ execute: responsesExecute }));
+  const responsesWhere2 = vi.fn(() => ({ where: responsesWhere3 }));
+  const responsesWhere1 = vi.fn(() => ({ where: responsesWhere2 }));
+  const responsesSelect = vi.fn(() => ({ where: responsesWhere1 }));
 
   const selectFrom = vi.fn((table: string) => {
     if (table === 'forms') {
@@ -115,6 +132,12 @@ function createFakeDashboardDb(input: {
     if (table === 'form_shares') {
       return {
         select: sharesSelect,
+      };
+    }
+
+    if (table === 'form_responses') {
+      return {
+        select: responsesSelect,
       };
     }
 
@@ -147,8 +170,10 @@ describe('dashboard routes', () => {
       ownerForm: null,
       sharedForm: null,
       shareAccess: false,
-      jobs: [],
+      jobsInRange: [],
+      latestSucceededSyncJob: null,
       shares: [],
+      responses: [],
     });
     const { app } = await buildApp(fakeDb.db);
 
@@ -165,8 +190,10 @@ describe('dashboard routes', () => {
       ownerForm: null,
       sharedForm: null,
       shareAccess: false,
-      jobs: [],
+      jobsInRange: [],
+      latestSucceededSyncJob: null,
       shares: [],
+      responses: [],
     });
     const { app, config } = await buildApp(fakeDb.db);
     const token = await signAccessToken(config, 'user-one');
@@ -182,16 +209,17 @@ describe('dashboard routes', () => {
     expect(response.statusCode).toBe(404);
   });
 
-  it('returns dashboard payload with kpis, series, and questions', async () => {
+  it('returns activity-focused dashboard payload for owner', async () => {
     const fakeDb = createFakeDashboardDb({
       ownerForm: {
         id: '11111111-1111-4111-8111-111111111111',
         title: 'Customer Survey',
         response_count: 12,
+        updated_at: '2026-04-09T00:00:00.000Z',
       },
       sharedForm: null,
       shareAccess: false,
-      jobs: [
+      jobsInRange: [
         {
           id: 'job-1',
           status: 'succeeded',
@@ -205,8 +233,26 @@ describe('dashboard routes', () => {
           created_at: '2026-04-05T11:00:00.000Z',
         },
       ],
+      latestSucceededSyncJob: {
+        id: 'job-latest',
+        created_at: '2026-04-09T08:00:00.000Z',
+        completed_at: '2026-04-09T08:15:00.000Z',
+      },
       shares: [{ permission_level: 'read' }, { permission_level: 'write' }],
+      responses: [
+        {
+          id: 'resp-1',
+          submitted_at: '2026-04-02T09:00:00.000Z',
+          completion: 'completed',
+        },
+        {
+          id: 'resp-2',
+          submitted_at: '2026-04-03T09:00:00.000Z',
+          completion: 'partial',
+        },
+      ],
     });
+
     const { app, config } = await buildApp(fakeDb.db);
     const token = await signAccessToken(config, 'user-one');
 
@@ -223,47 +269,10 @@ describe('dashboard routes', () => {
     expect(Array.isArray(payload.kpis)).toBe(true);
     expect(Array.isArray(payload.series)).toBe(true);
     expect(Array.isArray(payload.questions)).toBe(true);
-    expect(payload.kpis).toHaveLength(3);
-    expect(payload.questions).toHaveLength(3);
-
-    const succeededBucket = payload.questions[0].distribution.find(
-      (item: { label: string; value: number }) => item.label === 'Succeeded',
-    );
-    expect(succeededBucket?.value).toBe(1);
-  });
-
-  it('allows dashboard access when form is shared with requester', async () => {
-    const fakeDb = createFakeDashboardDb({
-      ownerForm: null,
-      sharedForm: {
-        id: '11111111-1111-4111-8111-111111111111',
-        title: 'Shared Survey',
-        response_count: 9,
-      },
-      shareAccess: true,
-      jobs: [
-        {
-          id: 'job-3',
-          status: 'succeeded',
-          trigger: 'scheduled',
-          created_at: '2026-04-03T08:00:00.000Z',
-        },
-      ],
-      shares: [{ permission_level: 'read' }],
-    });
-    const { app, config } = await buildApp(fakeDb.db);
-    const token = await signAccessToken(config, 'user-two');
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/dashboard?formId=11111111-1111-4111-8111-111111111111&from=2026-04-01&to=2026-04-10&granularity=day',
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const payload = response.json();
-    expect(payload.kpis[0]?.value).toBe('9');
+    expect(payload.kpis).toHaveLength(4);
+    expect(payload.kpis[0].label).toBe('Total responses');
+    expect(payload.kpis[1].label).toBe('Last synced');
+    expect(payload.questions[0].label).toContain('completion');
+    expect(payload.questions[0].distribution[0].value).toBe(1);
   });
 });

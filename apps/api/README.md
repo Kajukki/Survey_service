@@ -8,6 +8,7 @@ This README separates what is implemented now from target-state architecture.
 
 - Implemented now: local credential auth endpoints, explicit auth mode selection (`AUTH_MODE=local|oidc`), bearer token principal extraction on protected routes, job persistence, RabbitMQ publish with confirms, worker-consumable job lifecycle.
 - Partially implemented: export artifact storage and signed URL delivery hardening.
+- Implemented now: runtime mock fallbacks removed from connections/forms/sharing/exports and sync-target resolution paths (DB-backed runtime only).
 - Planned: enterprise IdP rollout hardening and final environment policy adoption.
 
 ## Architecture
@@ -133,7 +134,7 @@ Additional endpoints are implemented in feature modules under `modules/`.
 | `/forms/*` | DB-backed list/detail and form-level sync enqueue |
 | `/forms/:id/shares/*` | DB-backed list/create/delete with owner-scoped form checks |
 | `/exports/*` | DB-backed list/create/detail/download with owner-scoped access checks |
-| `/dashboard` | Implemented analytics read endpoint returning `{ kpis, series, questions }` |
+| `/dashboard` | Implemented form health/activity endpoint returning `{ kpis, series, questions }` (responses trend, sync freshness, collaborator/share distribution) |
 
 ### Auth Mode Matrix
 
@@ -222,3 +223,7 @@ API sync endpoints remain available and return `202` even when only a subset of 
 - `WORKER_ROLE=sync`: sync jobs are consumed.
 - `WORKER_ROLE=export`: sync jobs stay queued until sync workers resume.
 - `WORKER_ROLE=all`: sync and export pipelines both active.
+
+
+
+

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { httpResource } from '@angular/common/http';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 
 import { ApiSuccessEnvelope, emptyEnvelope } from '../../../core/api/api-envelope';
@@ -28,6 +28,7 @@ const EMPTY_DASHBOARD: DashboardPayload = {
   selector: 'app-dashboard-page',
   standalone: true,
   imports: [
+    RouterLink,
     DashboardFilterBarComponent,
     DashboardKpiRowComponent,
     ResponsesTrendChartComponent,
@@ -66,6 +67,11 @@ export class DashboardPageComponent {
       defaultValue: EMPTY_DASHBOARD,
     },
   );
+
+  protected readonly workspaceRoute = computed(() => {
+    const formId = this.filters().formId;
+    return formId ? ['/forms', formId] : ['/forms'];
+  });
 
   protected readonly questionHighlights = computed(
     () => this.dashboardResource.value()?.questions?.slice(0, 6) ?? [],
