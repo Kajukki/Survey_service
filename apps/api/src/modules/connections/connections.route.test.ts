@@ -124,7 +124,7 @@ function createFakeDbCreateResult(createdRow: {
   };
 }
 
-async function buildApp(db?: unknown) {
+async function buildApp(db: unknown) {
   const config = buildConfig();
   const app = Fastify();
 
@@ -132,7 +132,7 @@ async function buildApp(db?: unknown) {
   app.setSerializerCompiler(serializerCompiler);
 
   await registerPrincipalPlugin(app, config);
-  await connectionsRoutes(app, db ? { db: db as any, config } : undefined);
+  await connectionsRoutes(app, { db: db as any, config });
 
   return { app, config };
 }
@@ -180,25 +180,6 @@ describe('connections routes', () => {
         updatedAt: '2026-04-06T00:00:00.000Z',
       },
     ]);
-  });
-
-  it('falls back to mock connection list when no db dependency is provided', async () => {
-    const { app, config } = await buildApp();
-    const token = await signAccessToken(config);
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/connections',
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const payload = response.json();
-    expect(payload.success).toBe(true);
-    expect(Array.isArray(payload.data)).toBe(true);
-    expect(payload.data.length).toBeGreaterThan(0);
   });
 
   it('deletes DB-backed connection for owner', async () => {

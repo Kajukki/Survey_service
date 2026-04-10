@@ -161,7 +161,7 @@ function createFakeExportsDb(input: {
   };
 }
 
-async function buildApp(fakeDb?: unknown) {
+async function buildApp(fakeDb: unknown) {
   const config = buildConfig();
   const app = Fastify();
 
@@ -169,7 +169,7 @@ async function buildApp(fakeDb?: unknown) {
   app.setSerializerCompiler(serializerCompiler);
 
   await registerPrincipalPlugin(app, config);
-  await exportsRoutes(app, fakeDb ? { db: fakeDb as any } : undefined);
+  await exportsRoutes(app, { db: fakeDb as any });
 
   return { app, config };
 }

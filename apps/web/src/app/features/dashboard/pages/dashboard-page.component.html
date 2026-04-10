@@ -2,10 +2,12 @@
   <header class="page-header">
     <div>
       <h2>Dashboard</h2>
-      <p>Monitor survey health, response trends, and question distributions.</p>
+      <p>Monitor survey health, response trends, and sync activity.</p>
     </div>
     <div class="header-actions">
-      <a href="/exports" class="btn-secondary">Export this range</a>
+      <a class="btn-secondary" [routerLink]="workspaceRoute()" [queryParams]="{ tab: 'analytics' }"
+        >Open Workspace</a
+      >
       <button type="button" class="btn-primary" (click)="refresh()">Refresh</button>
     </div>
   </header>

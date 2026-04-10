@@ -9,46 +9,23 @@ const ExportIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
-const mockExports = [
-  {
-    id: 'export-mock-1',
-    format: 'csv',
-    status: 'ready',
-    requested_at: new Date(Date.now() - 3600_000).toISOString(),
-    download_url: 'https://example.com/downloads/export-mock-1.csv',
-    error: null,
-    completed_at: new Date(Date.now() - 3000_000).toISOString(),
-  },
-  {
-    id: 'export-mock-2',
-    format: 'excel',
-    status: 'queued',
-    requested_at: new Date().toISOString(),
-    download_url: null,
-    error: null,
-    completed_at: null,
-  },
-];
-
-export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<Database> }) {
+export async function exportsRoutes(app: FastifyInstance, deps: { db: Kysely<Database> }) {
   // GET /exports
   app.get('/exports', async (request, reply) => {
     const principal = getPrincipal(request);
-    const exportsList = deps?.db
-      ? (
-          await deps.db
-            .selectFrom('export_jobs')
-            .select(['id', 'format', 'status', 'requested_at'])
-            .where('requested_by', '=', principal.userId)
-            .orderBy('requested_at', 'desc')
-            .execute()
-        ).map((item) => ({
-          id: item.id,
-          format: item.format,
-          status: item.status,
-          requested_at: new Date(item.requested_at).toISOString(),
-        }))
-      : mockExports;
+    const exportsList = (
+      await deps.db
+        .selectFrom('export_jobs')
+        .select(['id', 'format', 'status', 'requested_at'])
+        .where('requested_by', '=', principal.userId)
+        .orderBy('requested_at', 'desc')
+        .execute()
+    ).map((item) => ({
+      id: item.id,
+      format: item.format,
+      status: item.status,
+      requested_at: new Date(item.requested_at).toISOString(),
+    }));
 
     return reply.send({
       success: true,
@@ -80,48 +57,13 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    const db = deps?.db;
-    if (db) {
-      const exportJob = await db
-        .selectFrom('export_jobs')
-        .select(['id', 'format', 'status', 'requested_at', 'download_url', 'error', 'completed_at'])
-        .where('id', '=', paramsResult.data.id)
-        .where('requested_by', '=', principal.userId)
-        .executeTakeFirst();
+    const exportJob = await deps.db
+      .selectFrom('export_jobs')
+      .select(['id', 'format', 'status', 'requested_at', 'download_url', 'error', 'completed_at'])
+      .where('id', '=', paramsResult.data.id)
+      .where('requested_by', '=', principal.userId)
+      .executeTakeFirst();
 
-      if (!exportJob) {
-        return reply.status(404).send({
-          success: false,
-          error: {
-            code: 'not_found',
-            message: 'Export not found',
-          },
-          meta: {
-            requestId: request.id,
-          },
-        });
-      }
-
-      return reply.send({
-        success: true,
-        data: {
-          id: exportJob.id,
-          format: exportJob.format,
-          status: exportJob.status,
-          requested_at: new Date(exportJob.requested_at).toISOString(),
-          download_url: exportJob.download_url,
-          error: exportJob.error,
-          completed_at: exportJob.completed_at
-            ? new Date(exportJob.completed_at).toISOString()
-            : null,
-        },
-        meta: {
-          requestId: request.id,
-        },
-      });
-    }
-
-    const exportJob = mockExports.find((item) => item.id === paramsResult.data.id);
     if (!exportJob) {
       return reply.status(404).send({
         success: false,
@@ -137,7 +79,17 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
 
     return reply.send({
       success: true,
-      data: exportJob,
+      data: {
+        id: exportJob.id,
+        format: exportJob.format,
+        status: exportJob.status,
+        requested_at: new Date(exportJob.requested_at).toISOString(),
+        download_url: exportJob.download_url,
+        error: exportJob.error,
+        completed_at: exportJob.completed_at
+          ? new Date(exportJob.completed_at).toISOString()
+          : null,
+      },
       meta: {
         requestId: request.id,
       },
@@ -164,54 +116,13 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    const db = deps?.db;
-    if (db) {
-      const exportJob = await db
-        .selectFrom('export_jobs')
-        .select(['id', 'status', 'download_url'])
-        .where('id', '=', paramsResult.data.id)
-        .where('requested_by', '=', principal.userId)
-        .executeTakeFirst();
+    const exportJob = await deps.db
+      .selectFrom('export_jobs')
+      .select(['id', 'status', 'download_url'])
+      .where('id', '=', paramsResult.data.id)
+      .where('requested_by', '=', principal.userId)
+      .executeTakeFirst();
 
-      if (!exportJob) {
-        return reply.status(404).send({
-          success: false,
-          error: {
-            code: 'not_found',
-            message: 'Export not found',
-          },
-          meta: {
-            requestId: request.id,
-          },
-        });
-      }
-
-      if (!exportJob.download_url || exportJob.status !== 'ready') {
-        return reply.status(409).send({
-          success: false,
-          error: {
-            code: 'export_not_ready',
-            message: 'Export is not ready for download',
-          },
-          meta: {
-            requestId: request.id,
-          },
-        });
-      }
-
-      return reply.send({
-        success: true,
-        data: {
-          id: exportJob.id,
-          download_url: exportJob.download_url,
-        },
-        meta: {
-          requestId: request.id,
-        },
-      });
-    }
-
-    const exportJob = mockExports.find((item) => item.id === paramsResult.data.id);
     if (!exportJob) {
       return reply.status(404).send({
         success: false,
@@ -270,49 +181,19 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    const db = deps?.db;
-    if (db) {
-      const ownedForm = await db
-        .selectFrom('forms')
-        .select('id')
-        .where('id', '=', bodyResult.data.formId)
-        .where('owner_id', '=', principal.userId)
-        .executeTakeFirst();
+    const ownedForm = await deps.db
+      .selectFrom('forms')
+      .select('id')
+      .where('id', '=', bodyResult.data.formId)
+      .where('owner_id', '=', principal.userId)
+      .executeTakeFirst();
 
-      if (!ownedForm) {
-        return reply.status(404).send({
-          success: false,
-          error: {
-            code: 'not_found',
-            message: 'Form not found',
-          },
-          meta: {
-            requestId: request.id,
-          },
-        });
-      }
-
-      const exportJob = await db
-        .insertInto('export_jobs')
-        .values({
-          requested_by: principal.userId,
-          form_id: bodyResult.data.formId,
-          format: bodyResult.data.format,
-          status: 'queued',
-          download_url: null,
-          error: null,
-          completed_at: null,
-        })
-        .returning(['id', 'format', 'status', 'requested_at'])
-        .executeTakeFirstOrThrow();
-
-      return reply.status(202).send({
-        success: true,
-        data: {
-          id: exportJob.id,
-          format: exportJob.format,
-          status: exportJob.status,
-          requested_at: new Date(exportJob.requested_at).toISOString(),
+    if (!ownedForm) {
+      return reply.status(404).send({
+        success: false,
+        error: {
+          code: 'not_found',
+          message: 'Form not found',
         },
         meta: {
           requestId: request.id,
@@ -320,20 +201,28 @@ export async function exportsRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    const exportJob = {
-      id: `export-job-${Date.now()}`,
-      format: bodyResult.data.format,
-      status: 'queued',
-      requested_at: new Date().toISOString(),
-      download_url: null,
-      error: null,
-      completed_at: null,
-    };
-    mockExports.unshift(exportJob);
+    const exportJob = await deps.db
+      .insertInto('export_jobs')
+      .values({
+        requested_by: principal.userId,
+        form_id: bodyResult.data.formId,
+        format: bodyResult.data.format,
+        status: 'queued',
+        download_url: null,
+        error: null,
+        completed_at: null,
+      })
+      .returning(['id', 'format', 'status', 'requested_at'])
+      .executeTakeFirstOrThrow();
 
     return reply.status(202).send({
       success: true,
-      data: exportJob,
+      data: {
+        id: exportJob.id,
+        format: exportJob.format,
+        status: exportJob.status,
+        requested_at: new Date(exportJob.requested_at).toISOString(),
+      },
       meta: {
         requestId: request.id,
       },

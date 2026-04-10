@@ -1,7 +1,5 @@
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
-import { mockConnections } from '../connections/connections.mock.js';
-import { mockForms } from '../forms/forms.mock.js';
 
 export interface SyncTargetForm {
   id: string;
@@ -22,22 +20,9 @@ export interface JobsSyncTargetQueryService {
   ): Promise<SyncTargetConnection | null>;
 }
 
-export function createJobsSyncTargetQueryService(
-  db: Kysely<Database> | undefined,
-): JobsSyncTargetQueryService {
+export function createJobsSyncTargetQueryService(db: Kysely<Database>): JobsSyncTargetQueryService {
   return {
     async resolveOwnedFormForSync(formId: string, userId: string): Promise<SyncTargetForm | null> {
-      if (!db) {
-        const mockForm = mockForms.find((item) => item.id === formId && item.ownerId === userId);
-        return mockForm
-          ? {
-              id: mockForm.id,
-              connectionId: mockForm.connectionId,
-              ownerId: mockForm.ownerId,
-            }
-          : null;
-      }
-
       const form = await db
         .selectFrom('forms')
         .select(['id', 'connection_id', 'owner_id'])
@@ -60,18 +45,6 @@ export function createJobsSyncTargetQueryService(
       connectionId: string,
       userId: string,
     ): Promise<SyncTargetConnection | null> {
-      if (!db) {
-        const mockConnection = mockConnections.find(
-          (item) => item.id === connectionId && item.ownerId === userId,
-        );
-        return mockConnection
-          ? {
-              id: mockConnection.id,
-              ownerId: mockConnection.ownerId,
-            }
-          : null;
-      }
-
       const connection = await db
         .selectFrom('provider_connections')
         .select(['id', 'owner_id'])

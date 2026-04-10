@@ -28,3 +28,9 @@ See [repository structure](../../docs/repository-structure.md).
 - Connections route query params:
 	- `oauth=linked` for successful link completion.
 	- `oauth=error&reason=<value>` for callback/start failures.
+
+## Dashboard Behavior
+
+- Dashboard displays form health/activity signals (response totals, response trend, sync freshness, share/collaboration distribution).
+- The dashboard header includes **Open Workspace** to jump to /forms/:id?tab=analytics for detailed question-level analysis.
+

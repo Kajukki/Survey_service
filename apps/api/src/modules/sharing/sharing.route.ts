@@ -3,39 +3,14 @@ import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
 import { getPrincipal } from '../../server/principal';
-import { mockForms } from '../forms/forms.mock.js';
-
-const mockShares: Array<{
-  id: string;
-  form_id: string;
-  grantee_user_id: string;
-  permission_level: 'read' | 'write' | 'admin';
-  created_at: string;
-}> = [
-  {
-    id: 'share-mock-1',
-    form_id: 'mock-form-id',
-    grantee_user_id: 'user-one',
-    permission_level: 'read',
-    created_at: new Date().toISOString(),
-  },
-];
 
 const CreateShareBodySchema = z.object({
   grantee_user_id: z.string().uuid(),
   permission_level: z.enum(['read', 'write', 'admin']),
 });
 
-export async function sharingRoutes(app: FastifyInstance, deps?: { db?: Kysely<Database> }) {
-  function canAccessFormShares(formId: string, userId: string): boolean {
-    return mockForms.some((form) => form.id === formId && form.ownerId === userId);
-  }
-
+export async function sharingRoutes(app: FastifyInstance, deps: { db: Kysely<Database> }) {
   async function canAccessFormSharesDb(formId: string, userId: string): Promise<boolean> {
-    if (!deps?.db) {
-      return canAccessFormShares(formId, userId);
-    }
-
     const form = await deps.db
       .selectFrom('forms')
       .select('id')
@@ -64,19 +39,17 @@ export async function sharingRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    const shares = deps?.db
-      ? (
-          await deps.db
-            .selectFrom('form_shares')
-            .select(['id', 'form_id', 'grantee_user_id', 'permission_level', 'created_at'])
-            .where('form_id', '=', id)
-            .orderBy('created_at', 'desc')
-            .execute()
-        ).map((share) => ({
-          ...share,
-          created_at: new Date(share.created_at).toISOString(),
-        }))
-      : mockShares.filter((share) => share.form_id === id);
+    const shares = (
+      await deps.db
+        .selectFrom('form_shares')
+        .select(['id', 'form_id', 'grantee_user_id', 'permission_level', 'created_at'])
+        .where('form_id', '=', id)
+        .orderBy('created_at', 'desc')
+        .execute()
+    ).map((share) => ({
+      ...share,
+      created_at: new Date(share.created_at).toISOString(),
+    }));
 
     return reply.send({
       success: true,
@@ -123,40 +96,27 @@ export async function sharingRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    const createdShare = deps?.db
-      ? await deps.db
-          .insertInto('form_shares')
-          .values({
-            form_id: id,
-            grantee_user_id: bodyResult.data.grantee_user_id,
-            permission_level: bodyResult.data.permission_level,
-          })
-          .onConflict((oc) =>
-            oc.columns(['form_id', 'grantee_user_id']).doUpdateSet({
-              permission_level: bodyResult.data.permission_level,
-            }),
-          )
-          .returning(['id', 'form_id', 'grantee_user_id', 'permission_level', 'created_at'])
-          .executeTakeFirstOrThrow()
-          .then((share) => ({
-            ...share,
-            created_at: new Date(share.created_at).toISOString(),
-          }))
-      : (() => {
-          const mockCreatedShare = {
-            ...mockShares[0],
-            id: `share-${Date.now()}`,
-            form_id: id,
-            grantee_user_id: bodyResult.data.grantee_user_id,
-            permission_level: bodyResult.data.permission_level,
-          };
-          mockShares.push(mockCreatedShare);
-          return mockCreatedShare;
-        })();
+    const createdShare = await deps.db
+      .insertInto('form_shares')
+      .values({
+        form_id: id,
+        grantee_user_id: bodyResult.data.grantee_user_id,
+        permission_level: bodyResult.data.permission_level,
+      })
+      .onConflict((oc) =>
+        oc.columns(['form_id', 'grantee_user_id']).doUpdateSet({
+          permission_level: bodyResult.data.permission_level,
+        }),
+      )
+      .returning(['id', 'form_id', 'grantee_user_id', 'permission_level', 'created_at'])
+      .executeTakeFirstOrThrow();
 
     return reply.status(201).send({
       success: true,
-      data: createdShare,
+      data: {
+        ...createdShare,
+        created_at: new Date(createdShare.created_at).toISOString(),
+      },
       meta: {
         requestId: request.id,
       },
@@ -181,35 +141,14 @@ export async function sharingRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    if (deps?.db) {
-      const deleted = await deps.db
-        .deleteFrom('form_shares')
-        .where('form_id', '=', id)
-        .where('id', '=', share_id)
-        .returning('id')
-        .executeTakeFirst();
+    const deleted = await deps.db
+      .deleteFrom('form_shares')
+      .where('form_id', '=', id)
+      .where('id', '=', share_id)
+      .returning('id')
+      .executeTakeFirst();
 
-      if (!deleted) {
-        return reply.status(404).send({
-          success: false,
-          error: {
-            code: 'not_found',
-            message: 'Share not found',
-          },
-          meta: {
-            requestId: request.id,
-          },
-        });
-      }
-
-      return reply.status(204).send();
-    }
-
-    const existingIndex = mockShares.findIndex(
-      (share) => share.form_id === id && share.id === share_id,
-    );
-
-    if (existingIndex === -1) {
+    if (!deleted) {
       return reply.status(404).send({
         success: false,
         error: {
@@ -222,7 +161,6 @@ export async function sharingRoutes(app: FastifyInstance, deps?: { db?: Kysely<D
       });
     }
 
-    mockShares.splice(existingIndex, 1);
     return reply.status(204).send();
   });
 }
