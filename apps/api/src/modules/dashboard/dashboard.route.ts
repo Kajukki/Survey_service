@@ -154,10 +154,7 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
           .where((eb) =>
             eb.or([
               eb('form_id', '=', query.formId),
-              eb.and([
-                eb('form_id', 'is', null),
-                eb('connection_id', '=', form.connection_id),
-              ]),
+              eb.and([eb('form_id', 'is', null), eb('connection_id', '=', form.connection_id)]),
             ]),
           )
           .where('created_at', '>=', rangeStart)
@@ -169,10 +166,7 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
           .where((eb) =>
             eb.or([
               eb('form_id', '=', query.formId),
-              eb.and([
-                eb('form_id', 'is', null),
-                eb('connection_id', '=', form.connection_id),
-              ]),
+              eb.and([eb('form_id', 'is', null), eb('connection_id', '=', form.connection_id)]),
             ]),
           )
           .where('status', '=', 'succeeded')
