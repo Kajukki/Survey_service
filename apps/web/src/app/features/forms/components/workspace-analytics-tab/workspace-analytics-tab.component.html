@@ -48,6 +48,13 @@
     <p class="analytics-meta">Generated {{ formatDate(analyticsFreshness()) }}</p>
   }
 
+  @if (!hasAnyQuestionAnalytics()) {
+    <section class="card empty-state">
+      <h3>No question analytics available</h3>
+      <p>This form has responses, but no per-question analytics were generated yet.</p>
+    </section>
+  }
+
   @if (scaleQuestions().length > 0) {
     <h3 class="section-title">Scale Questions</h3>
     @for (q of scaleQuestions(); track q.questionId) {
@@ -86,7 +93,10 @@
 
           @if (hasScaleChartData(q)) {
             <div class="chart-container">
-              <canvas #scaleCanvas></canvas>
+              <canvas
+                #scaleCanvas
+                [attr.aria-label]="'Scale distribution for ' + q.questionTitle"
+              ></canvas>
             </div>
           } @else {
             <div class="chart-empty">No scale distribution data available for this question.</div>
@@ -115,7 +125,10 @@
           <div class="select-layout">
             @if (hasSelectChartData(q)) {
               <div class="chart-container chart-doughnut">
-                <canvas #selectCanvas></canvas>
+                <canvas
+                  #selectCanvas
+                  [attr.aria-label]="'Choice distribution for ' + q.questionTitle"
+                ></canvas>
               </div>
             } @else {
               <div class="chart-empty chart-empty-inline">
@@ -182,6 +195,8 @@
             <button
               class="toggle-responses-btn"
               type="button"
+              [attr.aria-expanded]="expandedText().has(q.questionId)"
+              [attr.aria-controls]="textResponseListId(q.questionId)"
               (click)="toggleTextExpand(q.questionId)"
             >
               {{ expandedText().has(q.questionId) ? 'Hide' : 'Show' }} Responses ({{
@@ -189,7 +204,6 @@
               }})
               <svg
                 class="expand-icon"
-                [class.rotated]="expandedText().has(q.questionId)"
                 width="14"
                 height="14"
                 viewBox="0 0 24 24"
@@ -202,7 +216,7 @@
             </button>
 
             @if (expandedText().has(q.questionId)) {
-              <ul class="text-list">
+              <ul class="text-list" [attr.id]="textResponseListId(q.questionId)">
                 @for (resp of text.responses; track $index) {
                   <li class="text-item">{{ resp }}</li>
                 }

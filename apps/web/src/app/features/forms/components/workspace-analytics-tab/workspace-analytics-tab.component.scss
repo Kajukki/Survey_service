@@ -242,6 +242,11 @@
   background: var(--bg-elevated);
 }
 
+.toggle-responses-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
 .expand-icon {
   transition: transform var(--motion-fast);
 }
