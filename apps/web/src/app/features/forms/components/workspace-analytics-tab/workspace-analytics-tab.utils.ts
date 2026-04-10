@@ -50,3 +50,14 @@ export function scaleDistributionEntriesSorted(
     return a[0].localeCompare(b[0]);
   });
 }
+
+export function selectChartSeriesSorted(optionCounts: Record<string, number>): {
+  labels: string[];
+  values: number[];
+} {
+  const labels = optionKeysSorted(optionCounts);
+  return {
+    labels,
+    values: labels.map((label) => optionCounts[label] ?? 0),
+  };
+}

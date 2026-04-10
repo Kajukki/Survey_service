@@ -5,6 +5,7 @@ import {
   hasSelectChartData,
   optionKeysSorted,
   scaleDistributionEntriesSorted,
+  selectChartSeriesSorted,
 } from './workspace-analytics-tab.utils';
 
 describe('workspace analytics utils', () => {
@@ -94,5 +95,16 @@ describe('workspace analytics utils', () => {
       ['10', 2],
       ['N_A', 4],
     ]);
+  });
+
+  it('builds select chart series sorted by breakdown order', () => {
+    const series = selectChartSeriesSorted({
+      Maybe: 1,
+      Yes: 4,
+      No: 4,
+    });
+
+    expect(series.labels).toEqual(['No', 'Yes', 'Maybe']);
+    expect(series.values).toEqual([4, 4, 1]);
   });
 });
