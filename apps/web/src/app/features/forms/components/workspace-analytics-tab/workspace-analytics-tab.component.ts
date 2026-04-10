@@ -21,6 +21,7 @@ import {
   hasSelectChartData,
   optionKeysSorted,
   scaleDistributionEntriesSorted,
+  selectChartSeriesSorted,
 } from './workspace-analytics-tab.utils';
 
 Chart.register(...registerables);
@@ -234,8 +235,7 @@ export class WorkspaceAnalyticsTabComponent {
     question: FormAnalyticsQuestionRecordV2,
   ): Chart {
     const select = question.selectAnalytics!;
-    const labels = Object.keys(select.optionCounts);
-    const values = Object.values(select.optionCounts);
+    const { labels, values } = selectChartSeriesSorted(select.optionCounts);
     const palette = this.generatePalette(labels.length);
     const colors = this.getChartColors();
 
