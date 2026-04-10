@@ -7,6 +7,7 @@ import {
   inject,
   input,
   output,
+  signal,
   viewChildren,
 } from '@angular/core';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
@@ -38,6 +39,7 @@ export class WorkspaceAnalyticsTabComponent {
   readonly selectQuestions = input.required<FormAnalyticsQuestionRecordV2[]>();
   readonly textQuestions = input.required<FormAnalyticsQuestionRecordV2[]>();
   readonly retry = output<void>();
+  readonly expandedText = signal<Set<string>>(new Set());
 
   readonly scaleCanvases = viewChildren<ElementRef<HTMLCanvasElement>>('scaleCanvas');
   readonly selectCanvases = viewChildren<ElementRef<HTMLCanvasElement>>('selectCanvas');
@@ -107,6 +109,18 @@ export class WorkspaceAnalyticsTabComponent {
 
   objectKeys(input: Record<string, number>): string[] {
     return Object.keys(input);
+  }
+
+  toggleTextExpand(questionId: string): void {
+    this.expandedText.update((current) => {
+      const next = new Set(current);
+      if (next.has(questionId)) {
+        next.delete(questionId);
+      } else {
+        next.add(questionId);
+      }
+      return next;
+    });
   }
 
   private getChartColors(): {

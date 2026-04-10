@@ -6,7 +6,7 @@
       <p>Explore form structure, responses, and persisted analytics.</p>
     </div>
     <button type="button" class="btn-primary" [disabled]="isLoadingAny()" (click)="refresh()">
-      @if (isLoadingAny()) { Refreshing... } @else { Refresh }
+      {{ isLoadingAny() ? 'Refreshing...' : 'Refresh' }}
     </button>
   </header>
 
