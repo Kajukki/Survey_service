@@ -59,24 +59,20 @@ async function signAccessToken(config: Config, userId: string = 'user-one'): Pro
 }
 
 function createFakeDashboardDb(input: {
-  ownerForm:
-    | {
-        id: string;
-        connection_id: string;
-        title: string;
-        response_count: number;
-        updated_at: string;
-      }
-    | null;
-  sharedForm:
-    | {
-        id: string;
-        connection_id: string;
-        title: string;
-        response_count: number;
-        updated_at: string;
-      }
-    | null;
+  ownerForm: {
+    id: string;
+    connection_id: string;
+    title: string;
+    response_count: number;
+    updated_at: string;
+  } | null;
+  sharedForm: {
+    id: string;
+    connection_id: string;
+    title: string;
+    response_count: number;
+    updated_at: string;
+  } | null;
   shareAccess: boolean;
   jobsInRange: Array<{ id: string; status: string; trigger: string; created_at: string }>;
   latestSucceededSyncJob: { id: string; created_at: string; completed_at: string | null } | null;

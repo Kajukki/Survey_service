@@ -147,16 +147,16 @@ export async function createServer(context: AppContext): Promise<FastifyInstance
         err: {
           name: error.name,
           message: error.message,
-          code: (error as any).code,
-          statusCode: (error as any).statusCode,
+          code: error.code,
+          statusCode: error.statusCode,
           stack: error.stack,
         },
       },
       'Request error',
     );
 
-    const statusCode = (error as any).statusCode || 500;
-    const code = (error as any).code || 'internal_error';
+    const statusCode = error.statusCode || 500;
+    const code = error.code || 'internal_error';
     const message =
       statusCode >= 500 ? 'Internal Server Error' : error.message || 'An unexpected error occurred';
 

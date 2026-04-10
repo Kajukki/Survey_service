@@ -114,6 +114,7 @@ export function createJobsRepository(db: Kysely<Database>): JobsRepository {
         return createdJob;
       });
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return mapJobRow(inserted as any);
     },
 
@@ -143,6 +144,7 @@ export function createJobsRepository(db: Kysely<Database>): JobsRepository {
       ]);
 
       return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         items: rows.map((row) => mapJobRow(row as any)),
         total: Number(countResult?.count ?? 0),
       };
@@ -159,6 +161,7 @@ export function createJobsRepository(db: Kysely<Database>): JobsRepository {
         return null;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return mapJobRow(row as any);
     },
   };
