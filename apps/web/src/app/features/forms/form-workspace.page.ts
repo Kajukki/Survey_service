@@ -15,12 +15,15 @@ import {
   mapFormStructure,
 } from '../../core/api/survey-api.adapters';
 import {
-  FormAnalyticsQuestionRecordV2,
   FormAnalyticsReportRecord,
   FormResponseSummaryRecord,
   FormSectionRecord,
   FormStructureRecord,
 } from '../../shared/models/domain.models';
+import { WorkspaceAnalyticsTabComponent } from './components/workspace-analytics-tab/workspace-analytics-tab.component';
+import { WorkspaceOverviewTabComponent } from './components/workspace-overview-tab/workspace-overview-tab.component';
+import { WorkspaceQuestionsTabComponent } from './components/workspace-questions-tab/workspace-questions-tab.component';
+import { WorkspaceResponsesTabComponent } from './components/workspace-responses-tab/workspace-responses-tab.component';
 import {
   FormsWorkspaceTab,
   buildFormsWorkspaceQueryParams,
@@ -30,7 +33,14 @@ import {
 @Component({
   selector: 'app-form-workspace-page',
   standalone: true,
-  imports: [RouterLink, DatePipe],
+  imports: [
+    RouterLink,
+    DatePipe,
+    WorkspaceOverviewTabComponent,
+    WorkspaceQuestionsTabComponent,
+    WorkspaceResponsesTabComponent,
+    WorkspaceAnalyticsTabComponent,
+  ],
   templateUrl: './form-workspace.page.html',
   styleUrl: './form-workspace.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -248,37 +258,6 @@ export class FormWorkspacePageComponent {
       responseQuestionId: undefined,
       completion: undefined,
       responsesPage: 1,
-    });
-  }
-
-  protected objectKeys(input: Record<string, number>): string[] {
-    return Object.keys(input);
-  }
-
-  protected responseRate(question: FormAnalyticsQuestionRecordV2): number {
-    const total = question.answerCount + question.skippedCount;
-    if (total === 0) {
-      return 0;
-    }
-
-    return Math.round((question.answerCount / total) * 100);
-  }
-
-  protected formatNum(value: number): string {
-    return Number.isInteger(value) ? String(value) : value.toFixed(2);
-  }
-
-  protected formatDate(value?: string): string {
-    if (!value) {
-      return '—';
-    }
-
-    return new Date(value).toLocaleString('en-FI', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
     });
   }
 
