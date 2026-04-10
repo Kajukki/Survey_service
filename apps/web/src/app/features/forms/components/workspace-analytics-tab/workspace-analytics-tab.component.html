@@ -84,9 +84,13 @@
             </div>
           </div>
 
-          <div class="chart-container">
-            <canvas #scaleCanvas></canvas>
-          </div>
+          @if (hasScaleChartData(q)) {
+            <div class="chart-container">
+              <canvas #scaleCanvas></canvas>
+            </div>
+          } @else {
+            <div class="chart-empty">No scale distribution data available for this question.</div>
+          }
         }
       </section>
     }
@@ -109,9 +113,15 @@
 
         @if (q.selectAnalytics; as select) {
           <div class="select-layout">
-            <div class="chart-container chart-doughnut">
-              <canvas #selectCanvas></canvas>
-            </div>
+            @if (hasSelectChartData(q)) {
+              <div class="chart-container chart-doughnut">
+                <canvas #selectCanvas></canvas>
+              </div>
+            } @else {
+              <div class="chart-empty chart-empty-inline">
+                No choice distribution data available for this question.
+              </div>
+            }
 
             <div class="select-breakdown">
               <div class="breakdown-header">
@@ -119,7 +129,7 @@
                 <span class="breakdown-col right">Count</span>
                 <span class="breakdown-col right">%</span>
               </div>
-              @for (opt of objectKeys(select.optionCounts); track opt) {
+              @for (opt of optionKeysSorted(select.optionCounts); track opt) {
                 <div class="breakdown-row" [class.popular]="select.mostPopular.includes(opt)">
                   <span class="breakdown-option">{{ opt }}</span>
                   <span class="breakdown-count">{{ select.optionCounts[opt] }}</span>

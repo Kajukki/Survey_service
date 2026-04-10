@@ -62,14 +62,14 @@ export class WorkspaceAnalyticsTabComponent {
 
       scaleElements.forEach((ref, index) => {
         const question = scaleQuestions[index];
-        if (question?.scaleAnalytics) {
+        if (question?.scaleAnalytics && this.hasScaleChartData(question)) {
           this.charts.push(this.createScaleChart(ref.nativeElement, question));
         }
       });
 
       selectElements.forEach((ref, index) => {
         const question = selectQuestions[index];
-        if (question?.selectAnalytics) {
+        if (question?.selectAnalytics && this.hasSelectChartData(question)) {
           this.charts.push(this.createSelectChart(ref.nativeElement, question));
         }
       });
@@ -111,6 +111,18 @@ export class WorkspaceAnalyticsTabComponent {
     return Object.keys(input);
   }
 
+  optionKeysSorted(input: Record<string, number>): string[] {
+    return Object.entries(input)
+      .sort((a, b) => {
+        if (b[1] !== a[1]) {
+          return b[1] - a[1];
+        }
+
+        return a[0].localeCompare(b[0]);
+      })
+      .map(([label]) => label);
+  }
+
   toggleTextExpand(questionId: string): void {
     this.expandedText.update((current) => {
       const next = new Set(current);
@@ -144,6 +156,24 @@ export class WorkspaceAnalyticsTabComponent {
       ok: style.getPropertyValue('--ok').trim() || '#48bb78',
       danger: style.getPropertyValue('--danger').trim() || '#fc8181',
     };
+  }
+
+  hasScaleChartData(question: FormAnalyticsQuestionRecordV2): boolean {
+    const distribution = question.scaleAnalytics?.distribution;
+    if (!distribution) {
+      return false;
+    }
+
+    return Object.values(distribution).some((value) => value > 0);
+  }
+
+  hasSelectChartData(question: FormAnalyticsQuestionRecordV2): boolean {
+    const optionCounts = question.selectAnalytics?.optionCounts;
+    if (!optionCounts) {
+      return false;
+    }
+
+    return Object.values(optionCounts).some((value) => value > 0);
   }
 
   private createScaleChart(

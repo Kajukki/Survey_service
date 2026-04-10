@@ -127,6 +127,19 @@
   flex-shrink: 0;
 }
 
+.chart-empty {
+  border: 1px dashed var(--line-default);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-subtle) 88%, transparent);
+  color: var(--text-subtle);
+  font-size: 0.84rem;
+  padding: 0.8rem;
+}
+
+.chart-empty-inline {
+  width: min(340px, 100%);
+}
+
 .select-layout {
   display: flex;
   gap: 0.75rem;
