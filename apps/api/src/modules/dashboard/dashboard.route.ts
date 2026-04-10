@@ -19,6 +19,15 @@ const DashboardQuerySchema = z
 
 type Granularity = 'day' | 'week' | 'month';
 
+function startOfUtcDay(input: Date): Date {
+  return new Date(Date.UTC(input.getUTCFullYear(), input.getUTCMonth(), input.getUTCDate()));
+}
+
+function endExclusiveUtcDay(input: Date): Date {
+  const start = startOfUtcDay(input);
+  start.setUTCDate(start.getUTCDate() + 1);
+  return start;
+}
 function formatBucketDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
@@ -99,7 +108,7 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
     const query = queryResult.data;
     let form = await deps.db
       .selectFrom('forms')
-      .select(['id', 'title', 'response_count', 'updated_at'])
+      .select(['id', 'connection_id', 'title', 'response_count', 'updated_at'])
       .where('id', '=', query.formId)
       .where('owner_id', '=', principal.userId)
       .executeTakeFirst();
@@ -115,7 +124,7 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
       if (share) {
         form = await deps.db
           .selectFrom('forms')
-          .select(['id', 'title', 'response_count', 'updated_at'])
+          .select(['id', 'connection_id', 'title', 'response_count', 'updated_at'])
           .where('id', '=', query.formId)
           .executeTakeFirst();
       }
@@ -134,19 +143,38 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
       });
     }
 
+    const rangeStart = startOfUtcDay(query.from);
+    const rangeEndExclusive = endExclusiveUtcDay(query.to);
+
     const [syncJobsInRange, latestSucceededSyncJob, formShares, responsesInRange] =
       await Promise.all([
         deps.db
           .selectFrom('jobs')
           .select(['id', 'status', 'trigger', 'created_at'])
-          .where('form_id', '=', query.formId)
-          .where('created_at', '>=', query.from)
-          .where('created_at', '<=', query.to)
+          .where((eb) =>
+            eb.or([
+              eb('form_id', '=', query.formId),
+              eb.and([
+                eb('form_id', 'is', null),
+                eb('connection_id', '=', form.connection_id),
+              ]),
+            ]),
+          )
+          .where('created_at', '>=', rangeStart)
+          .where('created_at', '<', rangeEndExclusive)
           .execute(),
         deps.db
           .selectFrom('jobs')
           .select(['id', 'created_at', 'completed_at'])
-          .where('form_id', '=', query.formId)
+          .where((eb) =>
+            eb.or([
+              eb('form_id', '=', query.formId),
+              eb.and([
+                eb('form_id', 'is', null),
+                eb('connection_id', '=', form.connection_id),
+              ]),
+            ]),
+          )
           .where('status', '=', 'succeeded')
           .orderBy('completed_at', 'desc')
           .orderBy('created_at', 'desc')
@@ -160,8 +188,8 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
           .selectFrom('form_responses')
           .select(['id', 'submitted_at', 'completion'])
           .where('form_id', '=', query.formId)
-          .where('submitted_at', '>=', query.from)
-          .where('submitted_at', '<=', query.to)
+          .where('submitted_at', '>=', rangeStart)
+          .where('submitted_at', '<', rangeEndExclusive)
           .execute(),
       ]);
 
@@ -183,7 +211,11 @@ export async function dashboardRoutes(app: FastifyInstance, deps: { db: Kysely<D
       ? new Date(latestSucceededSyncJob.completed_at ?? latestSucceededSyncJob.created_at)
       : null;
 
-    const buckets = buildBuckets(query.from, query.to, query.granularity);
+    const buckets = buildBuckets(
+      rangeStart,
+      new Date(rangeEndExclusive.getTime() - 1),
+      query.granularity,
+    );
     const series = buckets.map((bucket) => ({
       date: bucket.key,
       count: 0,

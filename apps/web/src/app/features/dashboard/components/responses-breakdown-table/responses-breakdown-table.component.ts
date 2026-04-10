@@ -11,4 +11,12 @@ import { QuestionSummary } from '../../../../shared/models/domain.models';
 })
 export class ResponsesBreakdownTableComponent {
   readonly questions = input.required<QuestionSummary[]>();
+
+  protected topDistributionLabel(question: QuestionSummary): string {
+    const topItem = question.distribution
+      .slice()
+      .sort((left, right) => right.value - left.value)[0];
+
+    return topItem?.label ?? 'N/A';
+  }
 }

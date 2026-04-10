@@ -13,7 +13,7 @@
         <tr>
           <td>{{ question.label }}</td>
           <td>{{ question.responses }}</td>
-          <td>{{ question.distribution[0]?.label ?? 'N/A' }}</td>
+          <td>{{ topDistributionLabel(question) }}</td>
         </tr>
       } @empty {
         <tr>

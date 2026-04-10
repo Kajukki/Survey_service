@@ -16,6 +16,10 @@ function buildConfig(): Config {
     DATABASE_POOL_MIN: 2,
     RABBITMQ_URL: 'amqp://localhost',
     RABBITMQ_PREFETCH: 10,
+    OUTBOX_POLL_INTERVAL_MS: 1000,
+    OUTBOX_BATCH_SIZE: 100,
+    OUTBOX_MAX_ATTEMPTS: 10,
+    OUTBOX_RETRY_BASE_MS: 1000,
     OIDC_ISSUER: 'https://issuer.example.com',
     OIDC_AUDIENCE: 'survey-service',
     OIDC_JWKS_URI: 'https://issuer.example.com/.well-known/jwks.json',
@@ -55,8 +59,24 @@ async function signAccessToken(config: Config, userId: string = 'user-one'): Pro
 }
 
 function createFakeDashboardDb(input: {
-  ownerForm: { id: string; title: string; response_count: number; updated_at: string } | null;
-  sharedForm: { id: string; title: string; response_count: number; updated_at: string } | null;
+  ownerForm:
+    | {
+        id: string;
+        connection_id: string;
+        title: string;
+        response_count: number;
+        updated_at: string;
+      }
+    | null;
+  sharedForm:
+    | {
+        id: string;
+        connection_id: string;
+        title: string;
+        response_count: number;
+        updated_at: string;
+      }
+    | null;
   shareAccess: boolean;
   jobsInRange: Array<{ id: string; status: string; trigger: string; created_at: string }>;
   latestSucceededSyncJob: { id: string; created_at: string; completed_at: string | null } | null;
@@ -209,10 +229,70 @@ describe('dashboard routes', () => {
     expect(response.statusCode).toBe(404);
   });
 
+  it('includes sync jobs and responses that occur on the selected to-date', async () => {
+    const fakeDb = createFakeDashboardDb({
+      ownerForm: {
+        id: '11111111-1111-4111-8111-111111111111',
+        connection_id: '22222222-2222-4222-8222-222222222222',
+        title: 'Customer Survey',
+        response_count: 4,
+        updated_at: '2026-04-10T00:00:00.000Z',
+      },
+      sharedForm: null,
+      shareAccess: false,
+      jobsInRange: [
+        {
+          id: 'job-3',
+          status: 'failed',
+          trigger: 'manual',
+          created_at: '2026-04-10T18:30:00.000Z',
+        },
+      ],
+      latestSucceededSyncJob: null,
+      shares: [],
+      responses: [
+        {
+          id: 'resp-3',
+          submitted_at: '2026-04-10T19:00:00.000Z',
+          completion: 'completed',
+        },
+      ],
+    });
+
+    const { app, config } = await buildApp(fakeDb.db);
+    const token = await signAccessToken(config, 'user-one');
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/dashboard?formId=11111111-1111-4111-8111-111111111111&from=2026-04-10&to=2026-04-10&granularity=day',
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    const payload = response.json();
+
+    const syncStatusQuestion = payload.questions.find(
+      (question: { id: string }) =>
+        question.id === '11111111-1111-4111-8111-111111111111:sync-status',
+    );
+
+    expect(payload.kpis[1].delta).toContain('0/1');
+    expect(payload.series).toHaveLength(1);
+    expect(payload.series[0].count).toBe(1);
+    expect(syncStatusQuestion.responses).toBe(1);
+    expect(
+      syncStatusQuestion.distribution.find((item: { label: string }) => item.label === 'Failed')
+        ?.value,
+    ).toBe(1);
+  });
+
   it('returns activity-focused dashboard payload for owner', async () => {
     const fakeDb = createFakeDashboardDb({
       ownerForm: {
         id: '11111111-1111-4111-8111-111111111111',
+        connection_id: '22222222-2222-4222-8222-222222222222',
         title: 'Customer Survey',
         response_count: 12,
         updated_at: '2026-04-09T00:00:00.000Z',
