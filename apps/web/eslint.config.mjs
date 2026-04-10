@@ -53,6 +53,6 @@ export default defineConfig([...baseConfig, globalIgnores([
     ),
 
     rules: {
-        "prettier/prettier": "error",
+        "prettier/prettier": "off",
     },
 }]);
