@@ -168,11 +168,37 @@
             </div>
           </div>
 
-          <ul class="text-list">
-            @for (resp of text.responses; track $index) {
-              <li class="text-item">{{ resp }}</li>
+          <div class="text-responses-section">
+            <button
+              class="toggle-responses-btn"
+              type="button"
+              (click)="toggleTextExpand(q.questionId)"
+            >
+              {{ expandedText().has(q.questionId) ? 'Hide' : 'Show' }} Responses ({{
+                text.responses.length
+              }})
+              <svg
+                class="expand-icon"
+                [class.rotated]="expandedText().has(q.questionId)"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+
+            @if (expandedText().has(q.questionId)) {
+              <ul class="text-list">
+                @for (resp of text.responses; track $index) {
+                  <li class="text-item">{{ resp }}</li>
+                }
+              </ul>
             }
-          </ul>
+          </div>
         }
       </section>
     }
