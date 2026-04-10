@@ -16,6 +16,12 @@ import {
   FormAnalyticsQuestionRecordV2,
   FormAnalyticsReportRecord,
 } from '../../../../shared/models/domain.models';
+import {
+  hasScaleChartData,
+  hasSelectChartData,
+  optionKeysSorted,
+  scaleDistributionEntriesSorted,
+} from './workspace-analytics-tab.utils';
 
 Chart.register(...registerables);
 
@@ -45,6 +51,10 @@ export class WorkspaceAnalyticsTabComponent {
   readonly selectCanvases = viewChildren<ElementRef<HTMLCanvasElement>>('selectCanvas');
 
   private charts: Chart[] = [];
+
+  readonly optionKeysSorted = optionKeysSorted;
+  readonly hasScaleChartData = hasScaleChartData;
+  readonly hasSelectChartData = hasSelectChartData;
 
   constructor() {
     effect(() => {
@@ -111,18 +121,6 @@ export class WorkspaceAnalyticsTabComponent {
     return Object.keys(input);
   }
 
-  optionKeysSorted(input: Record<string, number>): string[] {
-    return Object.entries(input)
-      .sort((a, b) => {
-        if (b[1] !== a[1]) {
-          return b[1] - a[1];
-        }
-
-        return a[0].localeCompare(b[0]);
-      })
-      .map(([label]) => label);
-  }
-
   toggleTextExpand(questionId: string): void {
     this.expandedText.update((current) => {
       const next = new Set(current);
@@ -158,24 +156,6 @@ export class WorkspaceAnalyticsTabComponent {
     };
   }
 
-  hasScaleChartData(question: FormAnalyticsQuestionRecordV2): boolean {
-    const distribution = question.scaleAnalytics?.distribution;
-    if (!distribution) {
-      return false;
-    }
-
-    return Object.values(distribution).some((value) => value > 0);
-  }
-
-  hasSelectChartData(question: FormAnalyticsQuestionRecordV2): boolean {
-    const optionCounts = question.selectAnalytics?.optionCounts;
-    if (!optionCounts) {
-      return false;
-    }
-
-    return Object.values(optionCounts).some((value) => value > 0);
-  }
-
   private createScaleChart(
     canvas: HTMLCanvasElement,
     question: FormAnalyticsQuestionRecordV2,
@@ -183,9 +163,7 @@ export class WorkspaceAnalyticsTabComponent {
     const scale = question.scaleAnalytics!;
     const colors = this.getChartColors();
 
-    const sortedEntries = Object.entries(scale.distribution).sort(
-      ([a], [b]) => Number(a) - Number(b),
-    );
+    const sortedEntries = scaleDistributionEntriesSorted(scale.distribution);
     const labels = sortedEntries.map(([label]) => label);
     const values = sortedEntries.map(([, count]) => count);
 
