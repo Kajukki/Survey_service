@@ -309,10 +309,7 @@ Get export job status and metadata for the authenticated requester.
 
 ### `GET /api/v1/exports/:id/download`
 Resolve a ready export download URL for the authenticated requester.
-- **Status:** `Implemented`
-- **200 OK**: Returns `{ id, download_url }` when export is ready.
-- **404 Not Found**: Export not found or not accessible to requester.
-- **409 Conflict**: Export exists but is not ready for download.
+**Implementation note:** The worker currently generates deterministic placeholder `download_url` values when an export job transitions to `ready`. Durable artifact storage and signed URL delivery are planned but not yet implemented; treat `download_url` as provisional in integration tests and maintainers should not rely on production-grade signed-URL semantics until the export storage work is completed.
 
 ---
 

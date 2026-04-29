@@ -91,7 +91,7 @@ Core API, worker, and frontend flows are implemented for local development and i
 Known in-progress areas:
 
 - Dashboard focuses on form health/activity metrics; detailed question analytics live under the forms workspace endpoints.
-- Export artifact storage and signed URL delivery hardening is still in progress.
+ - Export artifact storage and signed URL delivery hardening is still in progress (current worker generates deterministic placeholder `download_url` values when exports reach `ready`; treat `download_url` as provisional until durable artifact storage and signed-URL delivery are implemented).
 - Target enterprise IdP integration remains planned and is not the active runtime path.
 
 ## License

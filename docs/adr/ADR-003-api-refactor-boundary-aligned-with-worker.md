@@ -1,7 +1,7 @@
 # ADR-003: API Boundary Refactor Aligned With Worker Phases 1-5
 
 ## Status
-Proposed
+In progress
 
 ## Date
 2026-04-09
@@ -99,7 +99,45 @@ apps/api/src/
       connections.repository.ts
 ```
 
-## Implementation Plan
+## Implementation Status (2026-04-29)
+
+### Implemented
+- Transactional outbox for sync jobs is in place (jobs insert plus outbox publisher loop).
+- Unified sync command service is used by both sync entry points.
+- Worker persists analytics snapshots during sync processing.
+
+### Partially Implemented
+- Analytics reads: /forms/:id/analytics reads snapshots but other analytics endpoints compute from responses and fall back to live calculations.
+- Route extraction: jobs has repository/command service, but other modules still query DB directly from routes.
+
+### Not Implemented
+- Repositories and query services for forms, connections, exports, and dashboard.
+- Jobs query service and messaging port structure from the target layout.
+- Runbook updates for worker role scenarios.
+
+## Remaining Implementation Plan (2026-04-29)
+
+### Phase 1: Route and Service Extraction (No Behavior Change)
+1. Create repositories and query services for forms, connections, exports, and dashboard; migrate all SQL from routes.
+2. Move resolveAccessibleForm, form response/structure loaders, and mapping helpers into forms.repository and forms.query-service.
+3. Introduce jobs.query-service for list/get and remove the duplicate enqueue path in jobs.service.
+4. Keep route payloads stable and update unit/integration tests to target services.
+
+### Phase 2: Analytics Read Alignment
+1. Use analytics snapshots for overview/questions/segments queries; only fall back to response-based computation when snapshots are missing.
+2. Make fallback explicit with a warning log and metric, and document deprecation timing.
+3. Add tests covering snapshot-based analytics and fallback behavior.
+
+### Phase 3: Unified Sync Command Boundary Hardening
+1. Add contract parity tests for POST /jobs/sync and POST /forms/:id/sync.
+2. Centralize authorization error mapping in the command service to ensure consistent responses.
+
+### Phase 5: Observability and Runbooks
+1. Add command/query correlation IDs to structured logs and outbox events.
+2. Document API behavior when WORKER_ROLE is sync, export, or all in runbooks.
+3. Add dashboard/alerts for enqueue latency and outbox lag.
+
+## Original Implementation Plan (2026-04-09)
 
 ### Phase 1: Route and Service Extraction (No Behavior Change)
 1. Extract non-HTTP logic from `forms.route` into query services and repositories.
@@ -177,3 +215,6 @@ Exit Criteria:
 - [ ] Transactional outbox is implemented and tested.
 - [ ] Analytics reads align with worker snapshot ownership.
 - [ ] Per-phase checks and tests pass before merge.
+
+
+
