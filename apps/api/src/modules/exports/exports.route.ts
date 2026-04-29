@@ -4,28 +4,21 @@ import { z } from 'zod';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
 import { getPrincipal } from '../../server/principal';
+import { createExportsRepository } from './exports.repository';
+import { mapExportDetail, mapExportSummary } from './exports.query-service';
 
 const ExportIdParamsSchema = z.object({
   id: z.string().uuid(),
 });
 
 export async function exportsRoutes(app: FastifyInstance, deps: { db: Kysely<Database> }) {
+  const repository = createExportsRepository(deps.db);
   // GET /exports
   app.get('/exports', async (request, reply) => {
     const principal = getPrincipal(request);
-    const exportsList = (
-      await deps.db
-        .selectFrom('export_jobs')
-        .select(['id', 'format', 'status', 'requested_at'])
-        .where('requested_by', '=', principal.userId)
-        .orderBy('requested_at', 'desc')
-        .execute()
-    ).map((item) => ({
-      id: item.id,
-      format: item.format,
-      status: item.status,
-      requested_at: new Date(item.requested_at).toISOString(),
-    }));
+    const exportsList = (await repository.listExportsForOwner(principal.userId)).map(
+      mapExportSummary,
+    );
 
     return reply.send({
       success: true,
@@ -57,12 +50,7 @@ export async function exportsRoutes(app: FastifyInstance, deps: { db: Kysely<Dat
       });
     }
 
-    const exportJob = await deps.db
-      .selectFrom('export_jobs')
-      .select(['id', 'format', 'status', 'requested_at', 'download_url', 'error', 'completed_at'])
-      .where('id', '=', paramsResult.data.id)
-      .where('requested_by', '=', principal.userId)
-      .executeTakeFirst();
+    const exportJob = await repository.getExportDetail(principal.userId, paramsResult.data.id);
 
     if (!exportJob) {
       return reply.status(404).send({
@@ -79,17 +67,7 @@ export async function exportsRoutes(app: FastifyInstance, deps: { db: Kysely<Dat
 
     return reply.send({
       success: true,
-      data: {
-        id: exportJob.id,
-        format: exportJob.format,
-        status: exportJob.status,
-        requested_at: new Date(exportJob.requested_at).toISOString(),
-        download_url: exportJob.download_url,
-        error: exportJob.error,
-        completed_at: exportJob.completed_at
-          ? new Date(exportJob.completed_at).toISOString()
-          : null,
-      },
+      data: mapExportDetail(exportJob),
       meta: {
         requestId: request.id,
       },
@@ -116,12 +94,7 @@ export async function exportsRoutes(app: FastifyInstance, deps: { db: Kysely<Dat
       });
     }
 
-    const exportJob = await deps.db
-      .selectFrom('export_jobs')
-      .select(['id', 'status', 'download_url'])
-      .where('id', '=', paramsResult.data.id)
-      .where('requested_by', '=', principal.userId)
-      .executeTakeFirst();
+    const exportJob = await repository.getExportDownload(principal.userId, paramsResult.data.id);
 
     if (!exportJob) {
       return reply.status(404).send({
@@ -181,14 +154,8 @@ export async function exportsRoutes(app: FastifyInstance, deps: { db: Kysely<Dat
       });
     }
 
-    const ownedForm = await deps.db
-      .selectFrom('forms')
-      .select('id')
-      .where('id', '=', bodyResult.data.formId)
-      .where('owner_id', '=', principal.userId)
-      .executeTakeFirst();
-
-    if (!ownedForm) {
+    const ownsForm = await repository.isFormOwnedByUser(bodyResult.data.formId, principal.userId);
+    if (!ownsForm) {
       return reply.status(404).send({
         success: false,
         error: {
@@ -201,28 +168,15 @@ export async function exportsRoutes(app: FastifyInstance, deps: { db: Kysely<Dat
       });
     }
 
-    const exportJob = await deps.db
-      .insertInto('export_jobs')
-      .values({
-        requested_by: principal.userId,
-        form_id: bodyResult.data.formId,
-        format: bodyResult.data.format,
-        status: 'queued',
-        download_url: null,
-        error: null,
-        completed_at: null,
-      })
-      .returning(['id', 'format', 'status', 'requested_at'])
-      .executeTakeFirstOrThrow();
+    const exportJob = await repository.createExportJob({
+      requestedBy: principal.userId,
+      formId: bodyResult.data.formId,
+      format: bodyResult.data.format,
+    });
 
     return reply.status(202).send({
       success: true,
-      data: {
-        id: exportJob.id,
-        format: exportJob.format,
-        status: exportJob.status,
-        requested_at: new Date(exportJob.requested_at).toISOString(),
-      },
+      data: mapExportSummary(exportJob),
       meta: {
         requestId: request.id,
       },
