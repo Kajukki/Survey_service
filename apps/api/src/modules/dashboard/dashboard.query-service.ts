@@ -75,17 +75,6 @@ function findBucketIndex(
   return -1;
 }
 
-function selectAccessibleForm(
-  ownedForm: DashboardFormRow | null,
-  sharedForm: DashboardFormRow | null,
-): DashboardFormRow | null {
-  if (ownedForm) {
-    return ownedForm;
-  }
-
-  return sharedForm;
-}
-
 function countShares(shares: FormShareRow[]) {
   return {
     readShares: shares.filter((share) => share.permission_level === 'read').length,
