@@ -1,6 +1,5 @@
 import type {
   DashboardRepository,
-  DashboardFormRow,
   FormShareRow,
   FormResponseRow,
   LatestSyncJobRow,
