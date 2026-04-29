@@ -7,7 +7,7 @@ import type { Metrics } from '../../infra/metrics';
 import { createJobsRepository } from './jobs.repository';
 import { createJobsCommandService } from './jobs.command-service';
 import { createJobsSyncTargetQueryService } from './jobs-sync-target.query-service';
-import { createJobsService } from './jobs.service';
+import { createJobsQueryService } from './jobs.query-service';
 import { getPrincipal } from '../../server/principal';
 
 const JobsQuerySchema = z.object({
@@ -41,7 +41,7 @@ export async function jobsRoutes(
     logger: deps.logger,
     metrics: deps.metrics,
   });
-  const service = createJobsService({
+  const queryService = createJobsQueryService({
     repository,
   });
 
@@ -66,7 +66,7 @@ export async function jobsRoutes(
     }
 
     const query = queryResult.data;
-    const jobs = await service.listJobs(principal.userId, query.page, query.perPage);
+    const jobs = await queryService.listJobs(principal.userId, query.page, query.perPage);
 
     return reply.send({
       success: true,
@@ -136,7 +136,7 @@ export async function jobsRoutes(
   app.get('/jobs/:id', async (request, reply) => {
     const principal = getPrincipal(request);
     const { id } = request.params as { id: string };
-    const existing = await service.getJobById(principal.userId, id);
+    const existing = await queryService.getJobById(principal.userId, id);
 
     if (!existing) {
       return reply.status(404).send({

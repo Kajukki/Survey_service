@@ -5,31 +5,11 @@ import type { Config } from '../../server/config';
 import type { Kysely } from 'kysely';
 import type { Database } from '@survey-service/db';
 import { createProviderCredentialCrypto } from '../providers/google/credential-crypto';
+import { createConnectionsRepository } from './connections.repository';
+import { mapConnectionRow } from './connections.query-service';
 
 import { ZodTypeProvider } from 'fastify-type-provider-zod';
 
-interface DbConnectionRow {
-  id: string;
-  owner_id: string;
-  provider: 'google' | 'microsoft';
-  external_account_id: string;
-  name: string;
-  created_at: Date | string;
-  updated_at: Date | string;
-}
-
-function mapDbConnection(row: DbConnectionRow) {
-  return {
-    id: row.id,
-    type: row.provider,
-    name: row.name,
-    externalId: row.external_account_id,
-    ownerId: row.owner_id,
-    syncStatus: 'idle' as const,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
 
 function createTokenSetFromCredentialToken(input: {
   provider: 'google' | 'microsoft';
@@ -48,26 +28,14 @@ export async function connectionsRoutes(
   deps: { db: Kysely<Database>; config: Config },
 ) {
   const zApp = app.withTypeProvider<ZodTypeProvider>();
+  const repository = createConnectionsRepository(deps.db);
 
   // GET /connections
   zApp.get('/connections', async (request, reply) => {
     const principal = getPrincipal(request);
-
-    const connections = (
-      await deps.db
-        .selectFrom('provider_connections')
-        .select([
-          'id',
-          'owner_id',
-          'provider',
-          'external_account_id',
-          'name',
-          'created_at',
-          'updated_at',
-        ])
-        .where('owner_id', '=', principal.userId)
-        .execute()
-    ).map((row) => mapDbConnection(row as DbConnectionRow));
+    const connections = (await repository.listConnectionsForOwner(principal.userId)).map(
+      mapConnectionRow,
+    );
 
     return reply.send({
       success: true,
@@ -111,55 +79,27 @@ export async function connectionsRoutes(
         idToken: '',
       });
 
-      const created = await deps.db
-        .insertInto('provider_connections')
-        .values({
-          owner_id: principal.userId,
-          org_id: principal.orgId,
-          provider: payload.type,
-          external_account_id: payload.externalId,
-          name: payload.name,
-          encrypted_token_payload: encrypted.encryptedTokenPayload,
-          encrypted_token_iv: encrypted.encryptedTokenIv,
-          encrypted_token_tag: encrypted.encryptedTokenTag,
-          encrypted_token_key_version: encrypted.encryptedTokenKeyVersion,
-          access_token: null,
-          refresh_token: null,
-          id_token: null,
-          expires_at: new Date(tokenSet.expiresAt),
-          scope: null,
-          token_type: tokenSet.tokenType,
-        })
-        .onConflict((oc) =>
-          oc.columns(['provider', 'owner_id', 'external_account_id']).doUpdateSet({
-            name: payload.name,
-            encrypted_token_payload: encrypted.encryptedTokenPayload,
-            encrypted_token_iv: encrypted.encryptedTokenIv,
-            encrypted_token_tag: encrypted.encryptedTokenTag,
-            encrypted_token_key_version: encrypted.encryptedTokenKeyVersion,
-            access_token: null,
-            refresh_token: null,
-            id_token: null,
-            expires_at: new Date(tokenSet.expiresAt),
-            scope: null,
-            token_type: tokenSet.tokenType,
-            updated_at: new Date(),
-          }),
-        )
-        .returning([
-          'id',
-          'owner_id',
-          'provider',
-          'external_account_id',
-          'name',
-          'created_at',
-          'updated_at',
-        ])
-        .executeTakeFirstOrThrow();
+      const created = await repository.createConnection({
+        ownerId: principal.userId,
+        orgId: principal.orgId,
+        provider: payload.type,
+        externalAccountId: payload.externalId,
+        name: payload.name,
+        encryptedTokenPayload: encrypted.encryptedTokenPayload,
+        encryptedTokenIv: encrypted.encryptedTokenIv,
+        encryptedTokenTag: encrypted.encryptedTokenTag,
+        encryptedTokenKeyVersion: encrypted.encryptedTokenKeyVersion,
+        accessToken: null,
+        refreshToken: null,
+        idToken: null,
+        expiresAt: new Date(tokenSet.expiresAt),
+        scope: null,
+        tokenType: tokenSet.tokenType,
+      });
 
       return reply.status(201).send({
         success: true,
-        data: mapDbConnection(created as DbConnectionRow),
+        data: mapConnectionRow(created),
         meta: {
           requestId: request.id,
         },
@@ -184,14 +124,8 @@ export async function connectionsRoutes(
       });
     }
 
-    const existing = await deps.db
-      .deleteFrom('provider_connections')
-      .where('id', '=', id)
-      .where('owner_id', '=', principal.userId)
-      .returning('id')
-      .executeTakeFirst();
-
-    if (!existing) {
+    const existingId = await repository.deleteConnectionByOwner(id, principal.userId);
+    if (!existingId) {
       return reply.status(404).send({
         success: false,
         error: {
